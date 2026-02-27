@@ -42,23 +42,71 @@ body {
 
 .container h1 {
   font-size: 2rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
-.container .status {
+.status-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  min-width: 320px;
+}
+
+.status-card .status {
   font-size: 1.1rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
-.container .muted {
+.status-card .info {
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.status-card .label {
   color: var(--text-secondary);
+}
+
+.muted {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
   font-size: 0.9rem;
 }
 
-.connected {
+.badge.connected {
   color: var(--success);
+  background: rgba(34, 197, 94, 0.1);
 }
 
-.disconnected {
+.badge.disconnected {
   color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.badge.connecting\.\.\. {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.badge.waiting {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.badge.error,
+.badge.no\ session {
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.error-msg {
+  color: var(--error);
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
 }

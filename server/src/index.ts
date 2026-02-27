@@ -3,6 +3,9 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { agents, webClients } from './context.js';
+import { handleAgentConnection } from './ws-agent.js';
+import { handleWebConnection } from './ws-client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -12,30 +15,82 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Serve web/ directory as static files
 const webDir = join(__dirname, '../../web');
+
+// Serve static assets from web/
 app.use(express.static(webDir));
+
+// SPA fallback: /s/:sessionId → serve index.html (Vue router handles the rest)
+app.get('/s/:sessionId', (_req, res) => {
+  res.sendFile(join(webDir, 'index.html'));
+});
 
 // Health check
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    agents: agents.size,
+    webClients: webClients.size,
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// WebSocket connection handler (placeholder)
+// Session info API (web client fetches this to know agent details)
+app.get('/api/session/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  for (const [, agent] of agents) {
+    if (agent.sessionId === sessionId) {
+      res.json({
+        sessionId,
+        agent: {
+          name: agent.name,
+          workDir: agent.workDir,
+          connectedAt: agent.connectedAt,
+        },
+      });
+      return;
+    }
+  }
+  res.status(404).json({ error: 'Session not found' });
+});
+
+// WebSocket routing: agent or web client
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
-  const type = url.searchParams.get('type'); // 'agent' or 'web'
+  const type = url.searchParams.get('type');
 
-  console.log(`[WS] ${type || 'unknown'} connected from ${req.socket.remoteAddress}`);
-
-  ws.on('message', (data) => {
-    console.log(`[WS] Received: ${data.toString().slice(0, 200)}`);
-  });
-
-  ws.on('close', () => {
-    console.log(`[WS] ${type || 'unknown'} disconnected`);
-  });
+  if (type === 'agent') {
+    handleAgentConnection(ws, req);
+  } else if (type === 'web') {
+    handleWebConnection(ws, req);
+  } else {
+    ws.send(JSON.stringify({ type: 'error', message: 'Unknown type. Use ?type=agent or ?type=web' }));
+    ws.close();
+  }
 });
+
+// Heartbeat every 30s to detect dead connections
+setInterval(() => {
+  for (const [agentId, agent] of agents) {
+    if (!agent.isAlive) {
+      console.log(`[Heartbeat] Agent ${agent.name} timed out`);
+      agent.ws.terminate();
+      return;
+    }
+    agent.isAlive = false;
+    agent.ws.ping();
+  }
+
+  for (const [clientId, client] of webClients) {
+    if (!client.isAlive) {
+      client.ws.terminate();
+      webClients.delete(clientId);
+      return;
+    }
+    client.isAlive = false;
+    client.ws.ping();
+  }
+}, 30_000);
 
 server.listen(PORT, () => {
   console.log(`[AgentLink] Server listening on http://localhost:${PORT}`);
