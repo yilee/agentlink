@@ -17,6 +17,7 @@ const DEFAULTS: AgentConfig = {
 const CONFIG_DIR = join(homedir(), '.agentlink');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 const RUNTIME_FILE = join(CONFIG_DIR, 'agent.json');
+const LOG_DIR = join(CONFIG_DIR, 'logs');
 
 function ensureConfigDir(): void {
   if (!existsSync(CONFIG_DIR)) {
@@ -88,4 +89,11 @@ export function clearRuntimeState(): void {
   } catch {
     // file may not exist
   }
+}
+
+export function getLogDir(): string {
+  if (!existsSync(LOG_DIR)) {
+    mkdirSync(LOG_DIR, { recursive: true });
+  }
+  return LOG_DIR;
 }

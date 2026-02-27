@@ -377,7 +377,11 @@ node agent/dist/cli.js --help
 - [x] Session registration (unique session URL via base64url IDs)
 - [x] Auto-reconnect on connection loss (exponential backoff, 20 attempts)
 - [x] Web UI: chat interface (message list, input, send/receive, typing indicator)
-- [x] Agent: chat message handler (echo reply placeholder for Claude SDK)
+- [x] Claude SDK integration (spawn claude CLI, stream-json I/O, turn management)
+- [x] Runtime state tracking (`~/.agentlink/agent.json`, `agentlink status`)
+- [x] Process management (`agentlink stop`, `agentlink start --daemon`)
 - [ ] Message protocol (encrypted relay)
-- [ ] Claude SDK integration
-- [ ] Process management (PID file, daemonize)
+- [ ] Web UI: markdown rendering for assistant messages
+- [ ] Web UI: streaming / incremental text display
+- [ ] Session resume (persist claudeSessionId, `--resume` on reconnect)
+- [ ] Multi-turn conversation management

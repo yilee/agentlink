@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { resolveConfig, loadConfig, saveConfig, getConfigPath, loadRuntimeState, clearRuntimeState } from './config.js';
+import { resolveConfig, loadConfig, saveConfig, getConfigPath, loadRuntimeState, clearRuntimeState, getLogDir } from './config.js';
+import { spawn } from 'child_process';
+import { openSync } from 'fs';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
 
 const program = new Command();
 
@@ -15,8 +19,69 @@ program
   .option('-d, --dir <path>', 'Working directory')
   .option('-s, --server <url>', 'Relay server URL')
   .option('-n, --name <name>', 'Agent name')
+  .option('-D, --daemon', 'Run agent in the background as a daemon')
   .action(async (options) => {
     const config = resolveConfig(options);
+
+    if (options.daemon) {
+      // Check if agent is already running
+      const existing = loadRuntimeState();
+      if (existing) {
+        let alive = false;
+        try { process.kill(existing.pid, 0); alive = true; } catch {}
+        if (alive) {
+          console.log(`Agent is already running (PID ${existing.pid}).`);
+          console.log(`  URL: ${existing.sessionUrl}`);
+          console.log('Use "agentlink stop" to stop it first.');
+          process.exit(1);
+        }
+        // Stale state, clean up
+        clearRuntimeState();
+      }
+
+      // Spawn detached child process running daemon.js
+      const __filename = fileURLToPath(import.meta.url);
+      const daemonScript = join(__filename, '..', 'daemon.js');
+      const logDir = getLogDir();
+      const logFile = join(logDir, 'agent.log');
+      const errFile = join(logDir, 'agent.err');
+
+      const out = openSync(logFile, 'a');
+      const err = openSync(errFile, 'a');
+
+      const child = spawn(process.execPath, [daemonScript, JSON.stringify(config)], {
+        detached: true,
+        stdio: ['ignore', out, err],
+        cwd: config.dir,
+      });
+
+      child.unref();
+
+      // Wait briefly for the daemon to write its runtime state
+      const maxWait = 5000;
+      const interval = 300;
+      let waited = 0;
+      let state = null;
+      while (waited < maxWait) {
+        await new Promise(r => setTimeout(r, interval));
+        waited += interval;
+        state = loadRuntimeState();
+        if (state && state.pid !== process.pid) break;
+      }
+
+      if (state && state.pid !== process.pid) {
+        console.log(`Agent started in background (PID ${state.pid}).`);
+        console.log(`  URL: ${state.sessionUrl}`);
+        console.log(`  Log: ${logFile}`);
+      } else {
+        console.error('Agent may have failed to start. Check logs:');
+        console.error(`  ${errFile}`);
+        process.exit(1);
+      }
+      return;
+    }
+
+    // Foreground mode (default)
     const { start } = await import('./index.js');
     await start(config);
   });
@@ -25,7 +90,61 @@ program
   .command('stop')
   .description('Stop the running agent')
   .action(async () => {
-    console.log('[AgentLink] Stop command not yet implemented');
+    const state = loadRuntimeState();
+    if (!state) {
+      console.log('Agent is not running (no runtime state found).');
+      return;
+    }
+
+    // Check if the process is still alive
+    let alive = false;
+    try {
+      process.kill(state.pid, 0);
+      alive = true;
+    } catch {
+      // Process not found
+    }
+
+    if (!alive) {
+      console.log('Agent is not running (process already exited).');
+      clearRuntimeState();
+      return;
+    }
+
+    console.log(`Stopping agent (PID ${state.pid})...`);
+    try {
+      process.kill(state.pid, 'SIGTERM');
+    } catch (err) {
+      console.error(`Failed to stop agent: ${(err as Error).message}`);
+      process.exit(1);
+    }
+
+    // Wait for the process to exit (poll up to 5 seconds)
+    const maxWait = 5000;
+    const interval = 200;
+    let waited = 0;
+    while (waited < maxWait) {
+      await new Promise(r => setTimeout(r, interval));
+      waited += interval;
+      try {
+        process.kill(state.pid, 0);
+      } catch {
+        // Process exited
+        clearRuntimeState();
+        console.log('Agent stopped.');
+        return;
+      }
+    }
+
+    // Process didn't exit gracefully — force kill
+    console.log('Agent did not exit gracefully, force killing...');
+    try {
+      process.kill(state.pid, 'SIGKILL');
+    } catch {
+      // Already exited
+    }
+    clearRuntimeState();
+    console.log('Agent stopped.');
   });
 
 program
