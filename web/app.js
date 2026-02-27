@@ -203,7 +203,7 @@ const App = {
         </div>
       </div>
 
-      <template v-else>
+      <div v-else class="chat-area">
         <div class="message-list">
           <div v-if="messages.length === 0 && status === 'Connected'" class="empty-state">
             <p>Connected to <strong>{{ agentName }}</strong></p>
@@ -235,12 +235,12 @@ const App = {
               @keydown="handleKeydown"
               :disabled="status !== 'Connected'"
               placeholder="Send a message..."
-              rows="1"
+              rows="2"
             ></textarea>
             <button @click="sendMessage" :disabled="!canSend" class="send-btn">Send</button>
           </div>
         </div>
-      </template>
+      </div>
     </div>
   `
 };
