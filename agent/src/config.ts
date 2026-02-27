@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -16,6 +16,7 @@ const DEFAULTS: AgentConfig = {
 
 const CONFIG_DIR = join(homedir(), '.agentlink');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
+const RUNTIME_FILE = join(CONFIG_DIR, 'agent.json');
 
 function ensureConfigDir(): void {
   if (!existsSync(CONFIG_DIR)) {
@@ -53,4 +54,38 @@ export function resolveConfig(cliOptions: Partial<AgentConfig>): AgentConfig {
     dir: cliOptions.dir || fileConfig.dir || DEFAULTS.dir,
     name: cliOptions.name || fileConfig.name || DEFAULTS.name,
   };
+}
+
+// ── Runtime state (written by running agent, read by `status` command) ──
+
+export interface RuntimeState {
+  pid: number;
+  sessionId: string;
+  sessionUrl: string;
+  server: string;
+  name: string;
+  dir: string;
+  startedAt: string;
+}
+
+export function saveRuntimeState(state: RuntimeState): void {
+  ensureConfigDir();
+  writeFileSync(RUNTIME_FILE, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+}
+
+export function loadRuntimeState(): RuntimeState | null {
+  try {
+    const raw = readFileSync(RUNTIME_FILE, 'utf-8');
+    return JSON.parse(raw) as RuntimeState;
+  } catch {
+    return null;
+  }
+}
+
+export function clearRuntimeState(): void {
+  try {
+    unlinkSync(RUNTIME_FILE);
+  } catch {
+    // file may not exist
+  }
 }

@@ -1,4 +1,5 @@
 import type { AgentConfig } from './config.js';
+import { saveRuntimeState, clearRuntimeState } from './config.js';
 import { connect, disconnect } from './connection.js';
 
 export async function start(config: AgentConfig): Promise<void> {
@@ -14,13 +15,27 @@ export async function start(config: AgentConfig): Promise<void> {
 
   try {
     const sessionId = await connect(config);
+    const sessionUrl = `${httpBase}/s/${sessionId}`;
+
+    // Persist runtime state so `agentlink status` can read it
+    saveRuntimeState({
+      pid: process.pid,
+      sessionId,
+      sessionUrl,
+      server: config.server,
+      name: config.name,
+      dir: config.dir,
+      startedAt: new Date().toISOString(),
+    });
+
     console.log('');
-    console.log(`[AgentLink] Session URL: ${httpBase}/s/${sessionId}`);
+    console.log(`[AgentLink] Session URL: ${sessionUrl}`);
     console.log('[AgentLink] Waiting for connections...');
 
     // Keep process alive, handle graceful shutdown
     const shutdown = () => {
       console.log('\n[AgentLink] Shutting down...');
+      clearRuntimeState();
       disconnect();
       process.exit(0);
     };

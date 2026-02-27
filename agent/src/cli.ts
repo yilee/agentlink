@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { resolveConfig, loadConfig, saveConfig, getConfigPath } from './config.js';
+import { resolveConfig, loadConfig, saveConfig, getConfigPath, loadRuntimeState, clearRuntimeState } from './config.js';
 
 const program = new Command();
 
@@ -32,7 +32,35 @@ program
   .command('status')
   .description('Show current agent status')
   .action(async () => {
-    console.log('[AgentLink] Status command not yet implemented');
+    const state = loadRuntimeState();
+    if (!state) {
+      console.log('Agent is not running (no runtime state found).');
+      return;
+    }
+
+    // Check if the process is still alive
+    let alive = false;
+    try {
+      process.kill(state.pid, 0);
+      alive = true;
+    } catch {
+      // Process not found — stale state file
+    }
+
+    if (!alive) {
+      console.log('Agent is not running (process exited).');
+      clearRuntimeState();
+      return;
+    }
+
+    console.log('Agent is running.\n');
+    console.log(`  PID:        ${state.pid}`);
+    console.log(`  Name:       ${state.name}`);
+    console.log(`  Directory:  ${state.dir}`);
+    console.log(`  Server:     ${state.server}`);
+    console.log(`  Session:    ${state.sessionId}`);
+    console.log(`  URL:        ${state.sessionUrl}`);
+    console.log(`  Started:    ${state.startedAt}`);
   });
 
 const configCmd = program
