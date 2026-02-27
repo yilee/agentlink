@@ -1,4 +1,4 @@
-const { createApp, ref, onMounted, onUnmounted } = Vue;
+const { createApp, ref, nextTick, onMounted, onUnmounted, computed } = Vue;
 
 const App = {
   setup() {
@@ -7,12 +7,58 @@ const App = {
     const workDir = ref('');
     const sessionId = ref('');
     const error = ref('');
+    const messages = ref([]);
+    const inputText = ref('');
+    const isProcessing = ref(false);
     let ws = null;
+    let messageIdCounter = 0;
+
+    const canSend = computed(() =>
+      status.value === 'Connected' && inputText.value.trim() && !isProcessing.value
+    );
 
     // Extract session ID from URL path: /s/:sessionId
     function getSessionId() {
       const match = window.location.pathname.match(/^\/s\/([^/]+)/);
       return match ? match[1] : null;
+    }
+
+    function scrollToBottom() {
+      nextTick(() => {
+        const el = document.querySelector('.message-list');
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    }
+
+    function sendMessage() {
+      if (!canSend.value) return;
+
+      const text = inputText.value.trim();
+      inputText.value = '';
+
+      // Add user message to UI
+      messages.value.push({
+        id: ++messageIdCounter,
+        role: 'user',
+        content: text,
+        timestamp: new Date(),
+      });
+
+      isProcessing.value = true;
+      scrollToBottom();
+
+      // Send to server → agent
+      ws.send(JSON.stringify({
+        type: 'chat',
+        prompt: text,
+      }));
+    }
+
+    function handleKeydown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
     }
 
     function connect() {
@@ -50,9 +96,15 @@ const App = {
           agentName.value = '';
           workDir.value = '';
           error.value = 'Agent has disconnected.';
+          isProcessing.value = false;
         } else if (msg.type === 'error') {
           status.value = 'Error';
           error.value = msg.message;
+          isProcessing.value = false;
+        } else if (msg.type === 'claude_output') {
+          handleClaudeOutput(msg);
+        } else if (msg.type === 'turn_completed') {
+          isProcessing.value = false;
         }
       };
 
@@ -61,11 +113,51 @@ const App = {
           status.value = 'Disconnected';
           error.value = 'Connection to server lost.';
         }
+        isProcessing.value = false;
       };
 
       ws.onerror = () => {
         // onclose will follow
       };
+    }
+
+    function handleClaudeOutput(msg) {
+      const data = msg.data;
+      if (!data) return;
+
+      if (data.type === 'assistant' && data.message) {
+        // Extract text content from message
+        const textBlocks = (data.message.content || [])
+          .filter(b => b.type === 'text')
+          .map(b => b.text);
+        if (textBlocks.length > 0) {
+          messages.value.push({
+            id: ++messageIdCounter,
+            role: 'assistant',
+            content: textBlocks.join('\n'),
+            timestamp: new Date(),
+          });
+          scrollToBottom();
+        }
+      } else if (data.type === 'tool_use') {
+        // Show tool usage as a system message
+        messages.value.push({
+          id: ++messageIdCounter,
+          role: 'tool',
+          toolName: data.name || 'unknown',
+          toolInput: data.input ? JSON.stringify(data.input, null, 2) : '',
+          timestamp: new Date(),
+        });
+        scrollToBottom();
+      } else if (data.type === 'tool_result') {
+        // Append tool result to the last tool message if possible
+        const lastMsg = messages.value[messages.value.length - 1];
+        if (lastMsg && lastMsg.role === 'tool') {
+          lastMsg.toolOutput = typeof data.content === 'string'
+            ? data.content
+            : JSON.stringify(data.content, null, 2);
+        }
+      }
     }
 
     onMounted(() => {
@@ -76,27 +168,79 @@ const App = {
       if (ws) ws.close();
     });
 
-    return { status, agentName, workDir, sessionId, error };
+    return {
+      status, agentName, workDir, sessionId, error,
+      messages, inputText, isProcessing, canSend,
+      sendMessage, handleKeydown,
+    };
   },
   template: `
-    <div class="container">
-      <h1>AgentLink</h1>
-      <div class="status-card">
-        <p class="status">
-          <span class="label">Status:</span>
+    <div class="layout">
+      <header class="top-bar">
+        <h1>AgentLink</h1>
+        <div class="top-bar-info">
           <span :class="['badge', status.toLowerCase()]">{{ status }}</span>
-        </p>
-        <p v-if="agentName" class="info">
-          <span class="label">Agent:</span> {{ agentName }}
-        </p>
-        <p v-if="workDir" class="info">
-          <span class="label">Directory:</span> {{ workDir }}
-        </p>
-        <p v-if="sessionId" class="info muted">
-          <span class="label">Session:</span> {{ sessionId }}
-        </p>
-        <p v-if="error" class="error-msg">{{ error }}</p>
+          <span v-if="agentName" class="agent-label">{{ agentName }}</span>
+        </div>
+      </header>
+
+      <div v-if="status === 'No Session' || (status !== 'Connected' && status !== 'Connecting...' && messages.length === 0)" class="center-card">
+        <div class="status-card">
+          <p class="status">
+            <span class="label">Status:</span>
+            <span :class="['badge', status.toLowerCase()]">{{ status }}</span>
+          </p>
+          <p v-if="agentName" class="info">
+            <span class="label">Agent:</span> {{ agentName }}
+          </p>
+          <p v-if="workDir" class="info">
+            <span class="label">Directory:</span> {{ workDir }}
+          </p>
+          <p v-if="sessionId" class="info muted">
+            <span class="label">Session:</span> {{ sessionId }}
+          </p>
+          <p v-if="error" class="error-msg">{{ error }}</p>
+        </div>
       </div>
+
+      <template v-else>
+        <div class="message-list">
+          <div v-if="messages.length === 0 && status === 'Connected'" class="empty-state">
+            <p>Connected to <strong>{{ agentName }}</strong></p>
+            <p class="muted">Working directory: {{ workDir }}</p>
+            <p class="muted">Send a message to start.</p>
+          </div>
+          <div v-for="msg in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">
+            <div v-if="msg.role === 'user'" class="message-bubble user-bubble">
+              <div class="message-content">{{ msg.content }}</div>
+            </div>
+            <div v-else-if="msg.role === 'assistant'" class="message-bubble assistant-bubble">
+              <div class="message-content" v-html="msg.content"></div>
+            </div>
+            <div v-else-if="msg.role === 'tool'" class="message-bubble tool-bubble">
+              <div class="tool-header">Tool: {{ msg.toolName }}</div>
+              <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
+              <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
+            </div>
+          </div>
+          <div v-if="isProcessing" class="typing-indicator">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <div class="input-wrapper">
+            <textarea
+              v-model="inputText"
+              @keydown="handleKeydown"
+              :disabled="status !== 'Connected'"
+              placeholder="Send a message..."
+              rows="1"
+            ></textarea>
+            <button @click="sendMessage" :disabled="!canSend" class="send-btn">Send</button>
+          </div>
+        </div>
+      </template>
     </div>
   `
 };

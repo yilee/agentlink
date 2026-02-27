@@ -310,18 +310,22 @@ agentlink/
 │   ├── package.json          # Express 4.18 + ws 8.16
 │   ├── tsconfig.json         # extends ../tsconfig.base.json
 │   └── src/
-│       └── index.ts          # HTTP server + WebSocket + static file serving
+│       ├── index.ts          # HTTP server + WebSocket routing + static serving
+│       ├── context.ts        # Shared state (agents, webClients, sessionToAgent maps)
+│       ├── ws-agent.ts       # Agent WebSocket handler (registration, message forwarding)
+│       └── ws-client.ts      # Web client WebSocket handler (session binding, forwarding)
 ├── agent/
 │   ├── package.json          # Commander.js 12 + ws 8.16, bin: agentlink
 │   ├── tsconfig.json         # extends ../tsconfig.base.json
 │   └── src/
 │       ├── cli.ts            # CLI entry point (start/stop/status/config)
 │       ├── config.ts         # Config load/save/resolve (~/.agentlink/config.json)
-│       └── index.ts          # Agent core (start function)
+│       ├── connection.ts     # WebSocket client (connect, reconnect, message dispatch)
+│       └── index.ts          # Agent core (start function, graceful shutdown)
 └── web/
     ├── index.html            # Vue 3 SPA shell (CDN, no bundler)
-    ├── style.css             # Dark theme base CSS
-    └── app.js                # Vue 3 app entry
+    ├── style.css             # Dark theme + chat UI styles
+    └── app.js                # Vue 3 app (connection, chat messages, input)
 ```
 
 ### Config System
@@ -369,10 +373,11 @@ node agent/dist/cli.js --help
 - [x] Agent CLI: Commander.js with start/stop/status/config commands
 - [x] Agent config: persistent config file with priority resolution
 - [x] Web: Vue 3 minimal skeleton (dark theme)
-- [ ] WebSocket connection layer (agent ↔ server)
-- [ ] Session registration (unique session URL)
+- [x] WebSocket connection layer (agent ↔ server ↔ web client)
+- [x] Session registration (unique session URL via base64url IDs)
+- [x] Auto-reconnect on connection loss (exponential backoff, 20 attempts)
+- [x] Web UI: chat interface (message list, input, send/receive, typing indicator)
+- [x] Agent: chat message handler (echo reply placeholder for Claude SDK)
 - [ ] Message protocol (encrypted relay)
 - [ ] Claude SDK integration
-- [ ] Web UI: chat interface, message rendering
 - [ ] Process management (PID file, daemonize)
-- [ ] Auto-reconnect on connection loss

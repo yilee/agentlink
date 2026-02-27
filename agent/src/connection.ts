@@ -109,6 +109,31 @@ function scheduleReconnect(config: AgentConfig): void {
 }
 
 function handleServerMessage(msg: { type: string; [key: string]: unknown }): void {
-  // Will be expanded as we add features (chat, file ops, etc.)
-  console.log(`[AgentLink] Server message: ${msg.type}`);
+  switch (msg.type) {
+    case 'chat':
+      handleChat(msg as { type: string; prompt: string });
+      break;
+    default:
+      console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
+  }
+}
+
+function handleChat(msg: { prompt: string }): void {
+  console.log(`[AgentLink] Chat: ${msg.prompt}`);
+
+  // Placeholder: echo reply. Will be replaced by Claude SDK integration.
+  send({
+    type: 'claude_output',
+    data: {
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: `Echo: ${msg.prompt}` },
+        ],
+      },
+    },
+  });
+
+  send({ type: 'turn_completed' });
 }
