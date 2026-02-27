@@ -1,0 +1,28 @@
+{
+  "name": "agentlink",
+  "version": "0.1.0",
+  "description": "Local agent that proxies a working directory to a cloud web interface",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "server",
+    "agent"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:agent": "npm run dev --workspace=agent",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:agent\"",
+    "start:server": "npm run start --workspace=server",
+    "start:agent": "npm run start --workspace=agent",
+    "clean": "rimraf server/dist agent/dist"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
