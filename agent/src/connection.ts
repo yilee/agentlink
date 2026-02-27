@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import type { AgentConfig } from './config.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude } from './claude.js';
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 30_000;
@@ -10,6 +11,7 @@ interface ConnectionState {
   sessionId: string | null;
   reconnectAttempts: number;
   shouldReconnect: boolean;
+  workDir: string;
 }
 
 const state: ConnectionState = {
@@ -17,9 +19,15 @@ const state: ConnectionState = {
   sessionId: null,
   reconnectAttempts: 0,
   shouldReconnect: true,
+  workDir: process.cwd(),
 };
 
 export function connect(config: AgentConfig): Promise<string> {
+  state.workDir = config.dir;
+
+  // Wire up the Claude module to send messages through our WebSocket
+  setSendFn(send);
+
   return new Promise((resolve, reject) => {
     const wsUrl = buildWsUrl(config);
     console.log(`[AgentLink] Connecting to ${config.server}...`);
@@ -61,6 +69,7 @@ export function connect(config: AgentConfig): Promise<string> {
 
 export function disconnect(): void {
   state.shouldReconnect = false;
+  abortClaude();
   if (state.ws) {
     state.ws.close();
     state.ws = null;
@@ -111,29 +120,12 @@ function scheduleReconnect(config: AgentConfig): void {
 function handleServerMessage(msg: { type: string; [key: string]: unknown }): void {
   switch (msg.type) {
     case 'chat':
-      handleChat(msg as { type: string; prompt: string });
+      claudeHandleChat(
+        (msg as unknown as { prompt: string }).prompt,
+        state.workDir,
+      );
       break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
   }
-}
-
-function handleChat(msg: { prompt: string }): void {
-  console.log(`[AgentLink] Chat: ${msg.prompt}`);
-
-  // Placeholder: echo reply. Will be replaced by Claude SDK integration.
-  send({
-    type: 'claude_output',
-    data: {
-      type: 'assistant',
-      message: {
-        role: 'assistant',
-        content: [
-          { type: 'text', text: `Echo: ${msg.prompt}` },
-        ],
-      },
-    },
-  });
-
-  send({ type: 'turn_completed' });
 }

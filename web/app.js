@@ -126,10 +126,10 @@ const App = {
       if (!data) return;
 
       if (data.type === 'assistant' && data.message) {
-        // Extract text content from message
-        const textBlocks = (data.message.content || [])
-          .filter(b => b.type === 'text')
-          .map(b => b.text);
+        const content = data.message.content || [];
+
+        // Extract text blocks
+        const textBlocks = content.filter(b => b.type === 'text').map(b => b.text);
         if (textBlocks.length > 0) {
           messages.value.push({
             id: ++messageIdCounter,
@@ -139,24 +139,39 @@ const App = {
           });
           scrollToBottom();
         }
-      } else if (data.type === 'tool_use') {
-        // Show tool usage as a system message
-        messages.value.push({
-          id: ++messageIdCounter,
-          role: 'tool',
-          toolName: data.name || 'unknown',
-          toolInput: data.input ? JSON.stringify(data.input, null, 2) : '',
-          timestamp: new Date(),
-        });
-        scrollToBottom();
-      } else if (data.type === 'tool_result') {
-        // Append tool result to the last tool message if possible
-        const lastMsg = messages.value[messages.value.length - 1];
-        if (lastMsg && lastMsg.role === 'tool') {
-          lastMsg.toolOutput = typeof data.content === 'string'
-            ? data.content
-            : JSON.stringify(data.content, null, 2);
+
+        // Extract tool_use blocks (SDK embeds them inside assistant messages)
+        const toolBlocks = content.filter(b => b.type === 'tool_use');
+        for (const tool of toolBlocks) {
+          messages.value.push({
+            id: ++messageIdCounter,
+            role: 'tool',
+            toolId: tool.id,
+            toolName: tool.name || 'unknown',
+            toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
+            timestamp: new Date(),
+          });
         }
+        if (toolBlocks.length > 0) scrollToBottom();
+
+      } else if (data.type === 'user' && data.tool_use_result) {
+        // Tool result from SDK: find the matching tool message and attach output
+        const result = data.tool_use_result;
+        const results = Array.isArray(result) ? result : [result];
+        for (const r of results) {
+          const toolMsg = [...messages.value].reverse().find(
+            m => m.role === 'tool' && m.toolId === r.tool_use_id
+          );
+          if (toolMsg) {
+            toolMsg.toolOutput = typeof r.content === 'string'
+              ? r.content
+              : JSON.stringify(r.content, null, 2);
+          }
+        }
+        scrollToBottom();
+
+      } else if (data.type === 'result') {
+        // Turn result with usage info — ignore for now
       }
     }
 
