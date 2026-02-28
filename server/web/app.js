@@ -466,6 +466,8 @@ const App = {
         }
       }
       streamingMessageId = null;
+      // Trigger syntax highlighting for the finalized message content
+      nextTick(scheduleHighlight);
     }
 
     // ── Tool expand/collapse ──
@@ -939,18 +941,20 @@ const App = {
           loadingSessions.value = false;
         } else if (msg.type === 'conversation_resumed') {
           currentClaudeSessionId.value = msg.claudeSessionId;
-          // Load history messages into the chat
+          // Build history messages in a plain array first, then assign once
+          // to avoid triggering Vue reactivity on every individual push.
           if (msg.history && Array.isArray(msg.history)) {
+            const batch = [];
             for (const h of msg.history) {
               if (h.role === 'user') {
                 if (isContextSummary(h.content)) {
-                  messages.value.push({
+                  batch.push({
                     id: ++messageIdCounter, role: 'context-summary',
                     content: h.content, contextExpanded: false,
                     timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
                   });
                 } else {
-                  messages.value.push({
+                  batch.push({
                     id: ++messageIdCounter, role: 'user',
                     content: h.content, isCommandOutput: !!h.isCommandOutput,
                     timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
@@ -958,18 +962,18 @@ const App = {
                 }
               } else if (h.role === 'assistant') {
                 // Merge with previous assistant message if consecutive
-                const last = messages.value[messages.value.length - 1];
+                const last = batch[batch.length - 1];
                 if (last && last.role === 'assistant' && !last.isStreaming) {
                   last.content += '\n\n' + h.content;
                 } else {
-                  messages.value.push({
+                  batch.push({
                     id: ++messageIdCounter, role: 'assistant',
                     content: h.content, isStreaming: false,
                     timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
                   });
                 }
               } else if (h.role === 'tool') {
-                messages.value.push({
+                batch.push({
                   id: ++messageIdCounter, role: 'tool',
                   toolId: h.toolId || '', toolName: h.toolName || 'unknown',
                   toolInput: h.toolInput || '', hasResult: true,
@@ -977,7 +981,8 @@ const App = {
                 });
               }
             }
-            scrollToBottom();
+            // Single reactive assignment — triggers Vue reactivity only once
+            messages.value = batch;
           }
           loadingHistory.value = false;
           // Show ready-for-input hint
@@ -1083,7 +1088,11 @@ const App = {
         }
       }, 300);
     }
-    watch(messages, () => { nextTick(scheduleHighlight); }, { deep: true });
+    // Trigger highlight when messages are added/removed (shallow watch on length)
+    // Deep watch is too expensive for large conversations — it traverses every
+    // property of every message object on every mutation (including streaming ticks).
+    const messageCount = computed(() => messages.value.length);
+    watch(messageCount, () => { nextTick(scheduleHighlight); });
 
     onMounted(() => { connect(); });
     onUnmounted(() => { if (ws) ws.close(); });
