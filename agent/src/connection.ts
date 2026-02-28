@@ -19,6 +19,7 @@ interface ConnectionState {
   reconnectAttempts: number;
   shouldReconnect: boolean;
   workDir: string;
+  config: AgentConfig | null;
 }
 
 const state: ConnectionState = {
@@ -28,68 +29,92 @@ const state: ConnectionState = {
   reconnectAttempts: 0,
   shouldReconnect: true,
   workDir: process.cwd(),
+  config: null,
 };
 
+/**
+ * Connect to the relay server. Returns the sessionId on first successful registration.
+ * Reconnects are handled internally — this Promise only covers the initial connect.
+ */
 export function connect(config: AgentConfig): Promise<string> {
   state.workDir = config.dir;
+  state.config = config;
+  state.shouldReconnect = true;
 
   // Wire up the Claude module to send messages through our WebSocket
   setSendFn(send);
 
   return new Promise((resolve, reject) => {
-    const wsUrl = buildWsUrl(config);
-    console.log(`[AgentLink] Connecting to ${config.server}...`);
+    doConnect(config, (sessionId) => resolve(sessionId), (err) => reject(err));
+  });
+}
 
-    const ws = new WebSocket(wsUrl);
-    state.ws = ws;
+/**
+ * Internal connect. Calls onRegistered on success, onError on failure.
+ * For reconnects, both callbacks are no-ops.
+ */
+function doConnect(
+  config: AgentConfig,
+  onRegistered: (sessionId: string) => void,
+  onError: (err: Error) => void,
+): void {
+  const wsUrl = buildWsUrl(config);
+  console.log(`[AgentLink] Connecting to ${config.server}...`);
 
-    ws.on('open', () => {
-      state.reconnectAttempts = 0;
-      console.log('[AgentLink] Connected to server');
-    });
+  const ws = new WebSocket(wsUrl);
+  state.ws = ws;
+  let settled = false;
 
-    ws.on('message', async (data) => {
-      // The 'registered' message is always plain text (key exchange)
-      const raw = data.toString();
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        console.error('[AgentLink] Failed to parse message');
-        return;
+  ws.on('open', () => {
+    state.reconnectAttempts = 0;
+    console.log('[AgentLink] Connected to server');
+  });
+
+  ws.on('message', async (data) => {
+    const raw = data.toString();
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      console.error('[AgentLink] Failed to parse message');
+      return;
+    }
+
+    if (parsed.type === 'registered') {
+      state.sessionId = parsed.sessionId as string;
+      if (typeof parsed.sessionKey === 'string') {
+        state.sessionKey = decodeKey(parsed.sessionKey);
       }
-
-      if (parsed.type === 'registered') {
-        state.sessionId = parsed.sessionId as string;
-        if (typeof parsed.sessionKey === 'string') {
-          state.sessionKey = decodeKey(parsed.sessionKey);
-        }
-        resolve(parsed.sessionId as string);
+      if (!settled) {
+        settled = true;
+        onRegistered(state.sessionId);
+      }
+      console.log(`[AgentLink] Registered, session: ${state.sessionId}`);
+    } else {
+      const msg = await parseMessage(raw, state.sessionKey);
+      if (msg) {
+        handleServerMessage(msg as { type: string; [key: string]: unknown });
       } else {
-        // All subsequent messages may be encrypted
-        const msg = await parseMessage(raw, state.sessionKey);
-        if (msg) {
-          handleServerMessage(msg as { type: string; [key: string]: unknown });
-        } else {
-          console.error('[AgentLink] Failed to decrypt message');
-        }
+        console.error('[AgentLink] Failed to decrypt message');
       }
-    });
+    }
+  });
 
-    ws.on('close', () => {
-      console.log('[AgentLink] Disconnected from server');
-      if (state.shouldReconnect) {
-        scheduleReconnect(config);
-      }
-    });
+  ws.on('close', () => {
+    console.log('[AgentLink] Disconnected from server');
+    if (state.shouldReconnect) {
+      scheduleReconnect(config);
+    }
+  });
 
-    ws.on('error', (err) => {
-      console.error(`[AgentLink] WebSocket error: ${err.message}`);
-      // 'close' event will fire after this, triggering reconnect
-      if (!state.sessionId) {
-        reject(err);
-      }
-    });
+  ws.on('error', (err) => {
+    console.error(`[AgentLink] WebSocket error: ${err.message}`);
+    // On first connect, reject the promise so index.ts can handle the error.
+    // On reconnect, do nothing — close handler will schedule another attempt.
+    if (!settled && !state.sessionId) {
+      settled = true;
+      onError(err);
+    }
   });
 }
 
@@ -132,21 +157,21 @@ function scheduleReconnect(config: AgentConfig): void {
   }
 
   const delay = Math.min(
-    RECONNECT_BASE_DELAY * Math.pow(2, state.reconnectAttempts),
+    RECONNECT_BASE_DELAY * Math.pow(1.5, state.reconnectAttempts),
     RECONNECT_MAX_DELAY
   );
   state.reconnectAttempts++;
 
-  console.log(`[AgentLink] Reconnecting in ${delay / 1000}s (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+  console.log(`[AgentLink] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
 
-  setTimeout(async () => {
-    try {
-      state.sessionKey = null; // Reset key; new one will come from server
-      await connect(config);
+  setTimeout(() => {
+    state.sessionKey = null; // Reset key; new one will come from server
+    // On reconnect, callbacks are no-ops — we don't need to resolve/reject anything
+    doConnect(config, () => {
       console.log('[AgentLink] Reconnected successfully');
-    } catch {
-      // close handler will trigger another reconnect
-    }
+    }, () => {
+      // Connection failed, close handler will schedule next attempt
+    });
   }, delay);
 }
 
