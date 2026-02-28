@@ -269,18 +269,11 @@ const App = {
 
       currentClaudeSessionId.value = session.sessionId;
 
-      // Notify agent to prepare for resume
+      // Notify agent to prepare for resume (agent will respond with history)
       ws.send(JSON.stringify({
         type: 'resume_conversation',
         claudeSessionId: session.sessionId,
       }));
-
-      // Add a system message so the user knows which session was loaded
-      messages.value.push({
-        id: ++messageIdCounter, role: 'system',
-        content: `Resumed session: ${session.title}`,
-        timestamp: new Date(),
-      });
     }
 
     function newConversation() {
@@ -365,6 +358,31 @@ const App = {
           loadingSessions.value = false;
         } else if (msg.type === 'conversation_resumed') {
           currentClaudeSessionId.value = msg.claudeSessionId;
+          // Load history messages into the chat
+          if (msg.history && Array.isArray(msg.history)) {
+            for (const h of msg.history) {
+              if (h.role === 'user') {
+                messages.value.push({
+                  id: ++messageIdCounter, role: 'user',
+                  content: h.content, timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                });
+              } else if (h.role === 'assistant') {
+                messages.value.push({
+                  id: ++messageIdCounter, role: 'assistant',
+                  content: h.content, isStreaming: false,
+                  timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                });
+              } else if (h.role === 'tool') {
+                messages.value.push({
+                  id: ++messageIdCounter, role: 'tool',
+                  toolId: h.toolId || '', toolName: h.toolName || 'unknown',
+                  toolInput: h.toolInput || '', hasResult: true,
+                  expanded: false, timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                });
+              }
+            }
+            scrollToBottom();
+          }
         }
       };
 

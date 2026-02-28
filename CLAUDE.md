@@ -290,12 +290,14 @@ conversations.set(conversationId, {
 
 ### Differences from claude-web-chat
 
-- **TypeScript** instead of JavaScript
+- **TypeScript** instead of JavaScript (server + agent)
 - **Commander.js** for CLI instead of custom cli.js
 - **Single-agent** model (one local agent per session)
 - Cloud relay (`msclaude.ai`) is the server component
 - Simplified auth model (session URL is the access token)
 - No multi-user, no roles, no invitations
+- No encryption (plain WebSocket for now)
+- No database (stateless server, agent reads Claude's JSONL files directly)
 
 ### Current Project Structure
 
@@ -321,11 +323,141 @@ agentlink/
 │       ├── cli.ts            # CLI entry point (start/stop/status/config)
 │       ├── config.ts         # Config load/save/resolve (~/.agentlink/config.json)
 │       ├── connection.ts     # WebSocket client (connect, reconnect, message dispatch)
+│       ├── claude.ts         # Claude CLI subprocess (spawn, stream-json I/O, turn mgmt)
+│       ├── sdk.ts            # Claude command resolution + environment helpers
+│       ├── stream.ts         # AsyncIterable stream for bidirectional IPC
+│       ├── history.ts        # Read Claude session JSONL files (list + message history)
+│       ├── daemon.ts         # Daemon mode (detached process spawning)
 │       └── index.ts          # Agent core (start function, graceful shutdown)
 └── web/
-    ├── index.html            # Vue 3 SPA shell (CDN, no bundler)
-    ├── style.css             # Dark theme + chat UI styles
-    └── app.js                # Vue 3 app (connection, chat messages, input)
+    ├── index.html            # Vue 3 SPA shell (CDN: Vue 3, marked.js, highlight.js)
+    ├── style.css             # Dark theme + sidebar + chat + tool display styles
+    └── app.js                # Vue 3 app (sidebar, chat, streaming, session resume)
+```
+
+### Agent Source Files Reference
+
+| File | Purpose | Key exports |
+|------|---------|-------------|
+| `cli.ts` | Commander.js CLI entry point | `start`, `stop`, `status`, `config` subcommands |
+| `config.ts` | Persistent config (`~/.agentlink/config.json`) | `loadConfig()`, `saveConfig()`, `resolveConfig()` |
+| `connection.ts` | WebSocket client to server | `connect()`, `disconnect()`, `send()` + message router |
+| `claude.ts` | Claude CLI subprocess lifecycle | `handleChat()`, `abort()`, `cancelExecution()`, `setSendFn()` |
+| `sdk.ts` | Resolves `claude` command location | `resolveClaudeCommand()`, `getCleanEnv()`, `streamToStdin()` |
+| `stream.ts` | AsyncIterable\<T\> with enqueue/done | `Stream` class (used for stdin/stdout piping) |
+| `history.ts` | Reads `~/.claude/projects/` JSONL files | `listSessions()`, `readSessionMessages()` |
+| `daemon.ts` | Background process management | Spawns/kills detached agent process |
+| `index.ts` | Agent startup orchestration | `start()` (connects, writes runtime state, handles shutdown) |
+
+### Claude CLI Integration (agent/claude.ts)
+
+**Lifecycle:**
+1. First user message → `startQuery()` spawns `claude` subprocess
+2. Claude runs with `--output-format stream-json --input-format stream-json --verbose --permission-mode bypassPermissions`
+3. User messages enqueued into `Stream<ClaudeMessage>` → piped to stdin
+4. Stdout parsed as JSON lines by `readline` → forwarded to web client
+5. On `result` message → turn complete, process stays alive for next turn
+6. On `--resume <sessionId>` → resumes previous Claude session
+
+**Output processing:**
+- `assistant` messages: extracts text deltas (incremental) + tool_use blocks
+- `user` messages: tool_result forwarding
+- `system` messages: session ID capture, logged only
+- `result` message: turn complete signal
+
+**State:**
+```typescript
+interface ConversationState {
+  child: ChildProcess | null;
+  inputStream: Stream<ClaudeMessage> | null;
+  abortController: AbortController | null;
+  claudeSessionId: string | null;
+  workDir: string;
+  turnActive: boolean;
+  turnResultReceived: boolean;
+}
+```
+
+### Session History (agent/history.ts)
+
+**JSONL file location:** `~/.claude/projects/<folder>/<sessionId>.jsonl`
+
+**Path conversion:** `Q:\src\agentlink` → `Q--src-agentlink` (colons → `-`, slashes → `-`)
+
+**`listSessions(workDir)`** — Scans JSONL files, extracts metadata:
+- Title: `custom-title` > `summary` > first user message (truncated to 100 chars)
+- Returns `SessionInfo[]` sorted by lastModified descending
+
+**`readSessionMessages(workDir, sessionId)`** — Parses full message history:
+- User messages: extracts text from `message.content` (handles string + array formats)
+- Assistant messages: iterates content blocks → separate entries for text + tool_use
+- Returns `HistoryMessage[]` (flat list of user/assistant/tool entries)
+
+### WebSocket Message Protocol (AgentLink)
+
+**Server acts as a transparent relay** — all messages from web clients are forwarded to the bound agent, and vice versa. No server-side message processing.
+
+**Registration flow:**
+1. Agent connects: `ws://server/?type=agent&id=NAME&name=NAME&workDir=PATH`
+2. Server sends `{ type: 'registered', sessionId }` (base64url session ID)
+3. Web client connects: `ws://server/?type=web&sessionId=SID`
+4. Server sends `{ type: 'connected', agent: { name, workDir } }` to web client
+
+**Message types (Web → Agent):**
+
+| Type | Purpose | Key fields |
+|------|---------|------------|
+| `chat` | Send user prompt | `prompt`, `resumeSessionId?` |
+| `cancel_execution` | Stop current Claude turn | — |
+| `list_sessions` | Request session history list | — |
+| `resume_conversation` | Resume a historical session | `claudeSessionId` |
+
+**Message types (Agent → Web):**
+
+| Type | Purpose | Key fields |
+|------|---------|------------|
+| `claude_output` | Streaming output | `data: { type, delta?, tools? }` |
+| `turn_completed` | Claude turn finished | — |
+| `execution_cancelled` | Execution was stopped | — |
+| `sessions_list` | Historical sessions | `sessions[], workDir` |
+| `conversation_resumed` | Session resumed with history | `claudeSessionId, history[]` |
+
+**claude_output subtypes:**
+
+| data.type | Purpose |
+|-----------|---------|
+| `content_block_delta` | Incremental text (`data.delta`) |
+| `tool_use` | Tool invocations (`data.tools[]`) |
+| `user` / `tool_use_result` | Tool results (forwarded from Claude stdout) |
+| `result` | Turn complete (triggers `turn_completed`) |
+
+### Web UI Architecture
+
+**Layout:** Top bar + main body (sidebar + chat area)
+
+**Sidebar (left, 260px, toggleable):**
+- Working directory display
+- "New conversation" button
+- Session history list (from `list_sessions` / `sessions_list` protocol)
+- Click session → `resume_conversation` → loads history messages into chat
+
+**Chat area:**
+- Message list with roles: user, assistant (markdown), tool (collapsible), system
+- Markdown rendering: marked.js + highlight.js, code block copy buttons
+- Streaming text: progressive reveal (3 chars/tick, 12ms interval)
+- Tool display: icon + name + summary line, expandable input/output
+- Stop button during processing
+- Auto-resizing textarea input
+
+**CDN dependencies:** Vue 3, marked.js 12, highlight.js 11.9 (github-dark theme)
+
+**Key reactive state:**
+```javascript
+{
+  status, agentName, workDir, sessionId, error,
+  messages, inputText, isProcessing,
+  sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions,
+}
 ```
 
 ### Config System
@@ -370,18 +502,31 @@ node agent/dist/cli.js --help
 
 - [x] Monorepo skeleton (npm workspaces, TypeScript, build pipeline)
 - [x] Server: Express + WebSocket + static file serving + health endpoint
+- [x] Server: transparent message relay (web ↔ agent)
 - [x] Agent CLI: Commander.js with start/stop/status/config commands
 - [x] Agent config: persistent config file with priority resolution
-- [x] Web: Vue 3 minimal skeleton (dark theme)
 - [x] WebSocket connection layer (agent ↔ server ↔ web client)
 - [x] Session registration (unique session URL via base64url IDs)
 - [x] Auto-reconnect on connection loss (exponential backoff, 20 attempts)
-- [x] Web UI: chat interface (message list, input, send/receive, typing indicator)
 - [x] Claude SDK integration (spawn claude CLI, stream-json I/O, turn management)
 - [x] Runtime state tracking (`~/.agentlink/agent.json`, `agentlink status`)
 - [x] Process management (`agentlink stop`, `agentlink start --daemon`)
+- [x] Web UI: chat interface (message list, input, send/receive, typing indicator)
+- [x] Web UI: markdown rendering (marked.js + highlight.js, code block copy)
+- [x] Web UI: streaming text display (progressive character reveal)
+- [x] Web UI: tool use display (collapsible blocks with icon, name, input/output)
+- [x] Web UI: stop/cancel button during processing
+- [x] Web UI: sidebar with working directory display
+- [x] Web UI: session history list (reads Claude's JSONL files)
+- [x] Session resume (load history from JSONL, `--resume` flag to Claude CLI)
+- [x] Multi-turn conversation management (persistent Claude process across turns)
 - [ ] Message protocol (encrypted relay)
-- [ ] Web UI: markdown rendering for assistant messages
-- [ ] Web UI: streaming / incremental text display
-- [ ] Session resume (persist claudeSessionId, `--resume` on reconnect)
-- [ ] Multi-turn conversation management
+- [ ] Web UI: file upload
+- [ ] Web UI: workbench panel (terminal, files, git)
+- [ ] Agent: terminal (PTY) support
+- [ ] Agent: file/git operations
+- [ ] Agent: port forwarding / proxy
+
+### Development Workflow
+
+- **Commit after each milestone** — every completed feature, bug fix, or logical unit of work should be committed immediately. Do not batch unrelated changes into a single commit.

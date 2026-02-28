@@ -16,6 +16,15 @@ export interface SessionInfo {
   lastModified: number;
 }
 
+export interface HistoryMessage {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  toolName?: string;
+  toolInput?: string;
+  toolId?: string;
+  timestamp?: string;
+}
+
 function getClaudeProjectsDir(): string {
   return join(homedir(), '.claude', 'projects');
 }
@@ -108,4 +117,63 @@ export function listSessions(workDir: string): SessionInfo[] {
 
   sessions.sort((a, b) => b.lastModified - a.lastModified);
   return sessions;
+}
+
+/**
+ * Read the message history from a session's JSONL file.
+ * Returns user messages and assistant text/tool_use blocks as a flat list.
+ */
+export function readSessionMessages(workDir: string, sessionId: string): HistoryMessage[] {
+  const projectsDir = getClaudeProjectsDir();
+  const projectFolder = pathToProjectFolder(workDir);
+  const filePath = join(projectsDir, projectFolder, `${sessionId}.jsonl`);
+
+  if (!existsSync(filePath)) {
+    return [];
+  }
+
+  const result: HistoryMessage[] = [];
+
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.trim());
+
+    for (const line of lines) {
+      try {
+        const data = JSON.parse(line);
+        const ts = data.timestamp || undefined;
+
+        if (data.type === 'user' && data.message?.content) {
+          const text = typeof data.message.content === 'string'
+            ? data.message.content
+            : data.message.content
+                .filter((b: { type: string }) => b.type === 'text')
+                .map((b: { text: string }) => b.text || '')
+                .join('');
+          if (text.trim()) {
+            result.push({ role: 'user', content: text, timestamp: ts });
+          }
+        }
+
+        if (data.type === 'assistant' && data.message?.content && Array.isArray(data.message.content)) {
+          for (const block of data.message.content) {
+            if (block.type === 'text' && block.text) {
+              result.push({ role: 'assistant', content: block.text, timestamp: ts });
+            } else if (block.type === 'tool_use') {
+              result.push({
+                role: 'tool',
+                content: '',
+                toolName: block.name,
+                toolInput: JSON.stringify(block.input || {}),
+                toolId: block.id,
+                timestamp: ts,
+              });
+            }
+          }
+        }
+      } catch { /* skip malformed lines */ }
+    }
+  } catch { /* skip unreadable files */ }
+
+  return result;
 }
