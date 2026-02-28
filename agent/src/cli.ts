@@ -5,6 +5,7 @@ import {
   loadRuntimeState, clearRuntimeState, getLogDir,
   killProcess, isProcessAlive,
 } from './config.js';
+import { serviceInstall, serviceUninstall } from './service.js';
 import { spawn } from 'child_process';
 import { openSync } from 'fs';
 import { join, dirname, resolve } from 'path';
@@ -202,6 +203,34 @@ configCmd
 // Default: show config list if no subcommand
 configCmd.action(() => {
   configCmd.commands.find(c => c.name() === 'list')?.parse([], { from: 'user' });
+});
+
+// ── Service management ──
+
+const serviceCmd = program
+  .command('service')
+  .description('Manage auto-start service');
+
+serviceCmd
+  .command('install')
+  .description('Register agent as an auto-start service and start it now')
+  .option('-d, --dir <path>', 'Working directory')
+  .option('-s, --server <url>', 'Relay server URL')
+  .option('-n, --name <name>', 'Agent name')
+  .action((options) => {
+    const config = resolveConfig(options);
+    serviceInstall(config);
+  });
+
+serviceCmd
+  .command('uninstall')
+  .description('Remove auto-start service and stop the agent')
+  .action(() => {
+    serviceUninstall();
+  });
+
+serviceCmd.action(() => {
+  serviceCmd.help();
 });
 
 program.parse();

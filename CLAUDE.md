@@ -323,7 +323,7 @@ agentlink/
 │   ├── package.json          # Commander.js 12 + ws 8.16, bin: agentlink-client
 │   ├── tsconfig.json         # extends ../tsconfig.base.json
 │   └── src/
-│       ├── cli.ts            # Client CLI entry point (start/stop/status/config)
+│       ├── cli.ts            # Client CLI entry point (start/stop/status/config/service)
 │       ├── config.ts         # Config load/save/resolve (~/.agentlink/config.json)
 │       ├── connection.ts     # WebSocket client (connect, reconnect, message dispatch)
 │       ├── claude.ts         # Claude CLI subprocess (spawn, stream-json I/O, turn mgmt)
@@ -332,6 +332,7 @@ agentlink/
 │       ├── history.ts        # Read Claude session JSONL files (list + message history)
 │       ├── daemon.ts         # Daemon mode (detached process spawning)
 │       ├── encryption.ts     # TweetNaCl encryption (XSalsa20-Poly1305 secretbox)
+│       ├── service.ts        # OS auto-start service (systemd/launchd/Startup folder)
 │       └── index.ts          # Agent core (start function, graceful shutdown)
 └── web/
     ├── index.html            # Vue 3 SPA shell (CDN: Vue 3, marked.js, highlight.js)
@@ -344,7 +345,7 @@ agentlink/
 
 | File | Purpose | Key exports |
 |------|---------|-------------|
-| `cli.ts` | Commander.js CLI entry point | `start`, `stop`, `status`, `config` subcommands |
+| `cli.ts` | Commander.js CLI entry point | `start`, `stop`, `status`, `config`, `service` subcommands |
 | `config.ts` | Persistent config (`~/.agentlink/config.json`) | `loadConfig()`, `saveConfig()`, `resolveConfig()`, `killProcess()`, `isProcessAlive()` |
 | `connection.ts` | WebSocket client to server | `connect()`, `disconnect()`, `send()` + message router |
 | `claude.ts` | Claude CLI subprocess lifecycle | `handleChat()`, `abort()`, `cancelExecution()`, `setSendFn()`, `handleUserAnswer()` |
@@ -352,6 +353,7 @@ agentlink/
 | `stream.ts` | AsyncIterable\<T\> with enqueue/done | `Stream` class (used for stdin/stdout piping) |
 | `history.ts` | Reads `~/.claude/projects/` JSONL files | `listSessions()`, `readSessionMessages()` |
 | `daemon.ts` | Background process management | Spawns/kills detached agent process |
+| `service.ts` | OS auto-start service management | `serviceInstall()`, `serviceUninstall()` (systemd/launchd/Startup folder) |
 | `encryption.ts` | TweetNaCl encryption | `encrypt()`, `decrypt()`, `parseMessage()`, `encryptAndSend()` |
 | `index.ts` | Agent startup orchestration | `start()` (connects, writes runtime state, handles shutdown) |
 
@@ -570,6 +572,12 @@ agentlink-client status                               # show agent status
 agentlink-client config list                          # show config
 agentlink-client config set server ws://localhost:3456
 agentlink-client config get server
+
+# Service management (auto-start on boot)
+agentlink-client service install                       # register + start now
+agentlink-client service install --name MyAgent        # with custom config
+agentlink-client service uninstall                     # remove + stop
+
 agentlink-client --help
 ```
 
@@ -608,6 +616,7 @@ agentlink-client --help
 - [x] Web UI: change working directory (folder picker modal, filesystem browsing)
 - [x] Message protocol (encrypted relay — TweetNaCl XSalsa20-Poly1305)
 - [x] Web UI: file upload (paperclip button, drag-drop, paste; base64 over WebSocket; images inline, non-images saved to `~/.agentlink/tmp-attachments/`)
+- [x] Auto-start service (`service install/uninstall` — systemd on Linux, launchd on macOS, Startup folder on Windows)
 - [ ] Web UI: workbench panel (terminal, files, git)
 - [ ] Agent: terminal (PTY) support
 - [ ] Agent: file/git operations
