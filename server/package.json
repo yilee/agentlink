@@ -1,11 +1,14 @@
 {
   "name": "@agent-link/server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AgentLink relay server",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist", "web"],
+  "files": [
+    "dist",
+    "web"
+  ],
   "bin": {
     "agentlink-server": "dist/cli.js"
   },
