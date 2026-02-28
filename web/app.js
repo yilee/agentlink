@@ -96,6 +96,7 @@ const App = {
     const historySessions = ref([]);
     const currentClaudeSessionId = ref(null);
     const loadingSessions = ref(false);
+    const loadingHistory = ref(false);
 
     let ws = null;
     let messageIdCounter = 0;
@@ -268,6 +269,7 @@ const App = {
       if (revealTimer !== null) { clearTimeout(revealTimer); revealTimer = null; }
 
       currentClaudeSessionId.value = session.sessionId;
+      loadingHistory.value = true;
 
       // Notify agent to prepare for resume (agent will respond with history)
       ws.send(JSON.stringify({
@@ -367,11 +369,17 @@ const App = {
                   content: h.content, timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
                 });
               } else if (h.role === 'assistant') {
-                messages.value.push({
-                  id: ++messageIdCounter, role: 'assistant',
-                  content: h.content, isStreaming: false,
-                  timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
-                });
+                // Merge with previous assistant message if consecutive
+                const last = messages.value[messages.value.length - 1];
+                if (last && last.role === 'assistant' && !last.isStreaming) {
+                  last.content += '\n\n' + h.content;
+                } else {
+                  messages.value.push({
+                    id: ++messageIdCounter, role: 'assistant',
+                    content: h.content, isStreaming: false,
+                    timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                  });
+                }
               } else if (h.role === 'tool') {
                 messages.value.push({
                   id: ++messageIdCounter, role: 'tool',
@@ -383,6 +391,14 @@ const App = {
             }
             scrollToBottom();
           }
+          loadingHistory.value = false;
+          // Show ready-for-input hint
+          messages.value.push({
+            id: ++messageIdCounter, role: 'system',
+            content: 'Session restored. You can continue the conversation.',
+            timestamp: new Date(),
+          });
+          scrollToBottom();
         }
       };
 
@@ -467,7 +483,7 @@ const App = {
       getRenderedContent, copyMessage, toggleTool,
       getToolIcon, getToolSummary, autoResize,
       // Sidebar
-      sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions,
+      sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
       toggleSidebar, resumeSession, newConversation, requestSessionList,
       formatRelativeTime,
     };
@@ -546,10 +562,15 @@ const App = {
         <!-- Chat area -->
         <div class="chat-area">
           <div class="message-list">
-            <div v-if="messages.length === 0 && status === 'Connected'" class="empty-state">
+            <div v-if="messages.length === 0 && status === 'Connected' && !loadingHistory" class="empty-state">
               <p>Connected to <strong>{{ agentName }}</strong></p>
               <p class="muted">Working directory: {{ workDir }}</p>
               <p class="muted">Send a message to start.</p>
+            </div>
+
+            <div v-if="loadingHistory" class="history-loading">
+              <div class="history-loading-spinner"></div>
+              <span>Loading conversation history...</span>
             </div>
 
             <div v-for="msg in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">

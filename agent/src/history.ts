@@ -156,19 +156,31 @@ export function readSessionMessages(workDir: string, sessionId: string): History
         }
 
         if (data.type === 'assistant' && data.message?.content && Array.isArray(data.message.content)) {
+          // Merge all text blocks within this assistant message into one entry
+          const textParts: string[] = [];
+          const toolBlocks: typeof data.message.content = [];
+
           for (const block of data.message.content) {
             if (block.type === 'text' && block.text) {
-              result.push({ role: 'assistant', content: block.text, timestamp: ts });
+              textParts.push(block.text);
             } else if (block.type === 'tool_use') {
-              result.push({
-                role: 'tool',
-                content: '',
-                toolName: block.name,
-                toolInput: JSON.stringify(block.input || {}),
-                toolId: block.id,
-                timestamp: ts,
-              });
+              toolBlocks.push(block);
             }
+          }
+
+          if (textParts.length > 0) {
+            result.push({ role: 'assistant', content: textParts.join('\n\n'), timestamp: ts });
+          }
+
+          for (const tool of toolBlocks) {
+            result.push({
+              role: 'tool',
+              content: '',
+              toolName: tool.name,
+              toolInput: JSON.stringify(tool.input || {}),
+              toolId: tool.id,
+              timestamp: ts,
+            });
           }
         }
       } catch { /* skip malformed lines */ }

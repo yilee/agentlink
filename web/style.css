@@ -666,6 +666,26 @@ body {
   padding: 0.25rem 0;
 }
 
+/* ── History loading indicator ── */
+.history-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.history-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 /* ── Typing indicator ── */
 .typing-indicator {
   display: flex;
