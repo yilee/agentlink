@@ -588,6 +588,21 @@ agentlink-client service uninstall                     # remove + stop
 agentlink-client --help
 ```
 
+**Local dev build** (run from source instead of npm-installed global):
+```bash
+# Server (local build)
+node Q:/src/agentlink/server/dist/cli.js start --daemon
+node Q:/src/agentlink/server/dist/cli.js stop
+node Q:/src/agentlink/server/dist/cli.js status
+
+# Agent (local build, pointing to local server)
+node Q:/src/agentlink/agent/dist/cli.js start --daemon --server ws://localhost:3456
+node Q:/src/agentlink/agent/dist/cli.js stop
+node Q:/src/agentlink/agent/dist/cli.js status
+```
+
+> **Note:** Both npm-global and local-dev commands share the same `~/.agentlink/` runtime state files (`server.json`, `agent.json`). Only run one set at a time — not both simultaneously. The `agentlink-server`/`agentlink-client` commands use the npm-installed version; the `node .../dist/cli.js` commands use the local build.
+
 ### Publishing to npm
 
 **Prerequisites:**

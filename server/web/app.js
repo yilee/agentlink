@@ -407,7 +407,7 @@ const App = {
 
     // ── Rendered markdown for assistant messages ──
     function getRenderedContent(msg) {
-      if (msg.role !== 'assistant') return msg.content;
+      if (msg.role !== 'assistant' && !msg.isCommandOutput) return msg.content;
       return renderMarkdown(msg.content);
     }
 
