@@ -767,6 +767,69 @@ body {
   color: var(--text-primary);
 }
 
+/* ── Edit tool diff view ── */
+.tool-diff {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  margin-top: 0.25rem;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+}
+
+.diff-file {
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+  font-weight: 500;
+}
+
+.diff-replace-all {
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.diff-lines {
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.diff-removed, .diff-added {
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 0 0.4rem;
+}
+
+.diff-removed {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.diff-added {
+  background: rgba(63, 185, 80, 0.15);
+  color: #3fb950;
+}
+
+.diff-sign {
+  display: inline-block;
+  width: 1.2em;
+  user-select: none;
+  opacity: 0.7;
+}
+
+[data-theme="light"] .diff-removed {
+  background: rgba(208, 46, 38, 0.12);
+  color: #b31d28;
+}
+
+[data-theme="light"] .diff-added {
+  background: rgba(34, 134, 58, 0.12);
+  color: #22863a;
+}
+
 /* ── Context summary (collapsible continuation notice) ── */
 .context-summary-wrapper {
   margin: 0.75rem 0;

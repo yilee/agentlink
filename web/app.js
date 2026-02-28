@@ -1,4 +1,5 @@
 const { createApp, ref, nextTick, onMounted, onUnmounted, computed, watch } = Vue;
+import { encrypt, decrypt, isEncrypted, decodeKey } from './encryption.js';
 
 // ── Markdown setup ──────────────────────────────────────────────────────────
 if (typeof marked !== 'undefined') {
@@ -110,6 +111,7 @@ const App = {
     const sidebarOpen = ref(true);
     const historySessions = ref([]);
     const currentClaudeSessionId = ref(null);
+    const needsResume = ref(false);
     const loadingSessions = ref(false);
     const loadingHistory = ref(false);
 
@@ -254,8 +256,19 @@ const App = {
     applyTheme();
 
     let ws = null;
+    let sessionKey = null;
     let messageIdCounter = 0;
     let streamingMessageId = null;
+
+    function wsSend(msg) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (sessionKey) {
+        const encrypted = encrypt(msg, sessionKey);
+        ws.send(JSON.stringify(encrypted));
+      } else {
+        ws.send(JSON.stringify(msg));
+      }
+    }
 
     // Progressive text reveal state
     let pendingText = '';
@@ -363,8 +376,9 @@ const App = {
 
       // Build payload
       const payload = { type: 'chat', prompt: text || '(see attached files)' };
-      if (currentClaudeSessionId.value && messages.value.filter(m => m.role === 'user').length === 1) {
+      if (needsResume.value && currentClaudeSessionId.value) {
         payload.resumeSessionId = currentClaudeSessionId.value;
+        needsResume.value = false;
       }
       if (files.length > 0) {
         payload.files = files.map(f => ({
@@ -373,7 +387,7 @@ const App = {
           data: f.data,
         }));
       }
-      ws.send(JSON.stringify(payload));
+      wsSend(payload);
 
       // Clear attachments (don't revoke thumbUrls — they're referenced by the message now)
       attachments.value = [];
@@ -381,7 +395,7 @@ const App = {
 
     function cancelExecution() {
       if (!ws || !isProcessing.value) return;
-      ws.send(JSON.stringify({ type: 'cancel_execution' }));
+      wsSend({ type: 'cancel_execution' });
     }
 
     function handleKeydown(e) {
@@ -453,6 +467,34 @@ const App = {
       return '';
     }
 
+    function isEditTool(msg) {
+      return msg.role === 'tool' && msg.toolName === 'Edit' && msg.toolInput;
+    }
+
+    function getEditDiffHtml(msg) {
+      try {
+        const obj = JSON.parse(msg.toolInput);
+        if (!obj.old_string && !obj.new_string) return null;
+        const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const filePath = obj.file_path || '';
+        const oldLines = (obj.old_string || '').split('\n');
+        const newLines = (obj.new_string || '').split('\n');
+        let html = '';
+        if (filePath) {
+          html += '<div class="diff-file">' + esc(filePath) + (obj.replace_all ? ' <span class="diff-replace-all">(replace all)</span>' : '') + '</div>';
+        }
+        html += '<div class="diff-lines">';
+        for (const line of oldLines) {
+          html += '<div class="diff-removed">' + '<span class="diff-sign">-</span>' + esc(line) + '</div>';
+        }
+        for (const line of newLines) {
+          html += '<div class="diff-added">' + '<span class="diff-sign">+</span>' + esc(line) + '</div>';
+        }
+        html += '</div>';
+        return html;
+      } catch { return null; }
+    }
+
     // ── AskUserQuestion interaction ──
     function selectQuestionOption(msg, qIndex, optLabel) {
       if (msg.answered) return;
@@ -492,7 +534,7 @@ const App = {
         }
       }
       msg.answered = true;
-      ws.send(JSON.stringify({ type: 'ask_user_answer', requestId: msg.requestId, answers }));
+      wsSend({ type: 'ask_user_answer', requestId: msg.requestId, answers });
     }
 
     function hasQuestionAnswer(msg) {
@@ -525,7 +567,7 @@ const App = {
     function requestSessionList() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       loadingSessions.value = true;
-      ws.send(JSON.stringify({ type: 'list_sessions' }));
+      wsSend({ type: 'list_sessions' });
     }
 
     function resumeSession(session) {
@@ -538,13 +580,14 @@ const App = {
       if (revealTimer !== null) { clearTimeout(revealTimer); revealTimer = null; }
 
       currentClaudeSessionId.value = session.sessionId;
+      needsResume.value = true;
       loadingHistory.value = true;
 
       // Notify agent to prepare for resume (agent will respond with history)
-      ws.send(JSON.stringify({
+      wsSend({
         type: 'resume_conversation',
         claudeSessionId: session.sessionId,
-      }));
+      });
     }
 
     function newConversation() {
@@ -554,7 +597,7 @@ const App = {
       streamingMessageId = null;
       pendingText = '';
       currentClaudeSessionId.value = null;
-      if (revealTimer !== null) { clearTimeout(revealTimer); revealTimer = null; }
+      needsResume.value = false;
 
       messages.value.push({
         id: ++messageIdCounter, role: 'system',
@@ -574,14 +617,14 @@ const App = {
       folderPickerLoading.value = true;
       folderPickerPath.value = workDir.value || '';
       folderPickerEntries.value = [];
-      ws.send(JSON.stringify({ type: 'list_directory', dirPath: workDir.value || '' }));
+      wsSend({ type: 'list_directory', dirPath: workDir.value || '' });
     }
 
     function loadFolderPickerDir(dirPath) {
       folderPickerLoading.value = true;
       folderPickerSelected.value = '';
       folderPickerEntries.value = [];
-      ws.send(JSON.stringify({ type: 'list_directory', dirPath }));
+      wsSend({ type: 'list_directory', dirPath });
     }
 
     function folderPickerNavigateUp() {
@@ -628,7 +671,7 @@ const App = {
         path = path.replace(/[/\\]$/, '') + sep + folderPickerSelected.value;
       }
       folderPickerOpen.value = false;
-      ws.send(JSON.stringify({ type: 'change_workdir', workDir: path }));
+      wsSend({ type: 'change_workdir', workDir: path });
     }
 
     // ── Sidebar: grouped sessions by time ──
@@ -671,7 +714,24 @@ const App = {
       ws.onopen = () => { error.value = ''; };
 
       ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
+        let msg;
+        const parsed = JSON.parse(event.data);
+
+        // The 'connected' message is always plain text (key exchange)
+        if (parsed.type === 'connected') {
+          msg = parsed;
+          if (typeof parsed.sessionKey === 'string') {
+            sessionKey = decodeKey(parsed.sessionKey);
+          }
+        } else if (sessionKey && isEncrypted(parsed)) {
+          msg = decrypt(parsed, sessionKey);
+          if (!msg) {
+            console.error('[WS] Failed to decrypt message');
+            return;
+          }
+        } else {
+          msg = parsed;
+        }
 
         if (msg.type === 'connected') {
           if (msg.agent) {
@@ -827,6 +887,7 @@ const App = {
       };
 
       ws.onclose = () => {
+        sessionKey = null;
         if (status.value === 'Connected' || status.value === 'Connecting...') {
           status.value = 'Disconnected';
           error.value = 'Connection to server lost.';
@@ -902,7 +963,7 @@ const App = {
       messages, inputText, isProcessing, isCompacting, canSend, inputRef,
       sendMessage, handleKeydown, cancelExecution,
       getRenderedContent, copyMessage, toggleTool, isPrevAssistant, toggleContextSummary,
-      getToolIcon, getToolSummary, autoResize,
+      getToolIcon, getToolSummary, isEditTool, getEditDiffHtml, autoResize,
       // AskUserQuestion
       selectQuestionOption, submitQuestionAnswer, hasQuestionAnswer, getQuestionResponseSummary,
       // Theme
@@ -1073,7 +1134,8 @@ const App = {
                     <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                   </div>
                   <div v-if="msg.expanded" class="tool-expand">
-                    <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
+                    <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
+                    <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
                     <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
                   </div>
                 </div>
