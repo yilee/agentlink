@@ -1113,7 +1113,7 @@ body {
 
 .input-bottom-row {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   padding: 0.1rem 0.25rem 0;
 }
@@ -1387,4 +1387,143 @@ body {
 .folder-picker-confirm:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ── File Upload: Attachment Bar ── */
+.attachment-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  max-width: 220px;
+}
+
+.attachment-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.attachment-file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.attachment-info {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.attachment-size {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.attachment-remove {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.attachment-remove:hover {
+  color: var(--error);
+}
+
+/* ── Paperclip attach button ── */
+.attach-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.attach-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.attach-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Drag-over highlight on input card ── */
+.input-card.drag-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 2px 12px rgba(99, 102, 241, 0.15);
+}
+
+/* ── Attachments displayed in sent messages ── */
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.message-attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.message-attachment-thumb {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.message-attachment-file-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
 }

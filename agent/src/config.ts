@@ -15,7 +15,7 @@ const DEFAULTS: AgentConfig = {
   name: `Agent-${process.platform}-${process.pid}`,
 };
 
-const CONFIG_DIR = join(homedir(), '.agentlink');
+export const CONFIG_DIR = join(homedir(), '.agentlink');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 const RUNTIME_FILE = join(CONFIG_DIR, 'agent.json');
 const SERVER_RUNTIME_FILE = join(CONFIG_DIR, 'server.json');

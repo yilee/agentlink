@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { resolve, isAbsolute, join } from 'path';
 import type { AgentConfig } from './config.js';
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages } from './history.js';
 
 const RECONNECT_BASE_DELAY = 1000;
@@ -130,6 +130,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         (msg as unknown as { prompt: string }).prompt,
         state.workDir,
         (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
+        (msg as unknown as { files?: ChatFile[] }).files,
       );
       break;
     case 'cancel_execution':

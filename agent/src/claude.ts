@@ -14,12 +14,15 @@
 
 import { spawn, type ChildProcess } from 'child_process';
 import { createInterface } from 'readline';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
 import { Stream } from './stream.js';
 import {
   resolveClaudeCommand,
   getCleanEnv,
   streamToStdin,
 } from './sdk.js';
+import { CONFIG_DIR } from './config.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -27,6 +30,12 @@ export interface ClaudeMessage {
   type: string;
   subtype?: string;
   [key: string]: unknown;
+}
+
+export interface ChatFile {
+  name: string;
+  mimeType: string;
+  data: string; // base64
 }
 
 export interface ConversationState {
@@ -79,7 +88,7 @@ export function getConversation(): ConversationState | null {
  * Lazily starts the Claude process on the first message.
  * If resumeSessionId is provided, resumes that Claude session.
  */
-export function handleChat(prompt: string, workDir: string, resumeSessionId?: string): void {
+export function handleChat(prompt: string, workDir: string, resumeSessionId?: string, files?: ChatFile[]): void {
   if (!conversation || !conversation.inputStream) {
     startQuery(workDir, resumeSessionId);
   }
@@ -90,10 +99,18 @@ export function handleChat(prompt: string, workDir: string, resumeSessionId?: st
 
   console.log(`[Claude] Sending: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
 
-  state.inputStream!.enqueue({
-    type: 'user',
-    message: { role: 'user', content: prompt },
-  });
+  if (files && files.length > 0) {
+    const content = processFilesForClaude(files, workDir, prompt);
+    state.inputStream!.enqueue({
+      type: 'user',
+      message: { role: 'user', content },
+    });
+  } else {
+    state.inputStream!.enqueue({
+      type: 'user',
+      message: { role: 'user', content: prompt },
+    });
+  }
 }
 
 /**
@@ -159,6 +176,51 @@ export function handleUserAnswer(requestId: string, answers: Record<string, unkn
 }
 
 // ── Internal ───────────────────────────────────────────────────────────────
+
+function processFilesForClaude(files: ChatFile[], workDir: string, prompt: string): unknown[] {
+  const attachDir = join(CONFIG_DIR, 'tmp-attachments');
+  if (!existsSync(attachDir)) {
+    mkdirSync(attachDir, { recursive: true });
+  }
+
+  const content: unknown[] = [];
+  const nonImagePaths: string[] = [];
+
+  for (const file of files) {
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const diskName = `${timestamp}-${safeName}`;
+    const diskPath = join(attachDir, diskName);
+
+    // Write file to disk
+    writeFileSync(diskPath, Buffer.from(file.data, 'base64'));
+    console.log(`[Claude] Saved attachment: ${diskPath}`);
+
+    if (file.mimeType.startsWith('image/')) {
+      // Images: send as inline base64 content blocks
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: file.mimeType,
+          data: file.data,
+        },
+      });
+    } else {
+      // Non-images: reference by file path
+      nonImagePaths.push(diskPath);
+    }
+  }
+
+  // Build text block with prompt + file references
+  let textContent = prompt;
+  if (nonImagePaths.length > 0) {
+    textContent += '\n\nAttached files:\n' + nonImagePaths.map(p => `- ${p}`).join('\n');
+  }
+  content.push({ type: 'text', text: textContent });
+
+  return content;
+}
 
 function startQuery(workDir: string, resumeSessionId?: string): void {
   // Tear down previous process if any

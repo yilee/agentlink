@@ -120,6 +120,123 @@ const App = {
     const folderPickerLoading = ref(false);
     const folderPickerSelected = ref('');
 
+    // File attachment state
+    const attachments = ref([]);
+    const fileInputRef = ref(null);
+    const dragOver = ref(false);
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const MAX_FILES = 5;
+    const ACCEPTED_EXTENSIONS = [
+      '.pdf', '.json', '.md', '.py', '.js', '.ts', '.tsx', '.jsx', '.css',
+      '.html', '.xml', '.yaml', '.yml', '.toml', '.sh', '.sql', '.csv',
+      '.c', '.cpp', '.h', '.hpp', '.java', '.go', '.rs', '.rb', '.php',
+      '.swift', '.kt', '.scala', '.r', '.m', '.vue', '.svelte', '.txt',
+      '.log', '.cfg', '.ini', '.env', '.gitignore', '.dockerfile',
+    ];
+
+    function isAcceptedFile(file) {
+      if (file.type.startsWith('image/')) return true;
+      if (file.type.startsWith('text/')) return true;
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      return ACCEPTED_EXTENSIONS.includes(ext);
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          // result is "data:<mime>;base64,<data>" — extract just the base64 part
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function addFiles(fileList) {
+      const currentCount = attachments.value.length;
+      const remaining = MAX_FILES - currentCount;
+      if (remaining <= 0) return;
+
+      const files = Array.from(fileList).slice(0, remaining);
+      for (const file of files) {
+        if (!isAcceptedFile(file)) continue;
+        if (file.size > MAX_FILE_SIZE) continue;
+        // Skip duplicates
+        if (attachments.value.some(a => a.name === file.name && a.size === file.size)) continue;
+
+        const data = await readFileAsBase64(file);
+        const isImage = file.type.startsWith('image/');
+        let thumbUrl = null;
+        if (isImage) {
+          thumbUrl = URL.createObjectURL(file);
+        }
+        attachments.value.push({
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          size: file.size,
+          data,
+          isImage,
+          thumbUrl,
+        });
+      }
+    }
+
+    function removeAttachment(index) {
+      const att = attachments.value[index];
+      if (att.thumbUrl) URL.revokeObjectURL(att.thumbUrl);
+      attachments.value.splice(index, 1);
+    }
+
+    function triggerFileInput() {
+      if (fileInputRef.value) fileInputRef.value.click();
+    }
+
+    function handleFileSelect(e) {
+      if (e.target.files) addFiles(e.target.files);
+      e.target.value = ''; // reset so same file can be selected again
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      dragOver.value = true;
+    }
+
+    function handleDragLeave(e) {
+      e.preventDefault();
+      dragOver.value = false;
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      dragOver.value = false;
+      if (e.dataTransfer?.files) addFiles(e.dataTransfer.files);
+    }
+
+    function handlePaste(e) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files = [];
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      if (files.length > 0) {
+        e.preventDefault();
+        addFiles(files);
+      }
+    }
+
     // Theme state
     const theme = ref(localStorage.getItem('agentlink-theme') || 'dark');
     function applyTheme() {
@@ -197,7 +314,7 @@ const App = {
     }
 
     const canSend = computed(() =>
-      status.value === 'Connected' && inputText.value.trim() && !isProcessing.value && !isCompacting.value
+      status.value === 'Connected' && (inputText.value.trim() || attachments.value.length > 0) && !isProcessing.value && !isCompacting.value
       && !messages.value.some(m => m.role === 'ask-question' && !m.answered)
     );
 
@@ -226,22 +343,40 @@ const App = {
       if (!canSend.value) return;
 
       const text = inputText.value.trim();
+      const files = attachments.value.slice();
       inputText.value = '';
       if (inputRef.value) inputRef.value.style.height = 'auto';
 
+      // Build message display with attachment info
+      const msgAttachments = files.map(f => ({
+        name: f.name, size: f.size, isImage: f.isImage, thumbUrl: f.thumbUrl,
+      }));
+
       messages.value.push({
         id: ++messageIdCounter, role: 'user',
-        content: text, timestamp: new Date(),
+        content: text || (files.length > 0 ? `[${files.length} file${files.length > 1 ? 's' : ''} attached]` : ''),
+        attachments: msgAttachments.length > 0 ? msgAttachments : undefined,
+        timestamp: new Date(),
       });
       isProcessing.value = true;
       scrollToBottom();
 
-      // If we have a resumed session and this is the first message, pass it along
-      const payload = { type: 'chat', prompt: text };
+      // Build payload
+      const payload = { type: 'chat', prompt: text || '(see attached files)' };
       if (currentClaudeSessionId.value && messages.value.filter(m => m.role === 'user').length === 1) {
         payload.resumeSessionId = currentClaudeSessionId.value;
       }
+      if (files.length > 0) {
+        payload.files = files.map(f => ({
+          name: f.name,
+          mimeType: f.mimeType,
+          data: f.data,
+        }));
+      }
       ws.send(JSON.stringify(payload));
+
+      // Clear attachments (don't revoke thumbUrls — they're referenced by the message now)
+      attachments.value = [];
     }
 
     function cancelExecution() {
@@ -781,6 +916,10 @@ const App = {
       folderPickerLoading, folderPickerSelected,
       openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
       folderPickerEnter, confirmFolderPicker,
+      // File attachments
+      attachments, fileInputRef, dragOver,
+      triggerFileInput, handleFileSelect, removeAttachment, formatFileSize,
+      handleDragOver, handleDragLeave, handleDrop, handlePaste,
     };
   },
   template: `
@@ -895,6 +1034,15 @@ const App = {
                   <div class="message-role-label user-label">You</div>
                   <div class="message-bubble user-bubble">
                     <div class="message-content">{{ msg.content }}</div>
+                    <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
+                      <div v-for="(att, ai) in msg.attachments" :key="ai" class="message-attachment-chip">
+                        <img v-if="att.isImage && att.thumbUrl" :src="att.thumbUrl" class="message-attachment-thumb" />
+                        <span v-else class="message-attachment-file-icon">
+                          <svg viewBox="0 0 16 16" width="12" height="12"><path fill="currentColor" d="M1 2.5A2.5 2.5 0 0 1 3.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75H3.5a1 1 0 0 0-1 1h9.25a.75.75 0 0 1 0 1.5H3.5A2.5 2.5 0 0 1 1 14V2.5z"/></svg>
+                        </span>
+                        <span>{{ att.name }}</span>
+                      </div>
+                    </div>
                   </div>
                 </template>
 
@@ -1002,17 +1150,47 @@ const App = {
           </div>
 
           <div class="input-area">
-            <div class="input-card">
+            <input
+              type="file"
+              ref="fileInputRef"
+              multiple
+              style="display: none"
+              @change="handleFileSelect"
+              accept="image/*,text/*,.pdf,.json,.md,.py,.js,.ts,.tsx,.jsx,.css,.html,.xml,.yaml,.yml,.toml,.sh,.sql,.csv"
+            />
+            <div
+              :class="['input-card', { 'drag-over': dragOver }]"
+              @dragover="handleDragOver"
+              @dragleave="handleDragLeave"
+              @drop="handleDrop"
+            >
               <textarea
                 ref="inputRef"
                 v-model="inputText"
                 @keydown="handleKeydown"
                 @input="autoResize"
+                @paste="handlePaste"
                 :disabled="status !== 'Connected' || isCompacting"
                 :placeholder="isCompacting ? 'Context compacting in progress...' : 'Send a message...'"
                 rows="1"
               ></textarea>
+              <div v-if="attachments.length > 0" class="attachment-bar">
+                <div v-for="(att, i) in attachments" :key="i" class="attachment-chip">
+                  <img v-if="att.isImage && att.thumbUrl" :src="att.thumbUrl" class="attachment-thumb" />
+                  <div v-else class="attachment-file-icon">
+                    <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M1 2.5A2.5 2.5 0 0 1 3.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75H3.5a1 1 0 0 0-1 1h9.25a.75.75 0 0 1 0 1.5H3.5A2.5 2.5 0 0 1 1 14V2.5z"/></svg>
+                  </div>
+                  <div class="attachment-info">
+                    <div class="attachment-name">{{ att.name }}</div>
+                    <div class="attachment-size">{{ formatFileSize(att.size) }}</div>
+                  </div>
+                  <button class="attachment-remove" @click="removeAttachment(i)" title="Remove">&times;</button>
+                </div>
+              </div>
               <div class="input-bottom-row">
+                <button class="attach-btn" @click="triggerFileInput" :disabled="status !== 'Connected' || isCompacting || attachments.length >= 5" title="Attach files">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                </button>
                 <button v-if="isProcessing" @click="cancelExecution" class="send-btn stop-btn" title="Stop generation">
                   <svg viewBox="0 0 24 24" width="14" height="14"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
                 </button>

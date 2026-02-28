@@ -419,7 +419,7 @@ interface ConversationState {
 
 | Type | Purpose | Key fields |
 |------|---------|------------|
-| `chat` | Send user prompt | `prompt`, `resumeSessionId?` |
+| `chat` | Send user prompt | `prompt`, `resumeSessionId?`, `files?: ChatFile[]` |
 | `cancel_execution` | Stop current Claude turn | — |
 | `list_sessions` | Request session history list | — |
 | `resume_conversation` | Resume a historical session | `claudeSessionId` |
@@ -518,12 +518,14 @@ Priority: **CLI flags > config file > defaults**
 | `dir` | `process.cwd()` | Working directory |
 | `name` | `Agent-{platform}-{pid}` | Agent display name |
 
-**Runtime state files (`~/.agentlink/`):**
+**Runtime & data files (`~/.agentlink/`):**
 
-| File | Written by | Contains |
-|------|-----------|----------|
+| File / Dir | Written by | Contains |
+|------------|-----------|----------|
 | `agent.json` | Agent process | PID, sessionId, sessionUrl, server, name, dir, startedAt |
 | `server.json` | Server process | PID, port, startedAt |
+| `logs/` | Agent / Server | stdout/stderr log files for daemon processes |
+| `tmp-attachments/` | Agent (claude.ts) | Uploaded files saved to disk for Claude (timestamped names) |
 
 Used by `agentlink stop`, `agentlink server stop`, and `agentlink status` to find and manage running processes. On Windows, `taskkill /pid /f /t` is used for reliable termination; on Unix, `SIGTERM`.
 
@@ -594,7 +596,7 @@ agentlink --help
 - [x] Web UI: light/dark theme toggle with localStorage persistence
 - [x] Web UI: change working directory (folder picker modal, filesystem browsing)
 - [ ] Message protocol (encrypted relay)
-- [ ] Web UI: file upload
+- [x] Web UI: file upload (paperclip button, drag-drop, paste; base64 over WebSocket; images inline, non-images saved to `~/.agentlink/tmp-attachments/`)
 - [ ] Web UI: workbench panel (terminal, files, git)
 - [ ] Agent: terminal (PTY) support
 - [ ] Agent: file/git operations
