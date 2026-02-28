@@ -42,7 +42,24 @@ export async function start(config: AgentConfig): Promise<void> {
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
   } catch (err) {
-    console.error(`[AgentLink] Failed to connect: ${(err as Error).message}`);
+    const msg = (err as Error).message || String(err);
+    console.error(`\n[AgentLink] Failed to connect to server: ${config.server}`);
+
+    if (msg.includes('ECONNREFUSED')) {
+      console.error('[AgentLink] Connection refused. Is the server running?');
+      console.error('[AgentLink] Check with: agentlink-server status');
+    } else if (msg.includes('ENOTFOUND') || msg.includes('EAI_AGAIN')) {
+      console.error('[AgentLink] Server address not found. Check the URL is correct.');
+      console.error(`[AgentLink] Current server: ${config.server}`);
+      console.error('[AgentLink] Update with: agentlink-client config set server <url>');
+    } else if (msg.includes('ETIMEDOUT') || msg.includes('ENETUNREACH')) {
+      console.error('[AgentLink] Network timeout. Check your internet connection and firewall.');
+    } else if (msg.includes('ECONNRESET') || msg.includes('socket hang up')) {
+      console.error('[AgentLink] Connection was reset by the server.');
+    } else {
+      console.error(`[AgentLink] Error: ${msg}`);
+    }
+
     process.exit(1);
   }
 }

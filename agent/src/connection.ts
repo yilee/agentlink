@@ -122,7 +122,8 @@ function buildWsUrl(config: AgentConfig): string {
 
 function scheduleReconnect(config: AgentConfig): void {
   if (state.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.error('[AgentLink] Max reconnect attempts reached. Giving up.');
+    console.error('[AgentLink] Max reconnect attempts reached. Server may be down.');
+    console.error('[AgentLink] Check server status or restart the agent.');
     process.exit(1);
   }
 
