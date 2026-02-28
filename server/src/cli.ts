@@ -8,6 +8,7 @@ import {
   loadServerRuntimeState, clearServerRuntimeState, getLogDir,
   killProcess, isProcessAlive,
 } from './config.js';
+import { serverServiceInstall, serverServiceUninstall } from './service.js';
 
 const program = new Command();
 
@@ -135,5 +136,30 @@ program
       console.log(`  Started: ${state.startedAt}`);
     }
   });
+
+// ── Service management ──
+
+const serviceCmd = program
+  .command('service')
+  .description('Manage auto-start service');
+
+serviceCmd
+  .command('install')
+  .description('Register server as an auto-start service and start it now')
+  .option('-p, --port <port>', 'Server port', '3456')
+  .action((options) => {
+    serverServiceInstall(parseInt(options.port, 10));
+  });
+
+serviceCmd
+  .command('uninstall')
+  .description('Remove auto-start service and stop the server')
+  .action(() => {
+    serverServiceUninstall();
+  });
+
+serviceCmd.action(() => {
+  serviceCmd.help();
+});
 
 program.parse();
