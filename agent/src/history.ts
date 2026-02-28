@@ -23,6 +23,7 @@ export interface HistoryMessage {
   toolInput?: string;
   toolId?: string;
   timestamp?: string;
+  isCommandOutput?: boolean;
 }
 
 function getClaudeProjectsDir(): string {
@@ -34,6 +35,21 @@ function pathToProjectFolder(workDir: string): string {
     .replace(/:/g, '-')
     .replace(/[/\\]/g, '-')
     .replace(/ /g, '-');
+}
+
+/** Messages that are pure CLI metadata — always hidden */
+function isHiddenCommand(text: string): boolean {
+  return text.includes('<local-command-caveat>') ||
+    text.includes('<command-name>');
+}
+
+/** Extract displayable output from local command stdout/stderr tags */
+function extractCommandOutput(text: string): string | null {
+  const stdoutMatch = text.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/);
+  if (stdoutMatch) return stdoutMatch[1].trim();
+  const stderrMatch = text.match(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/);
+  if (stderrMatch) return stderrMatch[1].trim();
+  return null;
 }
 
 /**
@@ -89,7 +105,7 @@ export function listSessions(workDir: string): SessionInfo[] {
             const text = typeof data.message.content === 'string'
               ? data.message.content
               : data.message.content[0]?.text || '';
-            if (text.trim()) {
+            if (text.trim() && !isHiddenCommand(text) && !extractCommandOutput(text)) {
               preview = text.substring(0, 100);
               title = text.substring(0, 100);
               hasUserMessage = true;
@@ -151,7 +167,14 @@ export function readSessionMessages(workDir: string, sessionId: string): History
                 .filter((b: { type: string }) => b.type === 'text')
                 .map((b: { text: string }) => b.text || '')
                 .join('');
-          if (text.trim()) {
+          if (!text.trim()) continue;
+          // Skip caveat and command-name metadata
+          if (isHiddenCommand(text)) continue;
+          // Extract command output (e.g. /cost, /context results)
+          const cmdOutput = extractCommandOutput(text);
+          if (cmdOutput) {
+            result.push({ role: 'user', content: cmdOutput, timestamp: ts, isCommandOutput: true });
+          } else {
             result.push({ role: 'user', content: text, timestamp: ts });
           }
         }

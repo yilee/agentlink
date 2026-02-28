@@ -296,7 +296,6 @@ conversations.set(conversationId, {
 - Cloud relay (`msclaude.ai`) is the server component
 - Simplified auth model (session URL is the access token)
 - No multi-user, no roles, no invitations
-- No encryption (plain WebSocket for now)
 - No database (stateless server, agent reads Claude's JSONL files directly)
 
 ### Current Project Structure
@@ -319,6 +318,11 @@ agentlink/
 │       ├── ws-agent.ts       # Agent WebSocket handler (registration, message forwarding)
 │       ├── encryption.ts      # TweetNaCl encryption (XSalsa20-Poly1305 secretbox)
 │       └── ws-client.ts      # Web client WebSocket handler (session binding, forwarding)
+│   └── web/                  # Vue 3 SPA (static assets served by Express)
+│       ├── index.html        # Vue 3 SPA shell (CDN: Vue 3, marked.js, highlight.js)
+│       ├── style.css         # Dark/light theme + responsive mobile CSS
+│       ├── encryption.js     # Browser-side TweetNaCl encryption (CDN globals)
+│       └── app.js            # Vue 3 app (sidebar, chat, streaming, session resume)
 ├── agent/
 │   ├── package.json          # Commander.js 12 + ws 8.16, bin: agentlink-client
 │   ├── tsconfig.json         # extends ../tsconfig.base.json
@@ -334,11 +338,6 @@ agentlink/
 │       ├── encryption.ts     # TweetNaCl encryption (XSalsa20-Poly1305 secretbox)
 │       ├── service.ts        # OS auto-start service (systemd/launchd/Startup folder)
 │       └── index.ts          # Agent core (start function, graceful shutdown)
-└── web/
-    ├── index.html            # Vue 3 SPA shell (CDN: Vue 3, marked.js, highlight.js)
-    ├── style.css             # Dark theme + sidebar + chat + tool display styles
-    ├── encryption.js         # Browser-side TweetNaCl encryption (CDN globals)
-    └── app.js                # Vue 3 app (sidebar, chat, streaming, session resume)
 ```
 
 ### Agent Source Files Reference
@@ -402,14 +401,16 @@ interface ConversationState {
 
 **JSONL file location:** `~/.claude/projects/<folder>/<sessionId>.jsonl`
 
-**Path conversion:** `Q:\src\agentlink` → `Q--src-agentlink` (colons → `-`, slashes → `-`)
+**Path conversion:** `Q:\src\agentlink` → `Q--src-agentlink` (colons → `-`, slashes → `-`, spaces → `-`)
 
 **`listSessions(workDir)`** — Scans JSONL files, extracts metadata:
 - Title: `custom-title` > `summary` > first user message (truncated to 100 chars)
+- Skips internal command messages (`/compact`, etc.) via `isInternalCommand()` tag detection
 - Returns `SessionInfo[]` sorted by lastModified descending
 
 **`readSessionMessages(workDir, sessionId)`** — Parses full message history:
 - User messages: extracts text from `message.content` (handles string + array formats)
+- Filters out internal CLI commands (messages containing `<local-command-caveat>`, `<command-name>`, `<local-command-stdout>` tags)
 - Assistant messages: iterates content blocks → separate entries for text + tool_use
 - Returns `HistoryMessage[]` (flat list of user/assistant/tool entries)
 
@@ -475,6 +476,7 @@ interface ConversationState {
 - Session history list grouped by time (Today / Yesterday / This week / Earlier)
 - `groupedSessions` computed property handles grouping
 - Click session → `resume_conversation` → loads history messages into chat
+- Mobile (≤768px): sidebar defaults to hidden, opens as fixed overlay with backdrop, auto-closes on session select or new conversation
 
 **Chat area:**
 - Centered `message-list-inner` container (max-width: 768px)
@@ -506,6 +508,11 @@ interface ConversationState {
 - Inline `<script>` in index.html prevents flash on load
 
 **CDN dependencies:** Vue 3, marked.js 12, highlight.js 11.9 (github-dark / github themes)
+
+**Mobile responsive (style.css media queries):**
+- `@media (max-width: 768px)`: sidebar as fixed overlay (280px, z-index 100) with `.sidebar-backdrop`, `overflow-x: hidden` on html/body/layout to prevent horizontal scroll, message bubbles constrained with `overflow: hidden` + `word-break: break-word`, code blocks scroll within their container, reduced padding throughout
+- `@media (max-width: 480px)`: further reduced padding for extra-small screens
+- `sidebarOpen` defaults to `window.innerWidth > 768`
 
 **Key reactive state:**
 ```javascript
@@ -670,6 +677,9 @@ agentlink-client start --daemon
 - [x] Message protocol (encrypted relay — TweetNaCl XSalsa20-Poly1305)
 - [x] Web UI: file upload (paperclip button, drag-drop, paste; base64 over WebSocket; images inline, non-images saved to `~/.agentlink/tmp-attachments/`)
 - [x] Auto-start service (`service install/uninstall` — systemd on Linux, launchd on macOS, Startup folder on Windows)
+- [x] Web UI: mobile responsive (sidebar overlay, constrained overflow, reduced padding at 768px/480px breakpoints)
+- [x] CLI: dynamic version from package.json (`createRequire` in cli.ts)
+- [x] History: filter internal CLI commands (`/compact`, etc.) from session list and message history
 - [ ] Web UI: workbench panel (terminal, files, git)
 - [ ] Agent: terminal (PTY) support
 - [ ] Agent: file/git operations

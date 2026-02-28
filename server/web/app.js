@@ -920,7 +920,8 @@ const App = {
                 } else {
                   messages.value.push({
                     id: ++messageIdCounter, role: 'user',
-                    content: h.content, timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                    content: h.content, isCommandOutput: !!h.isCommandOutput,
+                    timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
                   });
                 }
               } else if (h.role === 'assistant') {
@@ -940,7 +941,7 @@ const App = {
                   id: ++messageIdCounter, role: 'tool',
                   toolId: h.toolId || '', toolName: h.toolName || 'unknown',
                   toolInput: h.toolInput || '', hasResult: true,
-                  expanded: false, timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                  expanded: h.toolName === 'Edit', timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
                 });
               }
             }
@@ -1010,7 +1011,7 @@ const App = {
             id: ++messageIdCounter, role: 'tool',
             toolId: tool.id, toolName: tool.name || 'unknown',
             toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
-            hasResult: false, expanded: false, timestamp: new Date(),
+            hasResult: false, expanded: (tool.name === 'Edit'), timestamp: new Date(),
           });
         }
         scrollToBottom();
@@ -1188,7 +1189,8 @@ const App = {
                 <template v-if="msg.role === 'user'">
                   <div class="message-role-label user-label">You</div>
                   <div class="message-bubble user-bubble">
-                    <div class="message-content">{{ msg.content }}</div>
+                    <div v-if="msg.isCommandOutput" class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
+                    <div v-else class="message-content">{{ msg.content }}</div>
                     <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
                       <div v-for="(att, ai) in msg.attachments" :key="ai" class="message-attachment-chip">
                         <img v-if="att.isImage && att.thumbUrl" :src="att.thumbUrl" class="message-attachment-thumb" />
