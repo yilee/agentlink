@@ -56,14 +56,21 @@ window.__copyCodeBlock = async function(btn) {
   } catch {}
 };
 
-// Tool icons
-const TOOL_ICONS = {
-  Read: '\u{1F4D6}', Edit: '\u{270F}\u{FE0F}', Write: '\u{1F4DD}',
-  Bash: '\u{26A1}', Glob: '\u{1F50D}', Grep: '\u{1F50E}',
-  Task: '\u{1F4CB}', WebFetch: '\u{1F310}', WebSearch: '\u{1F50D}',
-  TodoWrite: '\u{2705}',
+// Tool icons (monochrome SVG)
+const TOOL_SVG = {
+  Read:      '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M1 2.5A2.5 2.5 0 0 1 3.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75H3.5a1 1 0 0 0-1 1h9.25a.75.75 0 0 1 0 1.5H3.5A2.5 2.5 0 0 1 1 14V2.5zm3 0v7l1.5-1.25L7 9.5v-7H4z"/></svg>',
+  Edit:      '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25a1.75 1.75 0 0 1 .445-.758l8.61-8.61zM11.524 2.2l-8.61 8.61a.25.25 0 0 0-.064.108l-.57 1.996 1.996-.57a.25.25 0 0 0 .108-.064l8.61-8.61a.25.25 0 0 0 0-.354l-1.086-1.086a.25.25 0 0 0-.354 0z"/></svg>',
+  Write:     '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8.75 1.75a.75.75 0 0 0-1.5 0V6H2.75a.75.75 0 0 0 0 1.5H7.25v4.25a.75.75 0 0 0 1.5 0V7.5h4.25a.75.75 0 0 0 0-1.5H8.75V1.75z"/></svg>',
+  Bash:      '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25H1.75zM7 11a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5A.75.75 0 0 1 7 11zm-3.22-4.53a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.75.75 0 0 1-1.06-1.06L5.25 9 3.78 7.53a.75.75 0 0 1 0-1.06z"/></svg>',
+  Glob:      '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 1 1-1.06 1.06l-3.04-3.04zM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7z"/></svg>',
+  Grep:      '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 1 1-1.06 1.06l-3.04-3.04zM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7z"/></svg>',
+  Task:      '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1zm0 1.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25H1.75zM3.5 5h9v1.5h-9V5zm0 3h9v1.5h-9V8zm0 3h5v1.5h-5V11z"/></svg>',
+  WebFetch:  '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.7 5.3a.75.75 0 0 0-1.06-1.06l-5.5 5.5a.75.75 0 1 0 1.06 1.06l5.5-5.5zM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13z"/></svg>',
+  WebSearch: '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zm3.7 5.3a.75.75 0 0 0-1.06-1.06l-5.5 5.5a.75.75 0 1 0 1.06 1.06l5.5-5.5zM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13z"/></svg>',
+  TodoWrite: '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 1.042-1.08L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0z"/></svg>',
 };
-function getToolIcon(name) { return TOOL_ICONS[name] || '\u{2699}\u{FE0F}'; }
+const TOOL_SVG_DEFAULT = '<svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M7.429 1.525a3.751 3.751 0 0 1 4.41.899l.04.045a.75.75 0 0 1-.17 1.143l-2.2 1.378a1.25 1.25 0 0 0-.473 1.58l.614 1.341a1.25 1.25 0 0 0 1.412.663l2.476-.542a.75.75 0 0 1 .848.496 3.75 3.75 0 0 1-1.468 4.155 3.751 3.751 0 0 1-4.41-.898l-.04-.046a.75.75 0 0 1 .17-1.142l2.2-1.378a1.25 1.25 0 0 0 .473-1.58l-.614-1.342a1.25 1.25 0 0 0-1.412-.662l-2.476.541a.75.75 0 0 1-.848-.496 3.75 3.75 0 0 1 1.468-4.155z"/></svg>';
+function getToolIcon(name) { return TOOL_SVG[name] || TOOL_SVG_DEFAULT; }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function formatRelativeTime(ts) {
@@ -660,7 +667,7 @@ const App = {
                 <!-- Tool use block (collapsible) -->
                 <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
                   <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
-                    <span class="tool-icon">{{ getToolIcon(msg.toolName) }}</span>
+                    <span class="tool-icon" v-html="getToolIcon(msg.toolName)"></span>
                     <span class="tool-name">{{ msg.toolName }}</span>
                     <span class="tool-summary">{{ getToolSummary(msg) }}</span>
                     <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>

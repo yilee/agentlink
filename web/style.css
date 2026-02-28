@@ -468,8 +468,8 @@ body {
 .message-bubble {
   padding: 0.6rem 0.9rem;
   border-radius: 10px;
-  font-size: 0.92rem;
-  line-height: 1.55;
+  font-size: 0.94rem;
+  line-height: 1.6;
   word-wrap: break-word;
   position: relative;
 }
@@ -640,23 +640,23 @@ body {
   padding: 0.8em 1em;
 }
 
-/* ── Tool use lines (collapsible, compact) ── */
+/* ── Tool use lines (collapsible, compact, subdued) ── */
 .tool-line-wrapper {
   max-width: 100%;
+  padding-left: 0.25rem;
 }
 
 .tool-line {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.82rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s;
+  color: var(--text-secondary);
 }
 
 .tool-line:hover {
@@ -665,11 +665,15 @@ body {
 
 .tool-icon {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .tool-name {
-  font-weight: 600;
-  color: var(--warning);
+  font-weight: 500;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -683,9 +687,16 @@ body {
 }
 
 .tool-status-icon {
-  color: var(--success);
-  font-weight: bold;
+  color: var(--text-secondary);
+  font-weight: normal;
   flex-shrink: 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.tool-line.completed .tool-status-icon {
+  color: var(--success);
+  opacity: 0.6;
 }
 
 .running-dots {
@@ -694,10 +705,10 @@ body {
 }
 
 .running-dots span {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
-  background: var(--warning);
+  background: var(--text-secondary);
   animation: typing 1.2s infinite ease-in-out;
 }
 
@@ -706,34 +717,37 @@ body {
 
 .tool-toggle {
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   flex-shrink: 0;
   margin-left: auto;
+  opacity: 0.5;
 }
 
 .tool-expand {
-  margin-top: 4px;
-  margin-left: 8px;
-  border-left: 2px solid var(--border);
+  margin-top: 2px;
+  margin-left: 20px;
+  border-left: 1px solid var(--border);
   padding-left: 8px;
 }
 
 .tool-block {
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   border-radius: 4px;
   padding: 0.4rem 0.6rem;
   margin-top: 0.25rem;
   overflow-x: auto;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   line-height: 1.4;
   max-height: 200px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
+  color: var(--text-secondary);
 }
 
 .tool-output {
   border-left: 2px solid var(--success);
+  color: var(--text-primary);
 }
 
 /* ── System message ── */
