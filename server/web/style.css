@@ -1705,3 +1705,117 @@ body {
   align-items: center;
   color: var(--text-secondary);
 }
+
+/* ── Sidebar backdrop (mobile overlay) ── */
+.sidebar-backdrop {
+  display: none;
+}
+
+/* ══════════════════════════════════════════
+   Mobile responsive — max-width: 768px
+   ══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Sidebar as fixed overlay */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 100;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+  }
+
+  /* Top bar */
+  .top-bar {
+    padding: 0 0.75rem;
+  }
+
+  .agent-label {
+    display: none;
+  }
+
+  /* Message area */
+  .message-list {
+    padding: 0.75rem 0.75rem 0.5rem;
+  }
+
+  .message-list-inner {
+    max-width: 100%;
+  }
+
+  /* Input area */
+  .input-area {
+    padding: 0 0.75rem 0.75rem;
+  }
+
+  .input-card {
+    max-width: 100%;
+  }
+
+  /* Folder picker */
+  .folder-picker-dialog {
+    width: calc(100vw - 2rem);
+    max-width: 440px;
+  }
+
+  /* Status card */
+  .status-card {
+    min-width: 0;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  /* Tool blocks */
+  .tool-expand {
+    margin-left: 0;
+  }
+
+  .tool-output-content pre {
+    font-size: 0.8rem;
+  }
+
+  /* AskUserQuestion — larger tap targets */
+  .ask-question-option {
+    min-height: 44px;
+  }
+
+  /* Message content overflow */
+  .message-content {
+    overflow-x: auto;
+  }
+
+  .message-content pre {
+    max-width: calc(100vw - 3rem);
+  }
+}
+
+/* ══════════════════════════════════════════
+   Extra-small screens — max-width: 480px
+   ══════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .message-list {
+    padding: 0.5rem 0.5rem 0.5rem;
+  }
+
+  .input-area {
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .top-bar {
+    padding: 0 0.5rem;
+  }
+
+  .folder-picker-dialog {
+    width: calc(100vw - 1rem);
+  }
+}

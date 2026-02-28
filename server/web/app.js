@@ -108,7 +108,7 @@ const App = {
     const inputRef = ref(null);
 
     // Sidebar state
-    const sidebarOpen = ref(true);
+    const sidebarOpen = ref(window.innerWidth > 768);
     const historySessions = ref([]);
     const currentClaudeSessionId = ref(null);
     const needsResume = ref(false);
@@ -660,6 +660,8 @@ const App = {
 
     function resumeSession(session) {
       if (isProcessing.value) return;
+      // Auto-close sidebar on mobile
+      if (window.innerWidth <= 768) sidebarOpen.value = false;
       // Clear current conversation
       messages.value = [];
       messageIdCounter = 0;
@@ -680,6 +682,8 @@ const App = {
 
     function newConversation() {
       if (isProcessing.value) return;
+      // Auto-close sidebar on mobile
+      if (window.innerWidth <= 768) sidebarOpen.value = false;
       messages.value = [];
       messageIdCounter = 0;
       streamingMessageId = null;
@@ -1104,6 +1108,8 @@ const App = {
       </div>
 
       <div v-else class="main-body">
+        <!-- Sidebar backdrop (mobile) -->
+        <div v-if="sidebarOpen" class="sidebar-backdrop" @click="toggleSidebar"></div>
         <!-- Sidebar -->
         <aside v-if="sidebarOpen" class="sidebar">
           <div class="sidebar-section">
