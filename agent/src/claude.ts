@@ -203,6 +203,8 @@ async function processOutput(
 
   // Consumer: iterate messages and forward to web client
   let resultHandled = false;
+  // Track accumulated text for streaming delta computation
+  let lastSentText = '';
 
   try {
     for await (const msg of messageStream) {
@@ -216,20 +218,52 @@ async function processOutput(
         resultHandled = true;
         state.turnActive = false;
 
+        // Reset streaming text tracker
+        lastSentText = '';
+
         // Forward the result, then signal turn_completed
         sendOutput(msg);
         sendFn({ type: 'turn_completed' });
         continue;
       }
 
-      // ── assistant message → forward text & tool_use blocks ──
+      // ── assistant message → extract delta and forward incrementally ──
       if (msg.type === 'assistant' && msg.message) {
-        sendOutput(msg);
+        const message = msg.message as { content?: Array<Record<string, unknown>> };
+        const content = message.content;
+        if (Array.isArray(content)) {
+          // Extract full text from all text blocks
+          const fullText = content
+            .filter((b) => b.type === 'text')
+            .map((b) => (b.text as string) || '')
+            .join('');
+
+          // Compute delta (new text since last emit)
+          if (fullText.length > lastSentText.length) {
+            const delta = fullText.slice(lastSentText.length);
+            lastSentText = fullText;
+            sendFn({
+              type: 'claude_output',
+              data: { type: 'content_block_delta', delta },
+            });
+          }
+
+          // Forward tool_use blocks as-is (they appear once)
+          const toolBlocks = content.filter((b) => b.type === 'tool_use');
+          if (toolBlocks.length > 0) {
+            sendFn({
+              type: 'claude_output',
+              data: { type: 'tool_use', tools: toolBlocks },
+            });
+          }
+        }
         continue;
       }
 
-      // ── user (tool_result) → forward ──
+      // ── user (tool_result) → forward, reset text tracker ──
       if (msg.type === 'user') {
+        // New turn segment — reset delta tracker for next assistant message
+        lastSentText = '';
         sendOutput(msg);
         continue;
       }

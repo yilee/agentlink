@@ -12,6 +12,7 @@ const App = {
     const isProcessing = ref(false);
     let ws = null;
     let messageIdCounter = 0;
+    let streamingMessageId = null;
 
     const canSend = computed(() =>
       status.value === 'Connected' && inputText.value.trim() && !isProcessing.value
@@ -105,6 +106,12 @@ const App = {
           handleClaudeOutput(msg);
         } else if (msg.type === 'turn_completed') {
           isProcessing.value = false;
+          // Finalize the streaming message
+          if (streamingMessageId !== null) {
+            const streamMsg = messages.value.find(m => m.id === streamingMessageId);
+            if (streamMsg) streamMsg.isStreaming = false;
+            streamingMessageId = null;
+          }
         }
       };
 
@@ -125,24 +132,40 @@ const App = {
       const data = msg.data;
       if (!data) return;
 
-      if (data.type === 'assistant' && data.message) {
-        const content = data.message.content || [];
+      // Streaming text delta — append to current assistant message
+      if (data.type === 'content_block_delta' && data.delta) {
+        if (streamingMessageId !== null) {
+          const streamMsg = messages.value.find(m => m.id === streamingMessageId);
+          if (streamMsg) {
+            streamMsg.content += data.delta;
+            scrollToBottom();
+            return;
+          }
+        }
+        // No streaming message yet — create one
+        const id = ++messageIdCounter;
+        messages.value.push({
+          id,
+          role: 'assistant',
+          content: data.delta,
+          isStreaming: true,
+          timestamp: new Date(),
+        });
+        streamingMessageId = id;
+        scrollToBottom();
+        return;
+      }
 
-        // Extract text blocks
-        const textBlocks = content.filter(b => b.type === 'text').map(b => b.text);
-        if (textBlocks.length > 0) {
-          messages.value.push({
-            id: ++messageIdCounter,
-            role: 'assistant',
-            content: textBlocks.join('\n'),
-            timestamp: new Date(),
-          });
-          scrollToBottom();
+      // Tool use blocks
+      if (data.type === 'tool_use' && data.tools) {
+        // Finalize the current streaming message before tool use
+        if (streamingMessageId !== null) {
+          const streamMsg = messages.value.find(m => m.id === streamingMessageId);
+          if (streamMsg) streamMsg.isStreaming = false;
+          streamingMessageId = null;
         }
 
-        // Extract tool_use blocks (SDK embeds them inside assistant messages)
-        const toolBlocks = content.filter(b => b.type === 'tool_use');
-        for (const tool of toolBlocks) {
+        for (const tool of data.tools) {
           messages.value.push({
             id: ++messageIdCounter,
             role: 'tool',
@@ -152,10 +175,12 @@ const App = {
             timestamp: new Date(),
           });
         }
-        if (toolBlocks.length > 0) scrollToBottom();
+        scrollToBottom();
+        return;
+      }
 
-      } else if (data.type === 'user' && data.tool_use_result) {
-        // Tool result from SDK: find the matching tool message and attach output
+      // Tool result from SDK (user message with tool_use_result)
+      if (data.type === 'user' && data.tool_use_result) {
         const result = data.tool_use_result;
         const results = Array.isArray(result) ? result : [result];
         for (const r of results) {
@@ -169,10 +194,10 @@ const App = {
           }
         }
         scrollToBottom();
-
-      } else if (data.type === 'result') {
-        // Turn result with usage info — ignore for now
+        return;
       }
+
+      // result message — ignore (turn_completed handles UI state)
     }
 
     onMounted(() => {
@@ -229,7 +254,7 @@ const App = {
             <div v-if="msg.role === 'user'" class="message-bubble user-bubble">
               <div class="message-content">{{ msg.content }}</div>
             </div>
-            <div v-else-if="msg.role === 'assistant'" class="message-bubble assistant-bubble">
+            <div v-else-if="msg.role === 'assistant'" :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
               <div class="message-content" v-html="msg.content"></div>
             </div>
             <div v-else-if="msg.role === 'tool'" class="message-bubble tool-bubble">
@@ -238,7 +263,7 @@ const App = {
               <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
             </div>
           </div>
-          <div v-if="isProcessing" class="typing-indicator">
+          <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
             <span></span><span></span><span></span>
           </div>
         </div>
