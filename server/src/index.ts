@@ -23,8 +23,14 @@ app.get('/', (_req, res) => {
   res.sendFile(join(webDir, 'landing.html'));
 });
 
-// Serve static assets from web/
-app.use(express.static(webDir));
+// Serve static assets from web/ with no-cache for JS/CSS (ensures updates are picked up)
+app.use(express.static(webDir, {
+  setHeaders(res, filePath) {
+    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 // SPA fallback: /s/:sessionId → serve index.html (Vue router handles the rest)
 app.get('/s/:sessionId', (_req, res) => {
