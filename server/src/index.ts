@@ -18,6 +18,11 @@ const wss = new WebSocketServer({ server });
 
 const webDir = join(__dirname, '../web');
 
+// Landing page at root
+app.get('/', (_req, res) => {
+  res.sendFile(join(webDir, 'landing.html'));
+});
+
 // Serve static assets from web/
 app.use(express.static(webDir));
 

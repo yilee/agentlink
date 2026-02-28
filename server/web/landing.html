@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentLink — Claude Code in Your Browser</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #252525;
+    --text: #e8e8e8;
+    --text-dim: #888;
+    --accent: #6c63ff;
+    --accent-hover: #7c74ff;
+    --green: #22c55e;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Nav ── */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .logo {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .logo span { color: var(--accent); }
+
+  nav a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+  }
+
+  nav a:hover { color: var(--text); }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    padding: 6rem 2rem 4rem;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    font-size: 1.15rem;
+    color: var(--text-dim);
+    max-width: 550px;
+    margin: 0 auto 1.5rem;
+  }
+
+  .hero-trust {
+    font-size: 0.95rem !important;
+    color: var(--green) !important;
+    font-weight: 500;
+    margin-bottom: 3rem !important;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Install box ── */
+  .install {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    max-width: 600px;
+    margin: 0 auto 4rem;
+    text-align: left;
+  }
+
+  .install-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1rem;
+  }
+
+  .install-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .install-cmd {
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.9rem;
+    color: var(--green);
+    flex: 1;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+
+  .install-cmd:hover {
+    border-color: var(--accent);
+  }
+
+  .install-cmd .copy-hint {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .install-cmd:hover .copy-hint { opacity: 1; }
+
+  .install-note {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 1rem;
+    text-align: center;
+  }
+
+  /* ── Features ── */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    max-width: 1000px;
+    margin: 0 auto 5rem;
+    padding: 0 2rem;
+  }
+
+  .feature {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+
+  .feature-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .feature h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature p {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* ── How it works ── */
+  .how {
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto 5rem;
+    padding: 0 2rem;
+  }
+
+  .how h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+  }
+
+  .diagram {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+
+  .diagram-node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    text-align: center;
+    min-width: 140px;
+  }
+
+  .diagram-node .node-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .diagram-node .node-name {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-top: 0.25rem;
+  }
+
+  .diagram-arrow {
+    color: var(--accent);
+    font-size: 1.5rem;
+    padding: 0 0.5rem;
+  }
+
+  .how p {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 640px) {
+    .hero { padding: 4rem 1.5rem 3rem; }
+    .install { padding: 1.5rem; margin: 0 1rem 3rem; }
+    .diagram { flex-direction: column; }
+    .diagram-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Agent<span>Link</span></div>
+  <div>
+    <a href="https://www.npmjs.com/package/@agent-link/agent" target="_blank">npm</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <h1>Claude Code,<br><em>in your browser</em></h1>
+  <p>Run Claude Code on your machine, use it from any browser. Two commands to get started.</p>
+  <p class="hero-trust">End-to-end encrypted. The server is a relay — it never sees, stores, or logs your data.</p>
+</section>
+
+<section class="install">
+  <div class="install-label">Get started</div>
+  <div class="install-step">
+    <div class="step-num">1</div>
+    <div class="install-cmd" onclick="copyCmd(this)">
+      npm install -g @agent-link/agent
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+  <div class="install-step">
+    <div class="step-num">2</div>
+    <div class="install-cmd" onclick="copyCmd(this)">
+      agentlink-client start
+      <span class="copy-hint">click to copy</span>
+    </div>
+  </div>
+  <div class="install-note">Open the URL it prints. That's it.</div>
+</section>
+
+<section class="features">
+  <div class="feature">
+    <div class="feature-icon">&#9889;</div>
+    <h3>Zero config</h3>
+    <p>Install, start, open the URL. No accounts, no setup, no configuration files needed.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">&#128274;</div>
+    <h3>Privacy first</h3>
+    <p>All messages are end-to-end encrypted. The relay server cannot read, store, or log any of your conversations or code. It's a blind forwarder.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">&#127760;</div>
+    <h3>Access anywhere</h3>
+    <p>Use Claude Code from your phone, tablet, or any device with a browser. Share the URL with teammates.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">&#128196;</div>
+    <h3>Full Claude Code</h3>
+    <p>File editing, bash commands, search, multi-turn conversations, session history — everything Claude Code can do.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">&#128260;</div>
+    <h3>Session history</h3>
+    <p>Browse and resume any past conversation from any working directory. Switch projects without losing context.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">&#128679;</div>
+    <h3>Self-hostable</h3>
+    <p>Run your own relay server with <code style="color:var(--green)">@agent-link/server</code>. Full control over your infrastructure.</p>
+  </div>
+</section>
+
+<section class="how">
+  <h2>How it works</h2>
+  <div class="diagram">
+    <div class="diagram-node">
+      <div class="node-label">Your browser</div>
+      <div class="node-name">Web UI</div>
+    </div>
+    <div class="diagram-arrow">&harr;</div>
+    <div class="diagram-node">
+      <div class="node-label">Encrypted relay</div>
+      <div class="node-name">Server</div>
+    </div>
+    <div class="diagram-arrow">&harr;</div>
+    <div class="diagram-node">
+      <div class="node-label">Your machine</div>
+      <div class="node-name">Agent</div>
+    </div>
+    <div class="diagram-arrow">&harr;</div>
+    <div class="diagram-node">
+      <div class="node-label">Local CLI</div>
+      <div class="node-name">Claude Code</div>
+    </div>
+  </div>
+  <p>The agent on your machine spawns Claude Code, streams output through the relay server to your browser, and sends your messages back. All tool execution happens locally. <strong>All traffic is end-to-end encrypted — the server is a stateless relay that never decrypts, stores, or logs your data.</strong></p>
+</section>
+
+<footer>
+  AgentLink &mdash; <a href="https://www.npmjs.com/package/@agent-link/agent">@agent-link/agent</a> &middot; <a href="https://www.npmjs.com/package/@agent-link/server">@agent-link/server</a>
+</footer>
+
+<script>
+function copyCmd(el) {
+  const text = el.childNodes[0].textContent.trim();
+  navigator.clipboard.writeText(text);
+  const hint = el.querySelector('.copy-hint');
+  hint.textContent = 'copied!';
+  hint.style.opacity = '1';
+  setTimeout(() => { hint.textContent = 'click to copy'; hint.style.opacity = ''; }, 1500);
+}
+</script>
+
+</body>
+</html>
