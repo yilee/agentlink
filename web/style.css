@@ -772,6 +772,149 @@ body {
   margin: 0.75rem 0;
 }
 
+/* ── AskUserQuestion interactive card ── */
+.ask-question-wrapper {
+  max-width: 100%;
+  padding-left: 0.25rem;
+  margin: 0.5rem 0;
+}
+
+.ask-question-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ask-question-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ask-question-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.ask-question-text {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.ask-question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ask-question-option {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ask-question-option:hover {
+  border-color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.ask-question-option.selected {
+  border-color: var(--accent);
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.ask-option-label {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ask-option-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.ask-question-custom {
+  margin-top: 2px;
+}
+
+.ask-question-custom input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ask-question-custom input::placeholder {
+  color: var(--text-secondary);
+}
+
+.ask-question-custom input:focus {
+  border-color: var(--accent);
+}
+
+.ask-question-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ask-question-submit {
+  padding: 6px 20px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.ask-question-submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.ask-question-submit:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ask-question-answered {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.ask-answered-icon {
+  color: var(--success);
+  font-size: 0.8rem;
+}
+
+.ask-answered-text {
+  font-style: italic;
+}
+
 .context-summary-bar {
   display: flex;
   align-items: center;

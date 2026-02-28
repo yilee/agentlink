@@ -198,6 +198,7 @@ const App = {
 
     const canSend = computed(() =>
       status.value === 'Connected' && inputText.value.trim() && !isProcessing.value && !isCompacting.value
+      && !messages.value.some(m => m.role === 'ask-question' && !m.answered)
     );
 
     function getSessionId() {
@@ -315,6 +316,74 @@ const App = {
         if (name === 'Grep' && obj.pattern) return obj.pattern;
       } catch {}
       return '';
+    }
+
+    // ── AskUserQuestion interaction ──
+    function selectQuestionOption(msg, qIndex, optLabel) {
+      if (msg.answered) return;
+      const q = msg.questions[qIndex];
+      if (!q) return;
+      if (q.multiSelect) {
+        // Toggle selection
+        const sel = msg.selectedAnswers[qIndex] || [];
+        const idx = sel.indexOf(optLabel);
+        if (idx >= 0) sel.splice(idx, 1);
+        else sel.push(optLabel);
+        msg.selectedAnswers[qIndex] = [...sel];
+      } else {
+        msg.selectedAnswers[qIndex] = optLabel;
+        msg.customTexts[qIndex] = ''; // clear custom text when option selected
+      }
+    }
+
+    function submitQuestionAnswer(msg) {
+      if (msg.answered || !ws) return;
+      // Build answers object keyed by question text: { "question text": "selected label" }
+      // This matches the format Claude CLI expects for AskUserQuestion answers
+      const answers = {};
+      for (let i = 0; i < msg.questions.length; i++) {
+        const q = msg.questions[i];
+        const key = q.question || String(i);
+        const custom = (msg.customTexts[i] || '').trim();
+        if (custom) {
+          answers[key] = custom;
+        } else {
+          const sel = msg.selectedAnswers[i];
+          if (Array.isArray(sel) && sel.length > 0) {
+            answers[key] = sel.join(', ');
+          } else if (sel != null) {
+            answers[key] = sel;
+          }
+        }
+      }
+      msg.answered = true;
+      ws.send(JSON.stringify({ type: 'ask_user_answer', requestId: msg.requestId, answers }));
+    }
+
+    function hasQuestionAnswer(msg) {
+      // Check if at least one question has a selection or custom text
+      for (let i = 0; i < msg.questions.length; i++) {
+        const sel = msg.selectedAnswers[i];
+        const custom = (msg.customTexts[i] || '').trim();
+        if (custom || (Array.isArray(sel) ? sel.length > 0 : sel != null)) return true;
+      }
+      return false;
+    }
+
+    function getQuestionResponseSummary(msg) {
+      // Build a summary string of the user's answers
+      const parts = [];
+      for (let i = 0; i < msg.questions.length; i++) {
+        const custom = (msg.customTexts[i] || '').trim();
+        if (custom) {
+          parts.push(custom);
+        } else {
+          const sel = msg.selectedAnswers[i];
+          if (Array.isArray(sel)) parts.push(sel.join(', '));
+          else if (sel) parts.push(sel);
+        }
+      }
+      return parts.join(' | ');
     }
 
     // ── Sidebar: session management ──
@@ -514,6 +583,38 @@ const App = {
             });
             scrollToBottom();
           }
+        } else if (msg.type === 'ask_user_question') {
+          flushReveal();
+          finalizeStreamingMsg();
+          // Remove any preceding tool message for AskUserQuestion (tool_use arrives before control_request)
+          for (let i = messages.value.length - 1; i >= 0; i--) {
+            const m = messages.value[i];
+            if (m.role === 'tool' && m.toolName === 'AskUserQuestion') {
+              messages.value.splice(i, 1);
+              break;
+            }
+            // Only look back within recent messages
+            if (m.role === 'user') break;
+          }
+          // Render interactive question card
+          const questions = msg.questions || [];
+          const selectedAnswers = {};
+          const customTexts = {};
+          for (let i = 0; i < questions.length; i++) {
+            selectedAnswers[i] = questions[i].multiSelect ? [] : null;
+            customTexts[i] = '';
+          }
+          messages.value.push({
+            id: ++messageIdCounter,
+            role: 'ask-question',
+            requestId: msg.requestId,
+            questions,
+            answered: false,
+            selectedAnswers,
+            customTexts,
+            timestamp: new Date(),
+          });
+          scrollToBottom();
         } else if (msg.type === 'sessions_list') {
           historySessions.value = msg.sessions || [];
           loadingSessions.value = false;
@@ -667,6 +768,8 @@ const App = {
       sendMessage, handleKeydown, cancelExecution,
       getRenderedContent, copyMessage, toggleTool, isPrevAssistant, toggleContextSummary,
       getToolIcon, getToolSummary, autoResize,
+      // AskUserQuestion
+      selectQuestionOption, submitQuestionAnswer, hasQuestionAnswer, getQuestionResponseSummary,
       // Theme
       theme, toggleTheme,
       // Sidebar
@@ -824,6 +927,48 @@ const App = {
                   <div v-if="msg.expanded" class="tool-expand">
                     <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
                     <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
+                  </div>
+                </div>
+
+                <!-- AskUserQuestion interactive card -->
+                <div v-else-if="msg.role === 'ask-question'" class="ask-question-wrapper">
+                  <div v-if="!msg.answered" class="ask-question-card">
+                    <div v-for="(q, qi) in msg.questions" :key="qi" class="ask-question-block">
+                      <div v-if="q.header" class="ask-question-header">{{ q.header }}</div>
+                      <div class="ask-question-text">{{ q.question }}</div>
+                      <div class="ask-question-options">
+                        <div
+                          v-for="(opt, oi) in q.options" :key="oi"
+                          :class="['ask-question-option', {
+                            selected: q.multiSelect
+                              ? (msg.selectedAnswers[qi] || []).includes(opt.label)
+                              : msg.selectedAnswers[qi] === opt.label
+                          }]"
+                          @click="selectQuestionOption(msg, qi, opt.label)"
+                        >
+                          <div class="ask-option-label">{{ opt.label }}</div>
+                          <div v-if="opt.description" class="ask-option-desc">{{ opt.description }}</div>
+                        </div>
+                      </div>
+                      <div class="ask-question-custom">
+                        <input
+                          type="text"
+                          v-model="msg.customTexts[qi]"
+                          placeholder="Or type a custom response..."
+                          @input="msg.selectedAnswers[qi] = q.multiSelect ? [] : null"
+                          @keydown.enter="hasQuestionAnswer(msg) && submitQuestionAnswer(msg)"
+                        />
+                      </div>
+                    </div>
+                    <div class="ask-question-actions">
+                      <button class="ask-question-submit" :disabled="!hasQuestionAnswer(msg)" @click="submitQuestionAnswer(msg)">
+                        Submit
+                      </button>
+                    </div>
+                  </div>
+                  <div v-else class="ask-question-answered">
+                    <span class="ask-answered-icon">\u{2713}</span>
+                    <span class="ask-answered-text">{{ getQuestionResponseSummary(msg) }}</span>
                   </div>
                 </div>
 

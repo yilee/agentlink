@@ -41,10 +41,28 @@ export interface ConversationState {
 
 type SendFn = (msg: Record<string, unknown>) => void;
 
+// ── Control request types ──────────────────────────────────────────────────
+
+interface ControlRequest {
+  type: 'control_request';
+  request_id: string;
+  request: {
+    subtype: string;
+    tool_name?: string;
+    input?: Record<string, unknown>;
+  };
+}
+
+interface PendingControlRequest {
+  request: ControlRequest;
+  child: ChildProcess;
+}
+
 // ── Module state ───────────────────────────────────────────────────────────
 
 let conversation: ConversationState | null = null;
 let sendFn: SendFn = () => {};
+const pendingControlRequests = new Map<string, PendingControlRequest>();
 
 export function setSendFn(fn: SendFn): void {
   sendFn = fn;
@@ -106,6 +124,40 @@ export function cancelExecution(): void {
   sendFn({ type: 'execution_cancelled' });
 }
 
+/**
+ * Handle the user's answer to an AskUserQuestion control request.
+ * Writes a control_response back to Claude's stdin.
+ */
+export function handleUserAnswer(requestId: string, answers: Record<string, unknown>): void {
+  const pending = pendingControlRequests.get(requestId);
+  if (!pending) {
+    console.warn(`[Claude] No pending control request for requestId: ${requestId}`);
+    return;
+  }
+
+  pendingControlRequests.delete(requestId);
+  console.log(`[Claude] Answering AskUserQuestion ${requestId}`);
+
+  const controlResponse = {
+    type: 'control_response',
+    response: {
+      subtype: 'success',
+      request_id: pending.request.request_id,
+      response: {
+        behavior: 'allow',
+        updatedInput: {
+          questions: pending.request.request.input?.questions || [],
+          answers,
+        },
+      },
+    },
+  };
+
+  if (pending.child.stdin && !pending.child.stdin.destroyed) {
+    pending.child.stdin.write(JSON.stringify(controlResponse) + '\n');
+  }
+}
+
 // ── Internal ───────────────────────────────────────────────────────────────
 
 function startQuery(workDir: string, resumeSessionId?: string): void {
@@ -130,11 +182,17 @@ function startQuery(workDir: string, resumeSessionId?: string): void {
   conversation = state;
 
   // Build args
+  // bypassPermissions auto-approves all regular tool calls.
+  // --permission-prompt-tool stdio tells Claude CLI to send control_request
+  // via stdout for interactive tools (like AskUserQuestion) instead of
+  // auto-denying them. Our handleControlRequest() intercepts these and
+  // either auto-approves or forwards to the web UI.
   const args = [
     '--output-format', 'stream-json',
     '--input-format', 'stream-json',
     '--verbose',
     '--permission-mode', 'bypassPermissions',
+    '--permission-prompt-tool', 'stdio',
   ];
 
   if (resumeSessionId) {
@@ -212,6 +270,27 @@ async function processOutput(
             console.log(`[Claude] Session ID: ${state.claudeSessionId}`);
           }
 
+          // Handle control_request (tool permission checks)
+          if (msg.type === 'control_request') {
+            handleControlRequest(msg as unknown as ControlRequest, child);
+            continue;
+          }
+
+          // Handle control_cancel_request (abort pending questions)
+          if (msg.type === 'control_cancel_request') {
+            const reqId = (msg as unknown as { request_id: string }).request_id;
+            if (pendingControlRequests.has(reqId)) {
+              console.log(`[Claude] Control request cancelled: ${reqId}`);
+              pendingControlRequests.delete(reqId);
+            }
+            continue;
+          }
+
+          // Ignore control_response (responses to our own requests, if any)
+          if (msg.type === 'control_response') {
+            continue;
+          }
+
           messageStream.enqueue(msg);
         } catch {
           // Non-JSON line, ignore
@@ -273,7 +352,10 @@ async function processOutput(
           }
 
           // Forward tool_use blocks as-is (they appear once)
-          const toolBlocks = content.filter((b) => b.type === 'tool_use');
+          // Filter out AskUserQuestion — handled via control_request path
+          const toolBlocks = content.filter(
+            (b) => b.type === 'tool_use' && b.name !== 'AskUserQuestion'
+          );
           if (toolBlocks.length > 0) {
             sendFn({
               type: 'claude_output',
@@ -348,7 +430,50 @@ function sendOutput(data: ClaudeMessage): void {
   sendFn({ type: 'claude_output', data });
 }
 
+/**
+ * Handle an incoming control_request from Claude's stdout.
+ * For AskUserQuestion: forward to web UI and wait for user answer.
+ * For other tools: auto-approve immediately.
+ */
+function handleControlRequest(request: ControlRequest, child: ChildProcess): void {
+  const requestId = request.request_id;
+  const subtype = request.request?.subtype;
+
+  if (subtype === 'can_use_tool' && request.request.tool_name === 'AskUserQuestion') {
+    console.log(`[Claude] AskUserQuestion control_request: ${requestId}`);
+    pendingControlRequests.set(requestId, { request, child });
+
+    // Forward to web UI
+    sendFn({
+      type: 'ask_user_question',
+      requestId,
+      questions: (request.request.input as Record<string, unknown>)?.questions || [],
+    });
+    return;
+  }
+
+  // Auto-approve all other tool calls
+  const autoApproveResponse = {
+    type: 'control_response',
+    response: {
+      subtype: 'success',
+      request_id: requestId,
+      response: {
+        behavior: 'allow',
+        updatedInput: request.request.input || {},
+      },
+    },
+  };
+
+  if (child.stdin && !child.stdin.destroyed) {
+    child.stdin.write(JSON.stringify(autoApproveResponse) + '\n');
+  }
+}
+
 function cleanup(): void {
+  // Clear any pending control requests
+  pendingControlRequests.clear();
+
   if (conversation) {
     if (conversation.child && !conversation.child.killed) {
       conversation.child.kill();

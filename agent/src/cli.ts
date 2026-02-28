@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { resolveConfig, loadConfig, saveConfig, getConfigPath, loadRuntimeState, clearRuntimeState, getLogDir } from './config.js';
+import {
+  resolveConfig, loadConfig, saveConfig, getConfigPath,
+  loadRuntimeState, clearRuntimeState, getLogDir,
+  loadServerRuntimeState, clearServerRuntimeState,
+  killProcess, isProcessAlive,
+} from './config.js';
 import { spawn } from 'child_process';
 import { openSync } from 'fs';
-import { join } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const program = new Command();
@@ -41,7 +46,7 @@ program
 
       // Spawn detached child process running daemon.js
       const __filename = fileURLToPath(import.meta.url);
-      const daemonScript = join(__filename, '..', 'daemon.js');
+      const daemonScript = resolve(dirname(__filename), 'daemon.js');
       const logDir = getLogDir();
       const logFile = join(logDir, 'agent.log');
       const errFile = join(logDir, 'agent.err');
@@ -96,90 +101,170 @@ program
       return;
     }
 
-    // Check if the process is still alive
-    let alive = false;
-    try {
-      process.kill(state.pid, 0);
-      alive = true;
-    } catch {
-      // Process not found
-    }
-
-    if (!alive) {
+    if (!isProcessAlive(state.pid)) {
       console.log('Agent is not running (process already exited).');
       clearRuntimeState();
       return;
     }
 
     console.log(`Stopping agent (PID ${state.pid})...`);
-    try {
-      process.kill(state.pid, 'SIGTERM');
-    } catch (err) {
-      console.error(`Failed to stop agent: ${(err as Error).message}`);
+    if (!killProcess(state.pid)) {
+      console.error('Failed to stop agent.');
       process.exit(1);
     }
 
-    // Wait for the process to exit (poll up to 5 seconds)
+    // Wait for the process to exit
     const maxWait = 5000;
     const interval = 200;
     let waited = 0;
     while (waited < maxWait) {
       await new Promise(r => setTimeout(r, interval));
       waited += interval;
-      try {
-        process.kill(state.pid, 0);
-      } catch {
-        // Process exited
+      if (!isProcessAlive(state.pid)) {
         clearRuntimeState();
         console.log('Agent stopped.');
         return;
       }
     }
 
-    // Process didn't exit gracefully — force kill
-    console.log('Agent did not exit gracefully, force killing...');
-    try {
-      process.kill(state.pid, 'SIGKILL');
-    } catch {
-      // Already exited
-    }
     clearRuntimeState();
     console.log('Agent stopped.');
   });
 
 program
   .command('status')
-  .description('Show current agent status')
+  .description('Show current agent and server status')
   .action(async () => {
-    const state = loadRuntimeState();
-    if (!state) {
-      console.log('Agent is not running (no runtime state found).');
-      return;
-    }
-
-    // Check if the process is still alive
-    let alive = false;
-    try {
-      process.kill(state.pid, 0);
-      alive = true;
-    } catch {
-      // Process not found — stale state file
-    }
-
-    if (!alive) {
-      console.log('Agent is not running (process exited).');
+    // Agent status
+    const agentState = loadRuntimeState();
+    if (!agentState) {
+      console.log('Agent:  not running');
+    } else if (!isProcessAlive(agentState.pid)) {
+      console.log('Agent:  not running (stale state)');
       clearRuntimeState();
+    } else {
+      console.log('Agent:  running');
+      console.log(`  PID:        ${agentState.pid}`);
+      console.log(`  Name:       ${agentState.name}`);
+      console.log(`  Directory:  ${agentState.dir}`);
+      console.log(`  Server:     ${agentState.server}`);
+      console.log(`  Session:    ${agentState.sessionId}`);
+      console.log(`  URL:        ${agentState.sessionUrl}`);
+      console.log(`  Started:    ${agentState.startedAt}`);
+    }
+
+    // Server status
+    const serverState = loadServerRuntimeState();
+    if (!serverState) {
+      console.log('Server: not running');
+    } else if (!isProcessAlive(serverState.pid)) {
+      console.log('Server: not running (stale state)');
+      clearServerRuntimeState();
+    } else {
+      console.log('Server: running');
+      console.log(`  PID:        ${serverState.pid}`);
+      console.log(`  Port:       ${serverState.port}`);
+      console.log(`  Started:    ${serverState.startedAt}`);
+    }
+  });
+
+// ── Server commands ──
+
+const serverCmd = program
+  .command('server')
+  .description('Manage the AgentLink relay server');
+
+serverCmd
+  .command('start')
+  .description('Start the relay server in the background')
+  .option('-p, --port <port>', 'Server port', '3456')
+  .action(async (options) => {
+    const existing = loadServerRuntimeState();
+    if (existing && isProcessAlive(existing.pid)) {
+      console.log(`Server is already running (PID ${existing.pid}, port ${existing.port}).`);
+      console.log('Use "agentlink server stop" to stop it first.');
+      process.exit(1);
+    }
+    if (existing) clearServerRuntimeState();
+
+    const __filename = fileURLToPath(import.meta.url);
+    const serverScript = resolve(dirname(__filename), '../../server/dist/index.js');
+    const logDir = getLogDir();
+    const logFile = join(logDir, 'server.log');
+    const errFile = join(logDir, 'server.err');
+
+    const out = openSync(logFile, 'a');
+    const err = openSync(errFile, 'a');
+
+    const child = spawn(process.execPath, [serverScript], {
+      detached: true,
+      stdio: ['ignore', out, err],
+      env: { ...process.env, PORT: options.port },
+    });
+
+    child.unref();
+
+    // Wait for server to write its runtime state
+    const maxWait = 5000;
+    const interval = 300;
+    let waited = 0;
+    let state = null;
+    while (waited < maxWait) {
+      await new Promise(r => setTimeout(r, interval));
+      waited += interval;
+      state = loadServerRuntimeState();
+      if (state && state.pid !== process.pid) break;
+    }
+
+    if (state && state.pid !== process.pid) {
+      console.log(`Server started (PID ${state.pid}, port ${state.port}).`);
+      console.log(`  URL: http://localhost:${state.port}`);
+      console.log(`  Log: ${logFile}`);
+    } else {
+      console.error('Server may have failed to start. Check logs:');
+      console.error(`  ${errFile}`);
+      process.exit(1);
+    }
+  });
+
+serverCmd
+  .command('stop')
+  .description('Stop the running relay server')
+  .action(async () => {
+    const state = loadServerRuntimeState();
+    if (!state) {
+      console.log('Server is not running (no runtime state found).');
       return;
     }
 
-    console.log('Agent is running.\n');
-    console.log(`  PID:        ${state.pid}`);
-    console.log(`  Name:       ${state.name}`);
-    console.log(`  Directory:  ${state.dir}`);
-    console.log(`  Server:     ${state.server}`);
-    console.log(`  Session:    ${state.sessionId}`);
-    console.log(`  URL:        ${state.sessionUrl}`);
-    console.log(`  Started:    ${state.startedAt}`);
+    if (!isProcessAlive(state.pid)) {
+      console.log('Server is not running (process already exited).');
+      clearServerRuntimeState();
+      return;
+    }
+
+    console.log(`Stopping server (PID ${state.pid})...`);
+    if (!killProcess(state.pid)) {
+      console.error('Failed to stop server.');
+      process.exit(1);
+    }
+
+    // Wait for exit
+    const maxWait = 5000;
+    const interval = 200;
+    let waited = 0;
+    while (waited < maxWait) {
+      await new Promise(r => setTimeout(r, interval));
+      waited += interval;
+      if (!isProcessAlive(state.pid)) {
+        clearServerRuntimeState();
+        console.log('Server stopped.');
+        return;
+      }
+    }
+
+    clearServerRuntimeState();
+    console.log('Server stopped.');
   });
 
 const configCmd = program

@@ -339,10 +339,10 @@ agentlink/
 
 | File | Purpose | Key exports |
 |------|---------|-------------|
-| `cli.ts` | Commander.js CLI entry point | `start`, `stop`, `status`, `config` subcommands |
-| `config.ts` | Persistent config (`~/.agentlink/config.json`) | `loadConfig()`, `saveConfig()`, `resolveConfig()` |
+| `cli.ts` | Commander.js CLI entry point | `start`, `stop`, `status`, `config`, `server start/stop` subcommands |
+| `config.ts` | Persistent config (`~/.agentlink/config.json`) | `loadConfig()`, `saveConfig()`, `resolveConfig()`, `loadServerRuntimeState()`, `killProcess()`, `isProcessAlive()` |
 | `connection.ts` | WebSocket client to server | `connect()`, `disconnect()`, `send()` + message router |
-| `claude.ts` | Claude CLI subprocess lifecycle | `handleChat()`, `abort()`, `cancelExecution()`, `setSendFn()` |
+| `claude.ts` | Claude CLI subprocess lifecycle | `handleChat()`, `abort()`, `cancelExecution()`, `setSendFn()`, `handleUserAnswer()` |
 | `sdk.ts` | Resolves `claude` command location | `resolveClaudeCommand()`, `getCleanEnv()`, `streamToStdin()` |
 | `stream.ts` | AsyncIterable\<T\> with enqueue/done | `Stream` class (used for stdin/stdout piping) |
 | `history.ts` | Reads `~/.claude/projects/` JSONL files | `listSessions()`, `readSessionMessages()` |
@@ -353,14 +353,26 @@ agentlink/
 
 **Lifecycle:**
 1. First user message → `startQuery()` spawns `claude` subprocess
-2. Claude runs with `--output-format stream-json --input-format stream-json --verbose --permission-mode bypassPermissions`
+2. Claude runs with `--output-format stream-json --input-format stream-json --verbose --permission-mode bypassPermissions --permission-prompt-tool stdio`
 3. User messages enqueued into `Stream<ClaudeMessage>` → piped to stdin
 4. Stdout parsed as JSON lines by `readline` → forwarded to web client
 5. On `result` message → turn complete, process stays alive for next turn
 6. On `--resume <sessionId>` → resumes previous Claude session
 
+**Permission & control_request protocol:**
+- `--permission-mode bypassPermissions` auto-approves all regular tool calls
+- `--permission-prompt-tool stdio` routes interactive tool permission checks (like `AskUserQuestion`) through stdout/stdin instead of auto-denying them
+- Claude emits `control_request` with `subtype: 'can_use_tool'` on stdout
+- Agent's `handleControlRequest()` intercepts these:
+  - `AskUserQuestion`: stored in `pendingControlRequests` Map, forwarded to web UI as `ask_user_question` message
+  - All other tools: auto-approved by sending `control_response` with `{ behavior: 'allow' }` back to stdin
+- When web UI submits an answer, agent receives `ask_user_answer`, resolves the pending request by writing `control_response` to Claude's stdin with `updatedInput` containing the user's answers
+- `AskUserQuestion` tool_use blocks are filtered out of regular `claude_output` forwarding (they're handled via the control_request path)
+
 **Output processing:**
-- `assistant` messages: extracts text deltas (incremental) + tool_use blocks
+- `assistant` messages: extracts text deltas (incremental) + tool_use blocks (excluding `AskUserQuestion`)
+- `control_request` messages: intercepted for permission handling
+- `control_cancel_request`: cleans up pending requests
 - `user` messages: tool_result forwarding
 - `system` messages: session ID capture, logged only
 - `result` message: turn complete signal
@@ -413,6 +425,7 @@ interface ConversationState {
 | `resume_conversation` | Resume a historical session | `claudeSessionId` |
 | `list_directory` | Browse host filesystem | `dirPath` |
 | `change_workdir` | Switch working directory | `workDir` |
+| `ask_user_answer` | User's answer to AskUserQuestion | `requestId`, `answers: { questionText: selectedLabel }` |
 
 **Message types (Agent → Web):**
 
@@ -425,6 +438,7 @@ interface ConversationState {
 | `conversation_resumed` | Session resumed with history | `claudeSessionId, history[]` |
 | `directory_listing` | Filesystem directory contents | `dirPath, entries[], error?` |
 | `workdir_changed` | Working directory updated | `workDir` |
+| `ask_user_question` | Interactive question from Claude | `requestId`, `questions[]` (with header, question, options, multiSelect) |
 
 **claude_output subtypes:**
 
@@ -459,6 +473,7 @@ interface ConversationState {
 - Markdown rendering: marked.js + highlight.js, code block copy buttons
 - Streaming text: progressive reveal (3 chars/tick, 12ms interval)
 - Tool display: icon + name + summary line, expandable input/output
+- AskUserQuestion: interactive card with selectable options, custom text input, submit button
 - Stop button during processing
 
 **Input area:**
@@ -503,6 +518,15 @@ Priority: **CLI flags > config file > defaults**
 | `dir` | `process.cwd()` | Working directory |
 | `name` | `Agent-{platform}-{pid}` | Agent display name |
 
+**Runtime state files (`~/.agentlink/`):**
+
+| File | Written by | Contains |
+|------|-----------|----------|
+| `agent.json` | Agent process | PID, sessionId, sessionUrl, server, name, dir, startedAt |
+| `server.json` | Server process | PID, port, startedAt |
+
+Used by `agentlink stop`, `agentlink server stop`, and `agentlink status` to find and manage running processes. On Windows, `taskkill /pid /f /t` is used for reliable termination; on Unix, `SIGTERM`.
+
 ### Build & Run Commands
 
 ```bash
@@ -512,21 +536,28 @@ npm install
 # Build all TypeScript packages
 npm run build
 
-# Start server (serves web UI on http://localhost:3456)
-npm run start:server
-
 # Dev mode with hot reload
 npm run dev:server       # server only
 npm run dev:agent        # agent only
 npm run dev              # both (concurrently)
 
+# Server management via CLI
+agentlink server start                         # start server in background (port 3456)
+agentlink server start --port 8080             # custom port
+agentlink server stop                          # stop the server
+
 # Agent CLI
-node agent/dist/cli.js start                        # use config file defaults
-node agent/dist/cli.js start --server ws://localhost:3456  # override server
-node agent/dist/cli.js config list                   # show config
-node agent/dist/cli.js config set server ws://localhost:3456
-node agent/dist/cli.js config get server
-node agent/dist/cli.js --help
+agentlink start                                # foreground mode, use config defaults
+agentlink start --server ws://localhost:3456    # override server
+agentlink start --daemon                       # background mode
+agentlink stop                                 # stop the agent
+agentlink status                               # show agent + server status
+
+# Config
+agentlink config list                          # show config
+agentlink config set server ws://localhost:3456
+agentlink config get server
+agentlink --help
 ```
 
 ### Implementation Status
@@ -534,18 +565,24 @@ node agent/dist/cli.js --help
 - [x] Monorepo skeleton (npm workspaces, TypeScript, build pipeline)
 - [x] Server: Express + WebSocket + static file serving + health endpoint
 - [x] Server: transparent message relay (web ↔ agent)
-- [x] Agent CLI: Commander.js with start/stop/status/config commands
+- [x] Server: runtime state file (`server.json`) for CLI management
+- [x] Agent CLI: Commander.js with start/stop/status/config/server commands
+- [x] Agent CLI: server start/stop subcommands (background daemon, PID tracking)
+- [x] Agent CLI: cross-platform process kill (taskkill on Windows, SIGTERM on Unix)
 - [x] Agent config: persistent config file with priority resolution
 - [x] WebSocket connection layer (agent ↔ server ↔ web client)
 - [x] Session registration (unique session URL via base64url IDs)
 - [x] Auto-reconnect on connection loss (exponential backoff, 20 attempts)
 - [x] Claude SDK integration (spawn claude CLI, stream-json I/O, turn management)
-- [x] Runtime state tracking (`~/.agentlink/agent.json`, `agentlink status`)
-- [x] Process management (`agentlink stop`, `agentlink start --daemon`)
+- [x] Claude: control_request/control_response protocol (`--permission-prompt-tool stdio`)
+- [x] Claude: AskUserQuestion interception (forward to web UI, collect answer, reply to stdin)
+- [x] Runtime state tracking (`~/.agentlink/agent.json`, `~/.agentlink/server.json`)
+- [x] Process management (`agentlink stop`, `agentlink start --daemon`, `agentlink server start/stop`)
 - [x] Web UI: chat interface (message list, input, send/receive, typing indicator)
 - [x] Web UI: markdown rendering (marked.js + highlight.js, code block copy)
 - [x] Web UI: streaming text display (progressive character reveal)
 - [x] Web UI: tool use display (collapsible blocks with icon, name, input/output)
+- [x] Web UI: AskUserQuestion interactive card (options, custom input, submit)
 - [x] Web UI: stop/cancel button during processing
 - [x] Web UI: sidebar with working directory display
 - [x] Web UI: session history list (reads Claude's JSONL files)

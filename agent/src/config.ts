@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
+import { execSync } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -17,6 +18,7 @@ const DEFAULTS: AgentConfig = {
 const CONFIG_DIR = join(homedir(), '.agentlink');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 const RUNTIME_FILE = join(CONFIG_DIR, 'agent.json');
+const SERVER_RUNTIME_FILE = join(CONFIG_DIR, 'server.json');
 const LOG_DIR = join(CONFIG_DIR, 'logs');
 
 function ensureConfigDir(): void {
@@ -96,4 +98,60 @@ export function getLogDir(): string {
     mkdirSync(LOG_DIR, { recursive: true });
   }
   return LOG_DIR;
+}
+
+// ── Server runtime state ──
+
+export interface ServerRuntimeState {
+  pid: number;
+  port: number;
+  startedAt: string;
+}
+
+export function saveServerRuntimeState(state: ServerRuntimeState): void {
+  ensureConfigDir();
+  writeFileSync(SERVER_RUNTIME_FILE, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+}
+
+export function loadServerRuntimeState(): ServerRuntimeState | null {
+  try {
+    const raw = readFileSync(SERVER_RUNTIME_FILE, 'utf-8');
+    return JSON.parse(raw) as ServerRuntimeState;
+  } catch {
+    return null;
+  }
+}
+
+export function clearServerRuntimeState(): void {
+  try {
+    unlinkSync(SERVER_RUNTIME_FILE);
+  } catch {
+    // file may not exist
+  }
+}
+
+// ── Cross-platform process kill ──
+
+export function killProcess(pid: number): boolean {
+  try {
+    if (process.platform === 'win32') {
+      // On Windows, process.kill(pid, 'SIGTERM') doesn't reliably terminate
+      // processes started in separate console windows. Use taskkill instead.
+      execSync(`taskkill /pid ${pid} /f /t`, { stdio: 'ignore' });
+    } else {
+      process.kill(pid, 'SIGTERM');
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }

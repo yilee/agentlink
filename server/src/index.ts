@@ -3,11 +3,15 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { writeFileSync, unlinkSync, mkdirSync, existsSync } from 'fs';
+import { homedir } from 'os';
 import { agents, webClients } from './context.js';
 import { handleAgentConnection } from './ws-agent.js';
 import { handleWebConnection } from './ws-client.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const AGENTLINK_DIR = join(homedir(), '.agentlink');
+const SERVER_RUNTIME_FILE = join(AGENTLINK_DIR, 'server.json');
 
 const PORT = parseInt(process.env.PORT || '3456', 10);
 
@@ -95,4 +99,22 @@ setInterval(() => {
 server.listen(PORT, () => {
   console.log(`[AgentLink] Server listening on http://localhost:${PORT}`);
   console.log(`[AgentLink] Web UI: ${webDir}`);
+
+  // Write server runtime state for CLI stop command
+  if (!existsSync(AGENTLINK_DIR)) {
+    mkdirSync(AGENTLINK_DIR, { recursive: true });
+  }
+  writeFileSync(SERVER_RUNTIME_FILE, JSON.stringify({
+    pid: process.pid,
+    port: PORT,
+    startedAt: new Date().toISOString(),
+  }, null, 2) + '\n', 'utf-8');
 });
+
+// Clean up runtime state on exit
+function cleanupServerState(): void {
+  try { unlinkSync(SERVER_RUNTIME_FILE); } catch {}
+}
+process.on('exit', cleanupServerState);
+process.on('SIGINT', () => { cleanupServerState(); process.exit(0); });
+process.on('SIGTERM', () => { cleanupServerState(); process.exit(0); });
