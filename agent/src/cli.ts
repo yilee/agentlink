@@ -3,7 +3,6 @@ import { Command } from 'commander';
 import {
   resolveConfig, loadConfig, saveConfig, getConfigPath,
   loadRuntimeState, clearRuntimeState, getLogDir,
-  loadServerRuntimeState, clearServerRuntimeState,
   killProcess, isProcessAlive,
 } from './config.js';
 import { spawn } from 'child_process';
@@ -14,7 +13,7 @@ import { fileURLToPath } from 'url';
 const program = new Command();
 
 program
-  .name('agentlink')
+  .name('agentlink-client')
   .description('Local agent that proxies a working directory to a cloud web interface')
   .version('0.1.0');
 
@@ -37,7 +36,7 @@ program
         if (alive) {
           console.log(`Agent is already running (PID ${existing.pid}).`);
           console.log(`  URL: ${existing.sessionUrl}`);
-          console.log('Use "agentlink stop" to stop it first.');
+          console.log('Use "agentlink-client stop" to stop it first.');
           process.exit(1);
         }
         // Stale state, clean up
@@ -133,7 +132,7 @@ program
 
 program
   .command('status')
-  .description('Show current agent and server status')
+  .description('Show current agent status')
   .action(async () => {
     // Agent status
     const agentState = loadRuntimeState();
@@ -152,119 +151,6 @@ program
       console.log(`  URL:        ${agentState.sessionUrl}`);
       console.log(`  Started:    ${agentState.startedAt}`);
     }
-
-    // Server status
-    const serverState = loadServerRuntimeState();
-    if (!serverState) {
-      console.log('Server: not running');
-    } else if (!isProcessAlive(serverState.pid)) {
-      console.log('Server: not running (stale state)');
-      clearServerRuntimeState();
-    } else {
-      console.log('Server: running');
-      console.log(`  PID:        ${serverState.pid}`);
-      console.log(`  Port:       ${serverState.port}`);
-      console.log(`  Started:    ${serverState.startedAt}`);
-    }
-  });
-
-// ── Server commands ──
-
-const serverCmd = program
-  .command('server')
-  .description('Manage the AgentLink relay server');
-
-serverCmd
-  .command('start')
-  .description('Start the relay server in the background')
-  .option('-p, --port <port>', 'Server port', '3456')
-  .action(async (options) => {
-    const existing = loadServerRuntimeState();
-    if (existing && isProcessAlive(existing.pid)) {
-      console.log(`Server is already running (PID ${existing.pid}, port ${existing.port}).`);
-      console.log('Use "agentlink server stop" to stop it first.');
-      process.exit(1);
-    }
-    if (existing) clearServerRuntimeState();
-
-    const __filename = fileURLToPath(import.meta.url);
-    const serverScript = resolve(dirname(__filename), '../../server/dist/index.js');
-    const logDir = getLogDir();
-    const logFile = join(logDir, 'server.log');
-    const errFile = join(logDir, 'server.err');
-
-    const out = openSync(logFile, 'a');
-    const err = openSync(errFile, 'a');
-
-    const child = spawn(process.execPath, [serverScript], {
-      detached: true,
-      stdio: ['ignore', out, err],
-      env: { ...process.env, PORT: options.port },
-    });
-
-    child.unref();
-
-    // Wait for server to write its runtime state
-    const maxWait = 5000;
-    const interval = 300;
-    let waited = 0;
-    let state = null;
-    while (waited < maxWait) {
-      await new Promise(r => setTimeout(r, interval));
-      waited += interval;
-      state = loadServerRuntimeState();
-      if (state && state.pid !== process.pid) break;
-    }
-
-    if (state && state.pid !== process.pid) {
-      console.log(`Server started (PID ${state.pid}, port ${state.port}).`);
-      console.log(`  URL: http://localhost:${state.port}`);
-      console.log(`  Log: ${logFile}`);
-    } else {
-      console.error('Server may have failed to start. Check logs:');
-      console.error(`  ${errFile}`);
-      process.exit(1);
-    }
-  });
-
-serverCmd
-  .command('stop')
-  .description('Stop the running relay server')
-  .action(async () => {
-    const state = loadServerRuntimeState();
-    if (!state) {
-      console.log('Server is not running (no runtime state found).');
-      return;
-    }
-
-    if (!isProcessAlive(state.pid)) {
-      console.log('Server is not running (process already exited).');
-      clearServerRuntimeState();
-      return;
-    }
-
-    console.log(`Stopping server (PID ${state.pid})...`);
-    if (!killProcess(state.pid)) {
-      console.error('Failed to stop server.');
-      process.exit(1);
-    }
-
-    // Wait for exit
-    const maxWait = 5000;
-    const interval = 200;
-    let waited = 0;
-    while (waited < maxWait) {
-      await new Promise(r => setTimeout(r, interval));
-      waited += interval;
-      if (!isProcessAlive(state.pid)) {
-        clearServerRuntimeState();
-        console.log('Server stopped.');
-        return;
-      }
-    }
-
-    clearServerRuntimeState();
-    console.log('Server stopped.');
   });
 
 const configCmd = program

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "agentlink": "dist/cli.js"
+    "agentlink-client": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",

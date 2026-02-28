@@ -309,18 +309,20 @@ agentlink/
 ├── requirements.md           # Product requirements
 ├── CLAUDE.md                 # This file
 ├── server/
-│   ├── package.json          # Express 4.18 + ws 8.16
+│   ├── package.json          # Express 4.18 + ws 8.16 + Commander.js 12, bin: agentlink-server
 │   ├── tsconfig.json         # extends ../tsconfig.base.json
 │   └── src/
+│       ├── cli.ts            # Server CLI entry point (start/stop/status)
+│       ├── config.ts         # Server runtime state (~/.agentlink/server.json)
 │       ├── index.ts          # HTTP server + WebSocket routing + static serving
 │       ├── context.ts        # Shared state (agents, webClients, sessionToAgent maps)
 │       ├── ws-agent.ts       # Agent WebSocket handler (registration, message forwarding)
 │       └── ws-client.ts      # Web client WebSocket handler (session binding, forwarding)
 ├── agent/
-│   ├── package.json          # Commander.js 12 + ws 8.16, bin: agentlink
+│   ├── package.json          # Commander.js 12 + ws 8.16, bin: agentlink-client
 │   ├── tsconfig.json         # extends ../tsconfig.base.json
 │   └── src/
-│       ├── cli.ts            # CLI entry point (start/stop/status/config)
+│       ├── cli.ts            # Client CLI entry point (start/stop/status/config)
 │       ├── config.ts         # Config load/save/resolve (~/.agentlink/config.json)
 │       ├── connection.ts     # WebSocket client (connect, reconnect, message dispatch)
 │       ├── claude.ts         # Claude CLI subprocess (spawn, stream-json I/O, turn mgmt)
@@ -339,8 +341,8 @@ agentlink/
 
 | File | Purpose | Key exports |
 |------|---------|-------------|
-| `cli.ts` | Commander.js CLI entry point | `start`, `stop`, `status`, `config`, `server start/stop` subcommands |
-| `config.ts` | Persistent config (`~/.agentlink/config.json`) | `loadConfig()`, `saveConfig()`, `resolveConfig()`, `loadServerRuntimeState()`, `killProcess()`, `isProcessAlive()` |
+| `cli.ts` | Commander.js CLI entry point | `start`, `stop`, `status`, `config` subcommands |
+| `config.ts` | Persistent config (`~/.agentlink/config.json`) | `loadConfig()`, `saveConfig()`, `resolveConfig()`, `killProcess()`, `isProcessAlive()` |
 | `connection.ts` | WebSocket client to server | `connect()`, `disconnect()`, `send()` + message router |
 | `claude.ts` | Claude CLI subprocess lifecycle | `handleChat()`, `abort()`, `cancelExecution()`, `setSendFn()`, `handleUserAnswer()` |
 | `sdk.ts` | Resolves `claude` command location | `resolveClaudeCommand()`, `getCleanEnv()`, `streamToStdin()` |
@@ -543,23 +545,25 @@ npm run dev:server       # server only
 npm run dev:agent        # agent only
 npm run dev              # both (concurrently)
 
-# Server management via CLI
-agentlink server start                         # start server in background (port 3456)
-agentlink server start --port 8080             # custom port
-agentlink server stop                          # stop the server
+# Server management (agentlink-server CLI)
+agentlink-server start                         # start server in foreground (port 3456)
+agentlink-server start --daemon                # start server in background
+agentlink-server start --port 8080             # custom port
+agentlink-server stop                          # stop the server
+agentlink-server status                        # show server status
 
-# Agent CLI
-agentlink start                                # foreground mode, use config defaults
-agentlink start --server ws://localhost:3456    # override server
-agentlink start --daemon                       # background mode
-agentlink stop                                 # stop the agent
-agentlink status                               # show agent + server status
+# Client / Agent management (agentlink-client CLI)
+agentlink-client start                                # foreground mode, use config defaults
+agentlink-client start --server ws://localhost:3456    # override server
+agentlink-client start --daemon                       # background mode
+agentlink-client stop                                 # stop the agent
+agentlink-client status                               # show agent status
 
 # Config
-agentlink config list                          # show config
-agentlink config set server ws://localhost:3456
-agentlink config get server
-agentlink --help
+agentlink-client config list                          # show config
+agentlink-client config set server ws://localhost:3456
+agentlink-client config get server
+agentlink-client --help
 ```
 
 ### Implementation Status
@@ -568,8 +572,8 @@ agentlink --help
 - [x] Server: Express + WebSocket + static file serving + health endpoint
 - [x] Server: transparent message relay (web ↔ agent)
 - [x] Server: runtime state file (`server.json`) for CLI management
-- [x] Agent CLI: Commander.js with start/stop/status/config/server commands
-- [x] Agent CLI: server start/stop subcommands (background daemon, PID tracking)
+- [x] Agent CLI: Commander.js with start/stop/status/config commands (`agentlink-client`)
+- [x] Server CLI: Commander.js with start/stop/status commands (`agentlink-server`)
 - [x] Agent CLI: cross-platform process kill (taskkill on Windows, SIGTERM on Unix)
 - [x] Agent config: persistent config file with priority resolution
 - [x] WebSocket connection layer (agent ↔ server ↔ web client)
