@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AgentLink — Claude Code in Your Browser</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -82,14 +83,6 @@
     color: var(--text-dim);
     max-width: 550px;
     margin: 0 auto 1.5rem;
-  }
-
-  .hero-trust {
-    font-size: 0.95rem !important;
-    color: var(--green) !important;
-    font-weight: 500;
-    margin-bottom: 3rem !important;
-    letter-spacing: 0.01em;
   }
 
   /* ── Install box ── */
@@ -218,43 +211,6 @@
     margin-bottom: 2rem;
   }
 
-  .diagram {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-    flex-wrap: wrap;
-    margin-bottom: 1.5rem;
-  }
-
-  .diagram-node {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem 1.5rem;
-    text-align: center;
-    min-width: 140px;
-  }
-
-  .diagram-node .node-label {
-    font-size: 0.75rem;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .diagram-node .node-name {
-    font-weight: 700;
-    font-size: 1rem;
-    margin-top: 0.25rem;
-  }
-
-  .diagram-arrow {
-    color: var(--accent);
-    font-size: 1.5rem;
-    padding: 0 0.5rem;
-  }
-
   .how p {
     color: var(--text-dim);
     font-size: 0.95rem;
@@ -275,8 +231,6 @@
   @media (max-width: 640px) {
     .hero { padding: 4rem 1.5rem 3rem; }
     .install { padding: 1.5rem; margin: 0 1rem 3rem; }
-    .diagram { flex-direction: column; }
-    .diagram-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
   }
 </style>
 </head>
@@ -291,8 +245,7 @@
 
 <section class="hero">
   <h1>Claude Code,<br><em>in your browser</em></h1>
-  <p>Run Claude Code on your machine, use it from any browser. Two commands to get started.</p>
-  <p class="hero-trust">End-to-end encrypted. The server is a relay — it never sees, stores, or logs your data.</p>
+  <p>Run Claude Code on your machine, use it from any browser.</p>
 </section>
 
 <section class="install">
@@ -349,27 +302,6 @@
 
 <section class="how">
   <h2>How it works</h2>
-  <div class="diagram">
-    <div class="diagram-node">
-      <div class="node-label">Your browser</div>
-      <div class="node-name">Web UI</div>
-    </div>
-    <div class="diagram-arrow">&harr;</div>
-    <div class="diagram-node">
-      <div class="node-label">Encrypted relay</div>
-      <div class="node-name">Server</div>
-    </div>
-    <div class="diagram-arrow">&harr;</div>
-    <div class="diagram-node">
-      <div class="node-label">Your machine</div>
-      <div class="node-name">Agent</div>
-    </div>
-    <div class="diagram-arrow">&harr;</div>
-    <div class="diagram-node">
-      <div class="node-label">Local CLI</div>
-      <div class="node-name">Claude Code</div>
-    </div>
-  </div>
   <p>The agent on your machine spawns Claude Code, streams output through the relay server to your browser, and sends your messages back. All tool execution happens locally. <strong>All traffic is end-to-end encrypted — the server is a stateless relay that never decrypts, stores, or logs your data.</strong></p>
 </section>
 
