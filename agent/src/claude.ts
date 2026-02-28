@@ -432,6 +432,27 @@ async function processOutput(
       if (msg.type === 'user') {
         // New turn segment — reset delta tracker for next assistant message
         lastSentText = '';
+
+        // Check for command output (e.g. /cost, /context) — extract and send separately
+        const message = msg.message as { content?: unknown } | undefined;
+        if (message && message.content) {
+          const raw = typeof message.content === 'string'
+            ? message.content
+            : Array.isArray(message.content)
+              ? (message.content as Array<{ type: string; text?: string }>)
+                  .filter(b => b.type === 'text')
+                  .map(b => b.text || '')
+                  .join('')
+              : '';
+          const stdoutMatch = raw.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/);
+          const stderrMatch = raw.match(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/);
+          const cmdOutput = (stdoutMatch && stdoutMatch[1].trim()) || (stderrMatch && stderrMatch[1].trim());
+          if (cmdOutput) {
+            sendFn({ type: 'command_output', content: cmdOutput });
+            continue;
+          }
+        }
+
         sendOutput(msg);
         continue;
       }
