@@ -750,6 +750,60 @@ body {
   color: var(--text-primary);
 }
 
+/* ── Context summary (collapsible continuation notice) ── */
+.context-summary-wrapper {
+  margin: 0.75rem 0;
+}
+
+.context-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.context-summary-bar:hover {
+  background: var(--bg-tertiary);
+}
+
+.context-summary-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.context-summary-label {
+  flex: 1;
+}
+
+.context-summary-toggle {
+  font-size: 0.72rem;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.context-summary-body {
+  margin-top: 6px;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.context-summary-body .markdown-body {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
 /* ── System message ── */
 .system-msg {
   text-align: center;

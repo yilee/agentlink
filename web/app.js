@@ -73,6 +73,12 @@ const TOOL_SVG_DEFAULT = '<svg viewBox="0 0 16 16" width="14" height="14"><path 
 function getToolIcon(name) { return TOOL_SVG[name] || TOOL_SVG_DEFAULT; }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+const CONTEXT_SUMMARY_PREFIX = 'This session is being continued from a previous conversation';
+
+function isContextSummary(text) {
+  return typeof text === 'string' && text.trimStart().startsWith(CONTEXT_SUMMARY_PREFIX);
+}
+
 function formatRelativeTime(ts) {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
@@ -263,6 +269,25 @@ const App = {
       return prev.role === 'assistant' || prev.role === 'tool';
     }
 
+    // ── Context summary toggle ──
+    function toggleContextSummary(msg) {
+      msg.contextExpanded = !msg.contextExpanded;
+    }
+
+    // ── Finalize a streaming message (mark done, detect context summary) ──
+    function finalizeStreamingMsg() {
+      if (streamingMessageId === null) return;
+      const streamMsg = messages.value.find(m => m.id === streamingMessageId);
+      if (streamMsg) {
+        streamMsg.isStreaming = false;
+        if (isContextSummary(streamMsg.content)) {
+          streamMsg.role = 'context-summary';
+          streamMsg.contextExpanded = false;
+        }
+      }
+      streamingMessageId = null;
+    }
+
     // ── Tool expand/collapse ──
     function toggleTool(msg) {
       msg.expanded = !msg.expanded;
@@ -397,11 +422,7 @@ const App = {
         } else if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
           isProcessing.value = false;
           flushReveal();
-          if (streamingMessageId !== null) {
-            const streamMsg = messages.value.find(m => m.id === streamingMessageId);
-            if (streamMsg) streamMsg.isStreaming = false;
-            streamingMessageId = null;
-          }
+          finalizeStreamingMsg();
           if (msg.type === 'execution_cancelled') {
             messages.value.push({
               id: ++messageIdCounter, role: 'system',
@@ -418,10 +439,18 @@ const App = {
           if (msg.history && Array.isArray(msg.history)) {
             for (const h of msg.history) {
               if (h.role === 'user') {
-                messages.value.push({
-                  id: ++messageIdCounter, role: 'user',
-                  content: h.content, timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
-                });
+                if (isContextSummary(h.content)) {
+                  messages.value.push({
+                    id: ++messageIdCounter, role: 'context-summary',
+                    content: h.content, contextExpanded: false,
+                    timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                  });
+                } else {
+                  messages.value.push({
+                    id: ++messageIdCounter, role: 'user',
+                    content: h.content, timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                  });
+                }
               } else if (h.role === 'assistant') {
                 // Merge with previous assistant message if consecutive
                 const last = messages.value[messages.value.length - 1];
@@ -479,11 +508,7 @@ const App = {
 
       if (data.type === 'tool_use' && data.tools) {
         flushReveal();
-        if (streamingMessageId !== null) {
-          const streamMsg = messages.value.find(m => m.id === streamingMessageId);
-          if (streamMsg) streamMsg.isStreaming = false;
-          streamingMessageId = null;
-        }
+        finalizeStreamingMsg();
 
         for (const tool of data.tools) {
           messages.value.push({
@@ -534,7 +559,7 @@ const App = {
       status, agentName, workDir, sessionId, error,
       messages, inputText, isProcessing, canSend, inputRef,
       sendMessage, handleKeydown, cancelExecution,
-      getRenderedContent, copyMessage, toggleTool, isPrevAssistant,
+      getRenderedContent, copyMessage, toggleTool, isPrevAssistant, toggleContextSummary,
       getToolIcon, getToolSummary, autoResize,
       // Theme
       theme, toggleTheme,
@@ -679,6 +704,18 @@ const App = {
                   <div v-if="msg.expanded" class="tool-expand">
                     <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
                     <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
+                  </div>
+                </div>
+
+                <!-- Context summary (collapsed by default) -->
+                <div v-else-if="msg.role === 'context-summary'" class="context-summary-wrapper">
+                  <div class="context-summary-bar" @click="toggleContextSummary(msg)">
+                    <svg class="context-summary-icon" viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Zm7 2.25v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 9a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
+                    <span class="context-summary-label">Context continued from previous conversation</span>
+                    <span class="context-summary-toggle">{{ msg.contextExpanded ? 'Hide' : 'Show' }}</span>
+                  </div>
+                  <div v-if="msg.contextExpanded" class="context-summary-body">
+                    <div class="markdown-body" v-html="getRenderedContent({ role: 'assistant', content: msg.content })"></div>
                   </div>
                 </div>
 
