@@ -65,6 +65,19 @@ const TOOL_ICONS = {
 };
 function getToolIcon(name) { return TOOL_ICONS[name] || '\u{2699}\u{FE0F}'; }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function formatRelativeTime(ts) {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
 // ── App ─────────────────────────────────────────────────────────────────────
 const App = {
   setup() {
@@ -77,6 +90,13 @@ const App = {
     const inputText = ref('');
     const isProcessing = ref(false);
     const inputRef = ref(null);
+
+    // Sidebar state
+    const sidebarOpen = ref(true);
+    const historySessions = ref([]);
+    const currentClaudeSessionId = ref(null);
+    const loadingSessions = ref(false);
+
     let ws = null;
     let messageIdCounter = 0;
     let streamingMessageId = null;
@@ -167,7 +187,6 @@ const App = {
 
       const text = inputText.value.trim();
       inputText.value = '';
-      // Reset textarea height
       if (inputRef.value) inputRef.value.style.height = 'auto';
 
       messages.value.push({
@@ -177,7 +196,12 @@ const App = {
       isProcessing.value = true;
       scrollToBottom();
 
-      ws.send(JSON.stringify({ type: 'chat', prompt: text }));
+      // If we have a resumed session and this is the first message, pass it along
+      const payload = { type: 'chat', prompt: text };
+      if (currentClaudeSessionId.value && messages.value.filter(m => m.role === 'user').length === 1) {
+        payload.resumeSessionId = currentClaudeSessionId.value;
+      }
+      ws.send(JSON.stringify(payload));
     }
 
     function cancelExecution() {
@@ -227,6 +251,58 @@ const App = {
       return '';
     }
 
+    // ── Sidebar: session management ──
+    function requestSessionList() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      loadingSessions.value = true;
+      ws.send(JSON.stringify({ type: 'list_sessions' }));
+    }
+
+    function resumeSession(session) {
+      if (isProcessing.value) return;
+      // Clear current conversation
+      messages.value = [];
+      messageIdCounter = 0;
+      streamingMessageId = null;
+      pendingText = '';
+      if (revealTimer !== null) { clearTimeout(revealTimer); revealTimer = null; }
+
+      currentClaudeSessionId.value = session.sessionId;
+
+      // Notify agent to prepare for resume
+      ws.send(JSON.stringify({
+        type: 'resume_conversation',
+        claudeSessionId: session.sessionId,
+      }));
+
+      // Add a system message so the user knows which session was loaded
+      messages.value.push({
+        id: ++messageIdCounter, role: 'system',
+        content: `Resumed session: ${session.title}`,
+        timestamp: new Date(),
+      });
+    }
+
+    function newConversation() {
+      if (isProcessing.value) return;
+      messages.value = [];
+      messageIdCounter = 0;
+      streamingMessageId = null;
+      pendingText = '';
+      currentClaudeSessionId.value = null;
+      if (revealTimer !== null) { clearTimeout(revealTimer); revealTimer = null; }
+
+      messages.value.push({
+        id: ++messageIdCounter, role: 'system',
+        content: 'New conversation started.',
+        timestamp: new Date(),
+      });
+    }
+
+    function toggleSidebar() {
+      sidebarOpen.value = !sidebarOpen.value;
+    }
+
     // ── WebSocket ──
     function connect() {
       const sid = getSessionId();
@@ -251,6 +327,8 @@ const App = {
             status.value = 'Connected';
             agentName.value = msg.agent.name;
             workDir.value = msg.agent.workDir;
+            // Request session list once connected
+            requestSessionList();
           } else {
             status.value = 'Waiting';
             error.value = 'Agent is not connected yet.';
@@ -282,6 +360,11 @@ const App = {
             });
             scrollToBottom();
           }
+        } else if (msg.type === 'sessions_list') {
+          historySessions.value = msg.sessions || [];
+          loadingSessions.value = false;
+        } else if (msg.type === 'conversation_resumed') {
+          currentClaudeSessionId.value = msg.claudeSessionId;
         }
       };
 
@@ -365,12 +448,21 @@ const App = {
       sendMessage, handleKeydown, cancelExecution,
       getRenderedContent, copyMessage, toggleTool,
       getToolIcon, getToolSummary, autoResize,
+      // Sidebar
+      sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions,
+      toggleSidebar, resumeSession, newConversation, requestSessionList,
+      formatRelativeTime,
     };
   },
   template: `
     <div class="layout">
       <header class="top-bar">
-        <h1>AgentLink</h1>
+        <div class="top-bar-left">
+          <button class="sidebar-toggle" @click="toggleSidebar" title="Toggle sidebar">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+          </button>
+          <h1>AgentLink</h1>
+        </div>
         <div class="top-bar-info">
           <span :class="['badge', status.toLowerCase()]">{{ status }}</span>
           <span v-if="agentName" class="agent-label">{{ agentName }}</span>
@@ -390,76 +482,121 @@ const App = {
         </div>
       </div>
 
-      <div v-else class="chat-area">
-        <div class="message-list">
-          <div v-if="messages.length === 0 && status === 'Connected'" class="empty-state">
-            <p>Connected to <strong>{{ agentName }}</strong></p>
-            <p class="muted">Working directory: {{ workDir }}</p>
-            <p class="muted">Send a message to start.</p>
-          </div>
-
-          <div v-for="msg in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">
-
-            <!-- User message -->
-            <div v-if="msg.role === 'user'" class="message-bubble user-bubble">
-              <div class="message-content">{{ msg.content }}</div>
-            </div>
-
-            <!-- Assistant message (markdown) -->
-            <div v-else-if="msg.role === 'assistant'" :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
-              <div class="message-actions">
-                <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? 'Copied!' : 'Copy'">
-                  <svg v-if="!msg.copied" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                  <svg v-else viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                </button>
-              </div>
-              <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
-            </div>
-
-            <!-- Tool use block (collapsible) -->
-            <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
-              <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
-                <span class="tool-icon">{{ getToolIcon(msg.toolName) }}</span>
-                <span class="tool-name">{{ msg.toolName }}</span>
-                <span class="tool-summary">{{ getToolSummary(msg) }}</span>
-                <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>
-                <span class="tool-status-icon running-dots" v-else>
-                  <span></span><span></span><span></span>
-                </span>
-                <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
-              </div>
-              <div v-if="msg.expanded" class="tool-expand">
-                <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
-                <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
-              </div>
-            </div>
-
-            <!-- System message -->
-            <div v-else-if="msg.role === 'system'" class="system-msg">
-              {{ msg.content }}
+      <div v-else class="main-body">
+        <!-- Sidebar -->
+        <aside v-if="sidebarOpen" class="sidebar">
+          <div class="sidebar-section">
+            <div class="sidebar-workdir">
+              <div class="sidebar-workdir-label">Working Directory</div>
+              <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
             </div>
           </div>
 
-          <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
-            <span></span><span></span><span></span>
-          </div>
-        </div>
+          <div class="sidebar-section sidebar-sessions">
+            <div class="sidebar-section-header">
+              <span>History</span>
+              <button class="sidebar-refresh-btn" @click="requestSessionList" title="Refresh" :disabled="loadingSessions">
+                <svg :class="{ spinning: loadingSessions }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              </button>
+            </div>
 
-        <div class="input-area">
-          <div class="input-wrapper">
-            <textarea
-              ref="inputRef"
-              v-model="inputText"
-              @keydown="handleKeydown"
-              @input="autoResize"
-              :disabled="status !== 'Connected'"
-              placeholder="Send a message..."
-              rows="1"
-            ></textarea>
-            <button v-if="isProcessing" @click="cancelExecution" class="send-btn stop-btn" title="Stop generation">
-              <svg viewBox="0 0 24 24" width="16" height="16"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+            <button class="new-conversation-btn" @click="newConversation" :disabled="isProcessing">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              New conversation
             </button>
-            <button v-else @click="sendMessage" :disabled="!canSend" class="send-btn">Send</button>
+
+            <div v-if="loadingSessions && historySessions.length === 0" class="sidebar-loading">
+              Loading sessions...
+            </div>
+            <div v-else-if="historySessions.length === 0" class="sidebar-empty">
+              No previous sessions found.
+            </div>
+            <div v-else class="session-list">
+              <div
+                v-for="s in historySessions" :key="s.sessionId"
+                :class="['session-item', { active: currentClaudeSessionId === s.sessionId }]"
+                @click="resumeSession(s)"
+                :title="s.preview"
+              >
+                <div class="session-title">{{ s.title }}</div>
+                <div class="session-meta">{{ formatRelativeTime(s.lastModified) }}</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Chat area -->
+        <div class="chat-area">
+          <div class="message-list">
+            <div v-if="messages.length === 0 && status === 'Connected'" class="empty-state">
+              <p>Connected to <strong>{{ agentName }}</strong></p>
+              <p class="muted">Working directory: {{ workDir }}</p>
+              <p class="muted">Send a message to start.</p>
+            </div>
+
+            <div v-for="msg in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">
+
+              <!-- User message -->
+              <div v-if="msg.role === 'user'" class="message-bubble user-bubble">
+                <div class="message-content">{{ msg.content }}</div>
+              </div>
+
+              <!-- Assistant message (markdown) -->
+              <div v-else-if="msg.role === 'assistant'" :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
+                <div class="message-actions">
+                  <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? 'Copied!' : 'Copy'">
+                    <svg v-if="!msg.copied" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  </button>
+                </div>
+                <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
+              </div>
+
+              <!-- Tool use block (collapsible) -->
+              <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
+                <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
+                  <span class="tool-icon">{{ getToolIcon(msg.toolName) }}</span>
+                  <span class="tool-name">{{ msg.toolName }}</span>
+                  <span class="tool-summary">{{ getToolSummary(msg) }}</span>
+                  <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>
+                  <span class="tool-status-icon running-dots" v-else>
+                    <span></span><span></span><span></span>
+                  </span>
+                  <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
+                </div>
+                <div v-if="msg.expanded" class="tool-expand">
+                  <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
+                  <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
+                </div>
+              </div>
+
+              <!-- System message -->
+              <div v-else-if="msg.role === 'system'" class="system-msg">
+                {{ msg.content }}
+              </div>
+            </div>
+
+            <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+
+          <div class="input-area">
+            <div class="input-wrapper">
+              <textarea
+                ref="inputRef"
+                v-model="inputText"
+                @keydown="handleKeydown"
+                @input="autoResize"
+                :disabled="status !== 'Connected'"
+                placeholder="Send a message..."
+                rows="1"
+              ></textarea>
+              <button v-if="isProcessing" @click="cancelExecution" class="send-btn stop-btn" title="Stop generation">
+                <svg viewBox="0 0 24 24" width="16" height="16"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+              </button>
+              <button v-else @click="sendMessage" :disabled="!canSend" class="send-btn">Send</button>
+            </div>
           </div>
         </div>
       </div>

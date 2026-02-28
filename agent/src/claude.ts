@@ -59,10 +59,11 @@ export function getConversation(): ConversationState | null {
 /**
  * Handle a chat message from the web client.
  * Lazily starts the Claude process on the first message.
+ * If resumeSessionId is provided, resumes that Claude session.
  */
-export function handleChat(prompt: string, workDir: string): void {
+export function handleChat(prompt: string, workDir: string, resumeSessionId?: string): void {
   if (!conversation || !conversation.inputStream) {
-    startQuery(workDir);
+    startQuery(workDir, resumeSessionId);
   }
 
   const state = conversation!;
@@ -107,7 +108,7 @@ export function cancelExecution(): void {
 
 // ── Internal ───────────────────────────────────────────────────────────────
 
-function startQuery(workDir: string): void {
+function startQuery(workDir: string, resumeSessionId?: string): void {
   // Tear down previous process if any
   if (conversation) {
     abort();
@@ -120,7 +121,7 @@ function startQuery(workDir: string): void {
     child: null,
     inputStream,
     abortController,
-    claudeSessionId: null,
+    claudeSessionId: resumeSessionId || null,
     workDir,
     turnActive: false,
     turnResultReceived: false,
@@ -135,6 +136,11 @@ function startQuery(workDir: string): void {
     '--verbose',
     '--permission-mode', 'bypassPermissions',
   ];
+
+  if (resumeSessionId) {
+    args.push('--resume', resumeSessionId);
+    console.log(`[Claude] Resuming session: ${resumeSessionId}`);
+  }
 
   const { command, prefixArgs, spawnOpts } = resolveClaudeCommand();
   const env = getCleanEnv();

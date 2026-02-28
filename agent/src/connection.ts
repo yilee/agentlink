@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import type { AgentConfig } from './config.js';
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution } from './claude.js';
+import { listSessions } from './history.js';
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 30_000;
@@ -123,12 +124,28 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       claudeHandleChat(
         (msg as unknown as { prompt: string }).prompt,
         state.workDir,
+        (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       );
       break;
     case 'cancel_execution':
       claudeCancelExecution();
       break;
+    case 'list_sessions':
+      handleListSessions();
+      break;
+    case 'resume_conversation': {
+      // Kill existing Claude process and start fresh with resume
+      abortClaude();
+      const m = msg as unknown as { claudeSessionId: string };
+      send({ type: 'conversation_resumed', claudeSessionId: m.claudeSessionId });
+      break;
+    }
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
   }
+}
+
+function handleListSessions(): void {
+  const sessions = listSessions(state.workDir);
+  send({ type: 'sessions_list', sessions, workDir: state.workDir });
 }
