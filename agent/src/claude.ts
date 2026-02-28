@@ -12,7 +12,7 @@
  *   5.  On abort / process exit → cleanup
  */
 
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, execSync, type ChildProcess } from 'child_process';
 import { createInterface } from 'readline';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -538,7 +538,15 @@ function cleanup(): void {
 
   if (conversation) {
     if (conversation.child && !conversation.child.killed) {
-      conversation.child.kill();
+      const pid = conversation.child.pid;
+      // On Windows with detached processes, kill the entire process tree
+      if (pid && process.platform === 'win32') {
+        try {
+          execSync(`taskkill /pid ${pid} /t /f`, { stdio: 'ignore' });
+        } catch { /* process may have already exited */ }
+      } else {
+        conversation.child.kill();
+      }
     }
     if (conversation.inputStream) {
       conversation.inputStream.done();

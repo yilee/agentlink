@@ -132,7 +132,13 @@ export function resolveClaudeCommand(): ResolvedCommand {
     }
   }
 
-  return { command: execPath, prefixArgs: [], spawnOpts: {} };
+  // On Windows, spawn detached + windowsHide to prevent console window flash
+  // for native .exe binaries that may spawn child processes with visible consoles.
+  const spawnOpts: Record<string, unknown> = {};
+  if (isWindows() && execPath.toLowerCase().endsWith('.exe')) {
+    spawnOpts.detached = true;
+  }
+  return { command: execPath, prefixArgs: [], spawnOpts };
 }
 
 /**
