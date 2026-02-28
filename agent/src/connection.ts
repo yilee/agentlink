@@ -114,9 +114,13 @@ function buildWsUrl(config: AgentConfig): string {
     type: 'agent',
     id: config.name,
     name: config.name,
-    workDir: config.dir,
+    workDir: state.workDir,
     hostname: os.hostname(),
   });
+  // On reconnect, send previous sessionId so the URL stays valid
+  if (state.sessionId) {
+    params.set('sessionId', state.sessionId);
+  }
   return `${base}/?${params}`;
 }
 

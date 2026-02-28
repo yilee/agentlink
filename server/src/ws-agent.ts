@@ -17,7 +17,9 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   const workDir = url.searchParams.get('workDir') || 'unknown';
   const hostname = url.searchParams.get('hostname') || '';
 
-  const sessionId = generateSessionId();
+  // Reuse requested sessionId (agent reconnecting) or generate a new one
+  const requestedSessionId = url.searchParams.get('sessionId');
+  const sessionId = requestedSessionId || generateSessionId();
   const sessionKey = generateSessionKey();
 
   const agent: AgentSession = {
@@ -35,7 +37,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   agents.set(agentId, agent);
   sessionToAgent.set(sessionId, agentId);
 
-  console.log(`[Agent] Registered: ${name} (${agentId}), session: ${sessionId}`);
+  console.log(`[Agent] Registered: ${name} (${agentId}), session: ${sessionId}${requestedSessionId ? ' (reconnect)' : ''}`);
 
   // Send registration with session key (this initial message is plain text)
   ws.send(JSON.stringify({
@@ -44,6 +46,16 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     sessionId,
     sessionKey: encodeKey(sessionKey),
   }));
+
+  // Notify any web clients already connected to this session (reconnect scenario)
+  for (const [, client] of webClients) {
+    if (client.sessionId === sessionId && client.ws.readyState === WebSocket.OPEN) {
+      encryptAndSend(client.ws, {
+        type: 'agent_reconnected',
+        agent: { agentId, name, hostname, workDir },
+      }, client.sessionKey);
+    }
+  }
 
   ws.on('message', (data) => {
     handleAgentMessage(agentId, data.toString());
