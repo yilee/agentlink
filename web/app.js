@@ -96,12 +96,14 @@ const App = {
   setup() {
     const status = ref('Connecting...');
     const agentName = ref('');
+    const hostname = ref('');
     const workDir = ref('');
     const sessionId = ref('');
     const error = ref('');
     const messages = ref([]);
     const inputText = ref('');
     const isProcessing = ref(false);
+    const isCompacting = ref(false);
     const inputRef = ref(null);
 
     // Sidebar state
@@ -110,6 +112,13 @@ const App = {
     const currentClaudeSessionId = ref(null);
     const loadingSessions = ref(false);
     const loadingHistory = ref(false);
+
+    // Folder picker state
+    const folderPickerOpen = ref(false);
+    const folderPickerPath = ref('');
+    const folderPickerEntries = ref([]);
+    const folderPickerLoading = ref(false);
+    const folderPickerSelected = ref('');
 
     // Theme state
     const theme = ref(localStorage.getItem('agentlink-theme') || 'dark');
@@ -188,7 +197,7 @@ const App = {
     }
 
     const canSend = computed(() =>
-      status.value === 'Connected' && inputText.value.trim() && !isProcessing.value
+      status.value === 'Connected' && inputText.value.trim() && !isProcessing.value && !isCompacting.value
     );
 
     function getSessionId() {
@@ -354,6 +363,70 @@ const App = {
       sidebarOpen.value = !sidebarOpen.value;
     }
 
+    // ── Folder picker: change working directory ──
+    function openFolderPicker() {
+      folderPickerOpen.value = true;
+      folderPickerSelected.value = '';
+      folderPickerLoading.value = true;
+      folderPickerPath.value = workDir.value || '';
+      folderPickerEntries.value = [];
+      ws.send(JSON.stringify({ type: 'list_directory', dirPath: workDir.value || '' }));
+    }
+
+    function loadFolderPickerDir(dirPath) {
+      folderPickerLoading.value = true;
+      folderPickerSelected.value = '';
+      folderPickerEntries.value = [];
+      ws.send(JSON.stringify({ type: 'list_directory', dirPath }));
+    }
+
+    function folderPickerNavigateUp() {
+      if (!folderPickerPath.value) return;
+      const isWin = folderPickerPath.value.includes('\\');
+      const parts = folderPickerPath.value.replace(/[/\\]$/, '').split(/[/\\]/);
+      parts.pop();
+      if (parts.length === 0) {
+        folderPickerPath.value = '';
+        loadFolderPickerDir('');
+      } else if (isWin && parts.length === 1 && /^[A-Za-z]:$/.test(parts[0])) {
+        folderPickerPath.value = parts[0] + '\\';
+        loadFolderPickerDir(parts[0] + '\\');
+      } else {
+        const sep = isWin ? '\\' : '/';
+        const parent = parts.join(sep);
+        folderPickerPath.value = parent;
+        loadFolderPickerDir(parent);
+      }
+    }
+
+    function folderPickerSelectItem(entry) {
+      folderPickerSelected.value = entry.name;
+    }
+
+    function folderPickerEnter(entry) {
+      const sep = folderPickerPath.value.includes('\\') || /^[A-Z]:/.test(entry.name) ? '\\' : '/';
+      let newPath;
+      if (!folderPickerPath.value) {
+        newPath = entry.name + (entry.name.endsWith('\\') ? '' : '\\');
+      } else {
+        newPath = folderPickerPath.value.replace(/[/\\]$/, '') + sep + entry.name;
+      }
+      folderPickerPath.value = newPath;
+      folderPickerSelected.value = '';
+      loadFolderPickerDir(newPath);
+    }
+
+    function confirmFolderPicker() {
+      let path = folderPickerPath.value;
+      if (!path) return;
+      if (folderPickerSelected.value) {
+        const sep = path.includes('\\') ? '\\' : '/';
+        path = path.replace(/[/\\]$/, '') + sep + folderPickerSelected.value;
+      }
+      folderPickerOpen.value = false;
+      ws.send(JSON.stringify({ type: 'change_workdir', workDir: path }));
+    }
+
     // ── Sidebar: grouped sessions by time ──
     const groupedSessions = computed(() => {
       if (!historySessions.value.length) return [];
@@ -400,6 +473,7 @@ const App = {
           if (msg.agent) {
             status.value = 'Connected';
             agentName.value = msg.agent.name;
+            hostname.value = msg.agent.hostname || '';
             workDir.value = msg.agent.workDir;
             // Request session list once connected
             requestSessionList();
@@ -410,17 +484,27 @@ const App = {
         } else if (msg.type === 'agent_disconnected') {
           status.value = 'Disconnected';
           agentName.value = '';
+          hostname.value = '';
           workDir.value = '';
           error.value = 'Agent has disconnected.';
           isProcessing.value = false;
+          isCompacting.value = false;
         } else if (msg.type === 'error') {
           status.value = 'Error';
           error.value = msg.message;
           isProcessing.value = false;
+          isCompacting.value = false;
         } else if (msg.type === 'claude_output') {
           handleClaudeOutput(msg);
+        } else if (msg.type === 'context_compaction') {
+          if (msg.status === 'started') {
+            isCompacting.value = true;
+          } else if (msg.status === 'completed') {
+            isCompacting.value = false;
+          }
         } else if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
           isProcessing.value = false;
+          isCompacting.value = false;
           flushReveal();
           finalizeStreamingMsg();
           if (msg.type === 'execution_cancelled') {
@@ -482,6 +566,27 @@ const App = {
             timestamp: new Date(),
           });
           scrollToBottom();
+        } else if (msg.type === 'directory_listing') {
+          folderPickerLoading.value = false;
+          folderPickerEntries.value = (msg.entries || [])
+            .filter(e => e.type === 'directory')
+            .sort((a, b) => a.name.localeCompare(b.name));
+          if (msg.dirPath != null) folderPickerPath.value = msg.dirPath;
+        } else if (msg.type === 'workdir_changed') {
+          workDir.value = msg.workDir;
+          messages.value = [];
+          messageIdCounter = 0;
+          streamingMessageId = null;
+          pendingText = '';
+          currentClaudeSessionId.value = null;
+          isProcessing.value = false;
+          if (revealTimer !== null) { clearTimeout(revealTimer); revealTimer = null; }
+          messages.value.push({
+            id: ++messageIdCounter, role: 'system',
+            content: 'Working directory changed to: ' + msg.workDir,
+            timestamp: new Date(),
+          });
+          requestSessionList();
         }
       };
 
@@ -491,6 +596,7 @@ const App = {
           error.value = 'Connection to server lost.';
         }
         isProcessing.value = false;
+        isCompacting.value = false;
       };
 
       ws.onerror = () => {};
@@ -556,8 +662,8 @@ const App = {
     onUnmounted(() => { if (ws) ws.close(); });
 
     return {
-      status, agentName, workDir, sessionId, error,
-      messages, inputText, isProcessing, canSend, inputRef,
+      status, agentName, hostname, workDir, sessionId, error,
+      messages, inputText, isProcessing, isCompacting, canSend, inputRef,
       sendMessage, handleKeydown, cancelExecution,
       getRenderedContent, copyMessage, toggleTool, isPrevAssistant, toggleContextSummary,
       getToolIcon, getToolSummary, autoResize,
@@ -567,6 +673,11 @@ const App = {
       sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
       toggleSidebar, resumeSession, newConversation, requestSessionList,
       formatRelativeTime, groupedSessions,
+      // Folder picker
+      folderPickerOpen, folderPickerPath, folderPickerEntries,
+      folderPickerLoading, folderPickerSelected,
+      openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
+      folderPickerEnter, confirmFolderPicker,
     };
   },
   template: `
@@ -606,7 +717,16 @@ const App = {
         <aside v-if="sidebarOpen" class="sidebar">
           <div class="sidebar-section">
             <div class="sidebar-workdir">
-              <div class="sidebar-workdir-label">Working Directory</div>
+              <div v-if="hostname" class="sidebar-hostname">
+                <svg class="sidebar-hostname-icon" viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3.5 2A1.5 1.5 0 0 0 2 3.5v5A1.5 1.5 0 0 0 3.5 10h9A1.5 1.5 0 0 0 14 8.5v-5A1.5 1.5 0 0 0 12.5 2h-9zM.5 3.5A3 3 0 0 1 3.5.5h9A3 3 0 0 1 15.5 3.5v5a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-5zM5 13.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75zM3.25 15a.75.75 0 0 0 0 1.5h9.5a.75.75 0 0 0 0-1.5h-9.5z"/></svg>
+                <span>{{ hostname }}</span>
+              </div>
+              <div class="sidebar-workdir-header">
+                <div class="sidebar-workdir-label">Working Directory</div>
+                <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory" :disabled="isProcessing">
+                  <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                </button>
+              </div>
               <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
             </div>
           </div>
@@ -725,8 +845,13 @@ const App = {
                 </div>
               </div>
 
-              <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
+              <div v-if="isProcessing && !isCompacting && !messages.some(m => m.isStreaming)" class="typing-indicator">
                 <span></span><span></span><span></span>
+              </div>
+
+              <div v-if="isCompacting" class="compacting-banner">
+                <div class="compacting-spinner"></div>
+                <span class="compacting-text">Context compacting in progress...</span>
               </div>
             </div>
           </div>
@@ -738,8 +863,8 @@ const App = {
                 v-model="inputText"
                 @keydown="handleKeydown"
                 @input="autoResize"
-                :disabled="status !== 'Connected'"
-                placeholder="Send a message..."
+                :disabled="status !== 'Connected' || isCompacting"
+                :placeholder="isCompacting ? 'Context compacting in progress...' : 'Send a message...'"
                 rows="1"
               ></textarea>
               <div class="input-bottom-row">
@@ -751,6 +876,44 @@ const App = {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Folder Picker Modal -->
+      <div class="folder-picker-overlay" v-if="folderPickerOpen" @click.self="folderPickerOpen = false">
+        <div class="folder-picker-dialog">
+          <div class="folder-picker-header">
+            <span>Select Working Directory</span>
+            <button class="folder-picker-close" @click="folderPickerOpen = false">&times;</button>
+          </div>
+          <div class="folder-picker-nav">
+            <button class="folder-picker-up" @click="folderPickerNavigateUp" :disabled="!folderPickerPath" title="Go to parent directory">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+            </button>
+            <span class="folder-picker-current" :title="folderPickerPath">{{ folderPickerPath || 'Drives' }}</span>
+          </div>
+          <div class="folder-picker-list">
+            <div v-if="folderPickerLoading" class="folder-picker-loading">
+              <div class="history-loading-spinner"></div>
+              <span>Loading...</span>
+            </div>
+            <template v-else>
+              <div
+                v-for="entry in folderPickerEntries" :key="entry.name"
+                :class="['folder-picker-item', { 'folder-picker-selected': folderPickerSelected === entry.name }]"
+                @click="folderPickerSelectItem(entry)"
+                @dblclick="folderPickerEnter(entry)"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                <span>{{ entry.name }}</span>
+              </div>
+              <div v-if="folderPickerEntries.length === 0" class="folder-picker-empty">No subdirectories found.</div>
+            </template>
+          </div>
+          <div class="folder-picker-footer">
+            <button class="folder-picker-cancel" @click="folderPickerOpen = false">Cancel</button>
+            <button class="folder-picker-confirm" @click="confirmFolderPicker" :disabled="!folderPickerPath">Open</button>
           </div>
         </div>
       </div>

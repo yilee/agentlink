@@ -14,6 +14,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   const agentId = url.searchParams.get('id') || randomUUID();
   const name = url.searchParams.get('name') || `Agent-${agentId.slice(0, 8)}`;
   const workDir = url.searchParams.get('workDir') || 'unknown';
+  const hostname = url.searchParams.get('hostname') || '';
 
   const sessionId = generateSessionId();
 
@@ -21,6 +22,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     ws,
     agentId,
     name,
+    hostname,
     workDir,
     sessionId,
     connectedAt: new Date(),
@@ -72,6 +74,12 @@ function handleAgentMessage(agentId: string, raw: string): void {
 
   const agent = agents.get(agentId);
   if (!agent) return;
+
+  // Intercept workdir_changed to keep server state in sync
+  if (msg.type === 'workdir_changed' && typeof msg.workDir === 'string') {
+    agent.workDir = msg.workDir;
+    console.log(`[Agent] ${agent.name} changed workDir to: ${msg.workDir}`);
+  }
 
   // Forward agent messages to all web clients connected to this session
   for (const [, client] of webClients) {

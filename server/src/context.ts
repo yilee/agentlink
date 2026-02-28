@@ -5,6 +5,7 @@ export interface AgentSession {
   ws: WebSocket;
   agentId: string;
   name: string;
+  hostname: string;
   workDir: string;
   sessionId: string;    // unique session ID for URL
   connectedAt: Date;

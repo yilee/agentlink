@@ -292,10 +292,26 @@ async function processOutput(
         continue;
       }
 
-      // ── system messages (init, compact, etc.) → log only ──
+      // ── system messages (init, compact, etc.) ──
       if (msg.type === 'system') {
-        const sub = msg.subtype || '';
+        const sub = (msg.subtype || '') as string;
         console.log(`[Claude] system/${sub}`);
+
+        // Forward context compaction events to web client
+        // New format: subtype='status', status='compacting'
+        if (sub === 'status' && msg.status === 'compacting') {
+          sendFn({ type: 'context_compaction', status: 'started' });
+        }
+        // Compact boundary = compaction completed
+        else if (sub === 'compact_boundary') {
+          sendFn({ type: 'context_compaction', status: 'completed' });
+        }
+        // Legacy subtypes
+        else if (sub === 'compact_start') {
+          sendFn({ type: 'context_compaction', status: 'started' });
+        } else if (sub === 'compact_complete' || sub === 'compact_end') {
+          sendFn({ type: 'context_compaction', status: 'completed' });
+        }
         continue;
       }
     }

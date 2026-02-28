@@ -40,6 +40,7 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
     agent: agent ? {
       agentId: agent.agentId,
       name: agent.name,
+      hostname: agent.hostname,
       workDir: agent.workDir,
     } : null,
   }));

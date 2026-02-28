@@ -1,4 +1,8 @@
 import WebSocket from 'ws';
+import os from 'os';
+import { existsSync } from 'fs';
+import { readdir } from 'fs/promises';
+import { resolve, isAbsolute, join } from 'path';
 import type { AgentConfig } from './config.js';
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution } from './claude.js';
 import { listSessions, readSessionMessages } from './history.js';
@@ -90,6 +94,7 @@ function buildWsUrl(config: AgentConfig): string {
     id: config.name,
     name: config.name,
     workDir: config.dir,
+    hostname: os.hostname(),
   });
   return `${base}/?${params}`;
 }
@@ -133,6 +138,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'list_sessions':
       handleListSessions();
       break;
+    case 'list_directory':
+      handleListDirectory(msg as unknown as { dirPath: string });
+      break;
+    case 'change_workdir':
+      handleChangeWorkDir(msg as unknown as { workDir: string });
+      break;
     case 'resume_conversation': {
       // Kill existing Claude process and start fresh with resume
       abortClaude();
@@ -149,4 +160,79 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
 function handleListSessions(): void {
   const sessions = listSessions(state.workDir);
   send({ type: 'sessions_list', sessions, workDir: state.workDir });
+}
+
+async function handleListDirectory(msg: { dirPath: string }): Promise<void> {
+  const dirPath = msg.dirPath || '';
+
+  try {
+    // Empty path: list drives (Windows) or root (Unix)
+    if (!dirPath) {
+      if (os.platform() === 'win32') {
+        const drives: { name: string; type: string }[] = [];
+        for (const letter of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
+          const drivePath = letter + ':\\';
+          if (existsSync(drivePath)) {
+            drives.push({ name: letter + ':', type: 'directory' });
+          }
+        }
+        send({ type: 'directory_listing', dirPath: '', entries: drives });
+        return;
+      }
+      // Unix: list root
+      const entries = await listDirectoryEntries('/');
+      send({ type: 'directory_listing', dirPath: '/', entries });
+      return;
+    }
+
+    const resolved = isAbsolute(dirPath) ? resolve(dirPath) : resolve(state.workDir, dirPath);
+    const entries = await listDirectoryEntries(resolved);
+    send({ type: 'directory_listing', dirPath: resolved, entries });
+  } catch (err) {
+    const error = err as Error;
+    send({ type: 'directory_listing', dirPath, entries: [], error: error.message });
+  }
+}
+
+async function listDirectoryEntries(dirPath: string): Promise<{ name: string; type: string }[]> {
+  const items = await readdir(dirPath, { withFileTypes: true });
+  const entries: { name: string; type: string }[] = [];
+
+  for (const item of items) {
+    if (item.name.startsWith('.')) continue;
+    if (item.name === 'node_modules') continue;
+    entries.push({
+      name: item.name,
+      type: item.isDirectory() ? 'directory' : 'file',
+    });
+  }
+
+  entries.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return entries;
+}
+
+function handleChangeWorkDir(msg: { workDir: string }): void {
+  const newDir = msg.workDir;
+
+  if (!existsSync(newDir)) {
+    send({ type: 'error', message: `Directory does not exist: ${newDir}` });
+    return;
+  }
+
+  // Kill any existing Claude process
+  abortClaude();
+
+  // Update agent-side workDir
+  state.workDir = newDir;
+  console.log(`[AgentLink] Working directory changed to: ${newDir}`);
+
+  // Notify web client (server intercepts to update its state)
+  send({ type: 'workdir_changed', workDir: newDir });
+
+  // Auto-refresh session list for new directory
+  handleListSessions();
 }

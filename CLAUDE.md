@@ -395,7 +395,7 @@ interface ConversationState {
 
 ### WebSocket Message Protocol (AgentLink)
 
-**Server acts as a transparent relay** — all messages from web clients are forwarded to the bound agent, and vice versa. No server-side message processing.
+**Server acts as a transparent relay** — all messages from web clients are forwarded to the bound agent, and vice versa. Server intercepts `workdir_changed` to keep its agent state in sync.
 
 **Registration flow:**
 1. Agent connects: `ws://server/?type=agent&id=NAME&name=NAME&workDir=PATH`
@@ -411,6 +411,8 @@ interface ConversationState {
 | `cancel_execution` | Stop current Claude turn | — |
 | `list_sessions` | Request session history list | — |
 | `resume_conversation` | Resume a historical session | `claudeSessionId` |
+| `list_directory` | Browse host filesystem | `dirPath` |
+| `change_workdir` | Switch working directory | `workDir` |
 
 **Message types (Agent → Web):**
 
@@ -421,6 +423,8 @@ interface ConversationState {
 | `execution_cancelled` | Execution was stopped | — |
 | `sessions_list` | Historical sessions | `sessions[], workDir` |
 | `conversation_resumed` | Session resumed with history | `claudeSessionId, history[]` |
+| `directory_listing` | Filesystem directory contents | `dirPath, entries[], error?` |
+| `workdir_changed` | Working directory updated | `workDir` |
 
 **claude_output subtypes:**
 
@@ -441,7 +445,7 @@ interface ConversationState {
 - Theme persisted to `localStorage('agentlink-theme')`, applied before first paint via inline script
 
 **Sidebar (left, 260px, toggleable):**
-- Working directory display
+- Working directory display with change-directory button (opens folder picker modal)
 - "New conversation" button
 - Session history list grouped by time (Today / Yesterday / This week / Earlier)
 - `groupedSessions` computed property handles grouping
@@ -462,6 +466,14 @@ interface ConversationState {
 - Textarea + embedded icon send button inside the card
 - Gradient fade at bottom of message list (`input-area::before`)
 
+**Folder picker modal:**
+- Triggered by folder icon button in sidebar next to "Working Directory"
+- Browses agent host filesystem (Windows: drive letters C-Z; Unix: root `/`)
+- Single-click to select, double-click to navigate into directory
+- Up button for parent navigation (platform-aware for Windows drive roots)
+- Filters hidden files and `node_modules`, shows directories only
+- On confirm: kills Claude process, updates workDir, clears chat, refreshes session history
+
 **Theme system:**
 - CSS variables in `:root` (dark default) and `[data-theme="light"]`
 - highlight.js stylesheet switches between `github-dark` and `github` themes
@@ -475,6 +487,7 @@ interface ConversationState {
   status, agentName, workDir, sessionId, error,
   messages, inputText, isProcessing, theme,
   sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions,
+  folderPickerOpen, folderPickerPath, folderPickerEntries, folderPickerLoading, folderPickerSelected,
 }
 ```
 
@@ -542,6 +555,7 @@ node agent/dist/cli.js --help
 - [x] Web UI: floating input card with embedded send button
 - [x] Web UI: sidebar session history grouped by time (Today/Yesterday/This week/Earlier)
 - [x] Web UI: light/dark theme toggle with localStorage persistence
+- [x] Web UI: change working directory (folder picker modal, filesystem browsing)
 - [ ] Message protocol (encrypted relay)
 - [ ] Web UI: file upload
 - [ ] Web UI: workbench panel (terminal, files, git)
