@@ -30,3 +30,8 @@ Thumbs.db
 # Lock files (root only)
 server/package-lock.json
 agent/package-lock.json
+
+# Test artifacts
+chat-ui-test.png
+.playwright-mcp/
+nul

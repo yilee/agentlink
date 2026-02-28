@@ -87,6 +87,24 @@ export function abort(): void {
   cleanup();
 }
 
+/**
+ * Cancel the current execution (user pressed stop button).
+ * Kills the process and notifies the web client.
+ */
+export function cancelExecution(): void {
+  if (!conversation) return;
+
+  console.log('[Claude] Cancelling execution');
+  conversation.turnActive = false;
+
+  if (conversation.abortController) {
+    conversation.abortController.abort();
+  }
+  cleanup();
+
+  sendFn({ type: 'execution_cancelled' });
+}
+
 // ── Internal ───────────────────────────────────────────────────────────────
 
 function startQuery(workDir: string): void {

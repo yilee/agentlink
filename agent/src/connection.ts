@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import type { AgentConfig } from './config.js';
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution } from './claude.js';
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 30_000;
@@ -124,6 +124,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         (msg as unknown as { prompt: string }).prompt,
         state.workDir,
       );
+      break;
+    case 'cancel_execution':
+      claudeCancelExecution();
       break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
