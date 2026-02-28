@@ -581,6 +581,59 @@ agentlink-client service uninstall                     # remove + stop
 agentlink-client --help
 ```
 
+### Publishing to npm
+
+**Prerequisites:**
+- npm org `agent-link` must exist on npmjs.com (for `@agent-link/*` scoped packages)
+- Logged in with `npm login` or have a granular access token with publish permissions
+- Token must have "Bypass 2FA for automation" enabled, or pass `--otp=<code>`
+
+**Set auth token (if using granular token):**
+```bash
+npm config set //registry.npmjs.org/:_authToken <YOUR_TOKEN>
+```
+
+**Publish both packages:**
+```bash
+# Publish server (includes web/ static assets)
+npm publish --workspace server --access public
+
+# Publish agent (client CLI only)
+npm publish --workspace agent --access public
+```
+
+**Version bump before re-publish:**
+```bash
+# Bump patch version (0.1.0 → 0.1.1)
+npm version patch --workspace server --no-git-tag-version
+npm version patch --workspace agent --no-git-tag-version
+
+# Or bump minor (0.1.0 → 0.2.0)
+npm version minor --workspace server --no-git-tag-version
+npm version minor --workspace agent --no-git-tag-version
+
+# Then publish
+npm publish --workspace server --access public
+npm publish --workspace agent --access public
+```
+
+**Verify before publish (dry run):**
+```bash
+npm publish --dry-run --workspace server
+npm publish --dry-run --workspace agent
+```
+
+**Install from npm (end users):**
+```bash
+# Server (on relay machine)
+npm install -g @agent-link/server
+agentlink-server start --daemon --port 3456
+
+# Client (on dev machine)
+npm install -g @agent-link/agent
+agentlink-client start --daemon
+```
+
 ### Implementation Status
 
 - [x] Monorepo skeleton (npm workspaces, TypeScript, build pipeline)

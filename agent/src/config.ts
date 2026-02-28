@@ -10,7 +10,7 @@ export interface AgentConfig {
 }
 
 const DEFAULTS: AgentConfig = {
-  server: 'wss://msclaude.ai',
+  server: 'ws://20.127.221.204:3456',
   dir: process.cwd(),
   name: `Agent-${process.platform}-${process.pid}`,
 };
