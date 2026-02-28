@@ -112,6 +112,15 @@ const App = {
     const sessionId = ref('');
     const error = ref('');
     const messages = ref([]);
+    const visibleLimit = ref(50);
+    const hasMoreMessages = computed(() => messages.value.length > visibleLimit.value);
+    const visibleMessages = computed(() => {
+      if (messages.value.length <= visibleLimit.value) return messages.value;
+      return messages.value.slice(messages.value.length - visibleLimit.value);
+    });
+    function loadMoreMessages() {
+      visibleLimit.value += 50;
+    }
     const inputText = ref('');
     const isProcessing = ref(false);
     const isCompacting = ref(false);
@@ -436,8 +445,8 @@ const App = {
     // ── Check if previous message is also assistant (to suppress repeated label) ──
     function isPrevAssistant(idx) {
       if (idx <= 0) return false;
-      const prev = messages.value[idx - 1];
-      return prev.role === 'assistant' || prev.role === 'tool';
+      const prev = visibleMessages.value[idx - 1];
+      return prev && (prev.role === 'assistant' || prev.role === 'tool');
     }
 
     // ── Context summary toggle ──
@@ -676,6 +685,7 @@ const App = {
       if (window.innerWidth <= 768) sidebarOpen.value = false;
       // Clear current conversation
       messages.value = [];
+      visibleLimit.value = 50;
       messageIdCounter = 0;
       streamingMessageId = null;
       pendingText = '';
@@ -697,6 +707,7 @@ const App = {
       // Auto-close sidebar on mobile
       if (window.innerWidth <= 768) sidebarOpen.value = false;
       messages.value = [];
+      visibleLimit.value = 50;
       messageIdCounter = 0;
       streamingMessageId = null;
       pendingText = '';
@@ -985,6 +996,7 @@ const App = {
         } else if (msg.type === 'workdir_changed') {
           workDir.value = msg.workDir;
           messages.value = [];
+          visibleLimit.value = 50;
           messageIdCounter = 0;
           streamingMessageId = null;
           pendingText = '';
@@ -1078,7 +1090,8 @@ const App = {
 
     return {
       status, agentName, hostname, workDir, sessionId, error,
-      messages, inputText, isProcessing, isCompacting, canSend, inputRef,
+      messages, visibleMessages, hasMoreMessages, loadMoreMessages,
+      inputText, isProcessing, isCompacting, canSend, inputRef,
       sendMessage, handleKeydown, cancelExecution,
       getRenderedContent, copyMessage, toggleTool, isPrevAssistant, toggleContextSummary,
       getToolIcon, getToolSummary, isEditTool, getEditDiffHtml, getFormattedToolInput, autoResize,
@@ -1208,7 +1221,11 @@ const App = {
                 <span>Loading conversation history...</span>
               </div>
 
-              <div v-for="(msg, msgIdx) in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">
+              <div v-if="hasMoreMessages" class="load-more-wrapper">
+                <button class="load-more-btn" @click="loadMoreMessages">Load earlier messages</button>
+              </div>
+
+              <div v-for="(msg, msgIdx) in visibleMessages" :key="msg.id" :class="['message', 'message-' + msg.role]">
 
                 <!-- User message -->
                 <template v-if="msg.role === 'user'">
