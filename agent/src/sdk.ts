@@ -71,6 +71,7 @@ export function getDefaultClaudeCodePath(): string {
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 5000,
       env: { ...process.env, PATH: enhancedPath },
+      windowsHide: true,
     }).toString().trim();
     const lines = output.split('\n').map(l => l.trim()).filter(Boolean);
 
@@ -132,13 +133,12 @@ export function resolveClaudeCommand(): ResolvedCommand {
     }
   }
 
-  // On Windows, spawn detached + windowsHide to prevent console window flash
-  // for native .exe binaries that may spawn child processes with visible consoles.
-  const spawnOpts: Record<string, unknown> = {};
-  if (isWindows() && execPath.toLowerCase().endsWith('.exe')) {
-    spawnOpts.detached = true;
-  }
-  return { command: execPath, prefixArgs: [], spawnOpts };
+  // windowsHide: true is set in claude.ts spawn() call, which prevents console
+  // flash for the process and its children. Do NOT set detached: true here —
+  // detached creates a new process group with its own console, and grandchild
+  // processes (Claude's tool calls) inherit that console visibility, causing
+  // repeated console window flashes on every operation.
+  return { command: execPath, prefixArgs: [], spawnOpts: {} };
 }
 
 /**

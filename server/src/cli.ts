@@ -56,6 +56,7 @@ program
       detached: true,
       stdio: ['ignore', out, err],
       env: { ...process.env, PORT: options.port },
+      windowsHide: true,
     });
 
     child.unref();

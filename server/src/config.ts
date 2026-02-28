@@ -55,7 +55,7 @@ export function getLogDir(): string {
 export function killProcess(pid: number): boolean {
   try {
     if (process.platform === 'win32') {
-      execSync(`taskkill /pid ${pid} /f /t`, { stdio: 'ignore' });
+      execSync(`taskkill /pid ${pid} /f /t`, { stdio: 'ignore', windowsHide: true });
     } else {
       process.kill(pid, 'SIGTERM');
     }

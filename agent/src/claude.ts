@@ -273,8 +273,8 @@ function startQuery(workDir: string, resumeSessionId?: string): void {
     stdio: ['pipe', 'pipe', 'pipe'],
     signal: abortController.signal,
     env,
-    windowsHide: true,
     ...spawnOpts,
+    windowsHide: true, // must come after spread to prevent override
   });
 
   state.child = child;
@@ -560,10 +560,10 @@ function cleanup(): void {
   if (conversation) {
     if (conversation.child && !conversation.child.killed) {
       const pid = conversation.child.pid;
-      // On Windows with detached processes, kill the entire process tree
+      // On Windows, kill the entire process tree (child.kill() won't kill grandchildren)
       if (pid && process.platform === 'win32') {
         try {
-          execSync(`taskkill /pid ${pid} /t /f`, { stdio: 'ignore' });
+          execSync(`taskkill /pid ${pid} /t /f`, { stdio: 'ignore', windowsHide: true });
         } catch { /* process may have already exited */ }
       } else {
         conversation.child.kill();

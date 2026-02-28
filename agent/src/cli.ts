@@ -62,6 +62,7 @@ program
         detached: true,
         stdio: ['ignore', out, err],
         cwd: config.dir,
+        windowsHide: true,
       });
 
       child.unref();

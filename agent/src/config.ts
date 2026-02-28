@@ -106,7 +106,7 @@ export function killProcess(pid: number): boolean {
     if (process.platform === 'win32') {
       // On Windows, process.kill(pid, 'SIGTERM') doesn't reliably terminate
       // processes started in separate console windows. Use taskkill instead.
-      execSync(`taskkill /pid ${pid} /f /t`, { stdio: 'ignore' });
+      execSync(`taskkill /pid ${pid} /f /t`, { stdio: 'ignore', windowsHide: true });
     } else {
       process.kill(pid, 'SIGTERM');
     }
