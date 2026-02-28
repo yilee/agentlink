@@ -1034,6 +1034,31 @@ const App = {
         scrollToBottom();
         return;
       }
+
+      // Command output (e.g. /cost, /context) — user message with content containing stdout/stderr tags
+      if (data.type === 'user' && data.message && data.message.content) {
+        const raw = typeof data.message.content === 'string'
+          ? data.message.content
+          : Array.isArray(data.message.content)
+            ? data.message.content.filter(b => b.type === 'text').map(b => b.text || '').join('')
+            : '';
+        if (raw.trim()) {
+          const stdoutMatch = raw.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/);
+          const stderrMatch = raw.match(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/);
+          const cmdOutput = (stdoutMatch && stdoutMatch[1].trim()) || (stderrMatch && stderrMatch[1].trim());
+          if (cmdOutput) {
+            flushReveal();
+            finalizeStreamingMsg();
+            messages.value.push({
+              id: ++messageIdCounter, role: 'user',
+              content: cmdOutput, isCommandOutput: true,
+              timestamp: new Date(),
+            });
+            scrollToBottom();
+          }
+        }
+        return;
+      }
     }
 
     // Apply syntax highlighting after DOM updates
