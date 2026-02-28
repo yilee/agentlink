@@ -15,11 +15,16 @@ if (typeof marked !== 'undefined') {
   });
 }
 
+const _mdCache = new Map();
+
 function renderMarkdown(text) {
   if (!text) return '';
+  const cached = _mdCache.get(text);
+  if (cached) return cached;
+  let html;
   try {
     if (typeof marked !== 'undefined') {
-      let html = marked.parse(text);
+      html = marked.parse(text);
       // Add copy buttons to code blocks
       html = html.replace(/<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g,
         (match, attrs, code) => {
@@ -36,11 +41,16 @@ function renderMarkdown(text) {
           </div>`;
         }
       );
-      return html;
+    } else {
+      html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
-  } catch {}
-  // Fallback: escape HTML
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  } catch {
+    html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  // Only cache completed (non-streaming) messages; streaming text changes every tick
+  if (_mdCache.size > 500) _mdCache.clear();
+  _mdCache.set(text, html);
+  return html;
 }
 
 // Global code copy handler
@@ -273,8 +283,8 @@ const App = {
     // Progressive text reveal state
     let pendingText = '';
     let revealTimer = null;
-    const CHARS_PER_TICK = 3;
-    const TICK_MS = 12;
+    const CHARS_PER_TICK = 5;
+    const TICK_MS = 16;
 
     function startReveal() {
       if (revealTimer !== null) return;
@@ -336,11 +346,14 @@ const App = {
       return match ? match[1] : null;
     }
 
+    let _scrollTimer = null;
     function scrollToBottom() {
-      nextTick(() => {
+      if (_scrollTimer) return;
+      _scrollTimer = setTimeout(() => {
+        _scrollTimer = null;
         const el = document.querySelector('.message-list');
         if (el) el.scrollTop = el.scrollHeight;
-      });
+      }, 50);
     }
 
     // ── Auto-resize textarea ──
@@ -421,8 +434,7 @@ const App = {
     }
 
     // ── Check if previous message is also assistant (to suppress repeated label) ──
-    function isPrevAssistant(msg) {
-      const idx = messages.value.indexOf(msg);
+    function isPrevAssistant(idx) {
       if (idx <= 0) return false;
       const prev = messages.value[idx - 1];
       return prev.role === 'assistant' || prev.role === 'tool';
@@ -1045,17 +1057,21 @@ const App = {
       }
     }
 
-    // Apply syntax highlighting after DOM updates
-    watch(messages, () => {
-      nextTick(() => {
+    // Apply syntax highlighting after DOM updates (throttled)
+    let _hlTimer = null;
+    function scheduleHighlight() {
+      if (_hlTimer) return;
+      _hlTimer = setTimeout(() => {
+        _hlTimer = null;
         if (typeof hljs !== 'undefined') {
           document.querySelectorAll('pre code:not([data-highlighted])').forEach(block => {
             hljs.highlightElement(block);
             block.dataset.highlighted = 'true';
           });
         }
-      });
-    }, { deep: true });
+      }, 300);
+    }
+    watch(messages, () => { nextTick(scheduleHighlight); }, { deep: true });
 
     onMounted(() => { connect(); });
     onUnmounted(() => { if (ws) ws.close(); });
@@ -1192,7 +1208,7 @@ const App = {
                 <span>Loading conversation history...</span>
               </div>
 
-              <div v-for="msg in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">
+              <div v-for="(msg, msgIdx) in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">
 
                 <!-- User message -->
                 <template v-if="msg.role === 'user'">
@@ -1214,7 +1230,7 @@ const App = {
 
                 <!-- Assistant message (markdown) -->
                 <template v-else-if="msg.role === 'assistant'">
-                  <div v-if="!isPrevAssistant(msg)" class="message-role-label assistant-label">Claude</div>
+                  <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">Claude</div>
                   <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
                     <div class="message-actions">
                       <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? 'Copied!' : 'Copy'">
