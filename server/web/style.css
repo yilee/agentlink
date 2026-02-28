@@ -44,10 +44,12 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 #app {
   height: 100vh;
+  height: 100dvh;
 }
 
 /* ── Layout ── */
@@ -55,6 +57,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
 }
 
 .top-bar {
