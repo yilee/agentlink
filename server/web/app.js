@@ -1055,9 +1055,9 @@ const App = {
               timestamp: new Date(),
             });
             scrollToBottom();
+            return;
           }
         }
-        return;
       }
     }
 
