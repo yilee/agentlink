@@ -32,7 +32,8 @@ function getClaudeProjectsDir(): string {
 function pathToProjectFolder(workDir: string): string {
   return workDir
     .replace(/:/g, '-')
-    .replace(/[/\\]/g, '-');
+    .replace(/[/\\]/g, '-')
+    .replace(/ /g, '-');
 }
 
 /**
