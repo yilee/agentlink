@@ -767,6 +767,121 @@ body {
   color: var(--text-primary);
 }
 
+/* ── Formatted tool input (Read, Write, Bash, Glob, Grep) ── */
+.tool-input-formatted {
+  padding: 0.3rem 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.tool-input-meta {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.tool-input-cmd {
+  background: var(--bg-secondary);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.73rem;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* ── TodoWrite checklist ── */
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.todo-item.todo-done {
+  opacity: 0.55;
+}
+
+.todo-item.todo-active {
+  color: var(--text-primary);
+}
+
+.todo-icon {
+  flex-shrink: 0;
+  width: 1em;
+  text-align: center;
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+.todo-icon.done {
+  color: var(--success);
+  opacity: 0.8;
+}
+
+.todo-icon.active {
+  color: #58a6ff;
+  opacity: 1;
+  font-size: 0.55rem;
+}
+
+.todo-text {
+  word-break: break-word;
+}
+
+/* ── Task / WebFetch formatted fields ── */
+.task-field {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.task-field + .task-field {
+  margin-top: 2px;
+}
+
+.task-prompt {
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  padding: 0.3rem 0.5rem;
+  margin-top: 3px;
+  font-size: 0.73rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.tool-link {
+  color: #58a6ff;
+  font-size: 0.75rem;
+  word-break: break-all;
+  text-decoration: none;
+}
+
+.tool-link:hover {
+  text-decoration: underline;
+}
+
+[data-theme="light"] .todo-icon.active {
+  color: #0969da;
+}
+
+[data-theme="light"] .tool-link {
+  color: #0969da;
+}
+
 /* ── Edit tool diff view ── */
 .tool-diff {
   background: var(--bg-secondary);

@@ -7,6 +7,7 @@ import {
   webClients,
   type WebClient,
 } from './context.js';
+import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
 export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
@@ -23,20 +24,24 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   const agentId = sessionToAgent.get(sessionId);
   const agent = agentId ? agents.get(agentId) : undefined;
 
+  const sessionKey = generateSessionKey();
+
   const client: WebClient = {
     ws,
     clientId,
     sessionId,
+    sessionKey,
     connectedAt: new Date(),
     isAlive: true,
   };
 
   webClients.set(clientId, client);
 
-  // Send connection result with agent info
+  // Send connection result with agent info and session key (plain text — key exchange)
   ws.send(JSON.stringify({
     type: 'connected',
     clientId,
+    sessionKey: encodeKey(sessionKey),
     agent: agent ? {
       agentId: agent.agentId,
       name: agent.name,
@@ -61,27 +66,25 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   });
 }
 
-function handleWebMessage(clientId: string, raw: string): void {
-  let msg: { type: string; [key: string]: unknown };
-  try {
-    msg = JSON.parse(raw);
-  } catch {
-    console.error(`[Web] Invalid JSON from ${clientId.slice(0, 8)}`);
-    return;
-  }
-
+async function handleWebMessage(clientId: string, raw: string): Promise<void> {
   const client = webClients.get(clientId);
   if (!client) return;
+
+  const msg = await parseMessage(raw, client.sessionKey);
+  if (!msg) {
+    console.error(`[Web] Failed to parse/decrypt message from ${clientId.slice(0, 8)}`);
+    return;
+  }
 
   // Find the agent for this session and forward
   const agentId = sessionToAgent.get(client.sessionId);
   const agent = agentId ? agents.get(agentId) : undefined;
 
   if (!agent || agent.ws.readyState !== WebSocket.OPEN) {
-    client.ws.send(JSON.stringify({ type: 'error', message: 'Agent not connected' }));
+    encryptAndSend(client.ws, { type: 'error', message: 'Agent not connected' }, client.sessionKey);
     return;
   }
 
-  // Forward web client message to agent
-  agent.ws.send(raw);
+  // Forward web client message to agent, encrypted with agent's session key
+  encryptAndSend(agent.ws, msg, agent.sessionKey);
 }

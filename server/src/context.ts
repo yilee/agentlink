@@ -8,6 +8,7 @@ export interface AgentSession {
   hostname: string;
   workDir: string;
   sessionId: string;    // unique session ID for URL
+  sessionKey: Uint8Array | null;  // encryption key for this agent
   connectedAt: Date;
   isAlive: boolean;
 }
@@ -16,6 +17,7 @@ export interface WebClient {
   ws: WebSocket;
   clientId: string;
   sessionId: string;    // which agent session this client belongs to
+  sessionKey: Uint8Array | null;  // encryption key for this client
   connectedAt: Date;
   isAlive: boolean;
 }

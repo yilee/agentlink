@@ -8,6 +8,7 @@ import {
   generateSessionId,
   type AgentSession,
 } from './context.js';
+import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
 export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
@@ -17,6 +18,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   const hostname = url.searchParams.get('hostname') || '';
 
   const sessionId = generateSessionId();
+  const sessionKey = generateSessionKey();
 
   const agent: AgentSession = {
     ws,
@@ -25,6 +27,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     hostname,
     workDir,
     sessionId,
+    sessionKey,
     connectedAt: new Date(),
     isAlive: true,
   };
@@ -34,11 +37,12 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
 
   console.log(`[Agent] Registered: ${name} (${agentId}), session: ${sessionId}`);
 
-  // Send registration confirmation with session info
+  // Send registration with session key (this initial message is plain text)
   ws.send(JSON.stringify({
     type: 'registered',
     agentId,
     sessionId,
+    sessionKey: encodeKey(sessionKey),
   }));
 
   ws.on('message', (data) => {
@@ -53,7 +57,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     // Notify connected web clients that agent is gone
     for (const [, client] of webClients) {
       if (client.sessionId === sessionId && client.ws.readyState === WebSocket.OPEN) {
-        client.ws.send(JSON.stringify({ type: 'agent_disconnected' }));
+        encryptAndSend(client.ws, { type: 'agent_disconnected' }, client.sessionKey);
       }
     }
   });
@@ -63,17 +67,15 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   });
 }
 
-function handleAgentMessage(agentId: string, raw: string): void {
-  let msg: { type: string; [key: string]: unknown };
-  try {
-    msg = JSON.parse(raw);
-  } catch {
-    console.error(`[Agent] Invalid JSON from ${agentId}`);
-    return;
-  }
-
+async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
   const agent = agents.get(agentId);
   if (!agent) return;
+
+  const msg = await parseMessage(raw, agent.sessionKey);
+  if (!msg) {
+    console.error(`[Agent] Failed to parse/decrypt message from ${agentId}`);
+    return;
+  }
 
   // Intercept workdir_changed to keep server state in sync
   if (msg.type === 'workdir_changed' && typeof msg.workDir === 'string') {
@@ -82,9 +84,10 @@ function handleAgentMessage(agentId: string, raw: string): void {
   }
 
   // Forward agent messages to all web clients connected to this session
+  // Re-encrypt with each client's own session key
   for (const [, client] of webClients) {
     if (client.sessionId === agent.sessionId && client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(raw);
+      encryptAndSend(client.ws, msg, client.sessionKey);
     }
   }
 }

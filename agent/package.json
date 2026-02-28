@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "commander": "^12.0.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1",
     "ws": "^8.16.0"
   },
   "devDependencies": {

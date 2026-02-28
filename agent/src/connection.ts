@@ -6,6 +6,7 @@ import { resolve, isAbsolute, join } from 'path';
 import type { AgentConfig } from './config.js';
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages } from './history.js';
+import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 30_000;
@@ -14,6 +15,7 @@ const MAX_RECONNECT_ATTEMPTS = 20;
 interface ConnectionState {
   ws: WebSocket | null;
   sessionId: string | null;
+  sessionKey: Uint8Array | null;
   reconnectAttempts: number;
   shouldReconnect: boolean;
   workDir: string;
@@ -22,6 +24,7 @@ interface ConnectionState {
 const state: ConnectionState = {
   ws: null,
   sessionId: null,
+  sessionKey: null,
   reconnectAttempts: 0,
   shouldReconnect: true,
   workDir: process.cwd(),
@@ -45,13 +48,31 @@ export function connect(config: AgentConfig): Promise<string> {
       console.log('[AgentLink] Connected to server');
     });
 
-    ws.on('message', (data) => {
-      const msg = JSON.parse(data.toString());
-      if (msg.type === 'registered') {
-        state.sessionId = msg.sessionId;
-        resolve(msg.sessionId);
+    ws.on('message', async (data) => {
+      // The 'registered' message is always plain text (key exchange)
+      const raw = data.toString();
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        console.error('[AgentLink] Failed to parse message');
+        return;
+      }
+
+      if (parsed.type === 'registered') {
+        state.sessionId = parsed.sessionId as string;
+        if (typeof parsed.sessionKey === 'string') {
+          state.sessionKey = decodeKey(parsed.sessionKey);
+        }
+        resolve(parsed.sessionId as string);
       } else {
-        handleServerMessage(msg);
+        // All subsequent messages may be encrypted
+        const msg = await parseMessage(raw, state.sessionKey);
+        if (msg) {
+          handleServerMessage(msg as { type: string; [key: string]: unknown });
+        } else {
+          console.error('[AgentLink] Failed to decrypt message');
+        }
       }
     });
 
@@ -83,7 +104,7 @@ export function disconnect(): void {
 
 export function send(msg: Record<string, unknown>): void {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-    state.ws.send(JSON.stringify(msg));
+    encryptAndSend(state.ws, msg, state.sessionKey);
   }
 }
 
@@ -115,6 +136,7 @@ function scheduleReconnect(config: AgentConfig): void {
 
   setTimeout(async () => {
     try {
+      state.sessionKey = null; // Reset key; new one will come from server
       await connect(config);
       console.log('[AgentLink] Reconnected successfully');
     } catch {

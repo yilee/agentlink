@@ -317,6 +317,7 @@ agentlink/
 │       ├── index.ts          # HTTP server + WebSocket routing + static serving
 │       ├── context.ts        # Shared state (agents, webClients, sessionToAgent maps)
 │       ├── ws-agent.ts       # Agent WebSocket handler (registration, message forwarding)
+│       ├── encryption.ts      # TweetNaCl encryption (XSalsa20-Poly1305 secretbox)
 │       └── ws-client.ts      # Web client WebSocket handler (session binding, forwarding)
 ├── agent/
 │   ├── package.json          # Commander.js 12 + ws 8.16, bin: agentlink-client
@@ -330,10 +331,12 @@ agentlink/
 │       ├── stream.ts         # AsyncIterable stream for bidirectional IPC
 │       ├── history.ts        # Read Claude session JSONL files (list + message history)
 │       ├── daemon.ts         # Daemon mode (detached process spawning)
+│       ├── encryption.ts     # TweetNaCl encryption (XSalsa20-Poly1305 secretbox)
 │       └── index.ts          # Agent core (start function, graceful shutdown)
 └── web/
     ├── index.html            # Vue 3 SPA shell (CDN: Vue 3, marked.js, highlight.js)
     ├── style.css             # Dark theme + sidebar + chat + tool display styles
+    ├── encryption.js         # Browser-side TweetNaCl encryption (CDN globals)
     └── app.js                # Vue 3 app (sidebar, chat, streaming, session resume)
 ```
 
@@ -349,6 +352,7 @@ agentlink/
 | `stream.ts` | AsyncIterable\<T\> with enqueue/done | `Stream` class (used for stdin/stdout piping) |
 | `history.ts` | Reads `~/.claude/projects/` JSONL files | `listSessions()`, `readSessionMessages()` |
 | `daemon.ts` | Background process management | Spawns/kills detached agent process |
+| `encryption.ts` | TweetNaCl encryption | `encrypt()`, `decrypt()`, `parseMessage()`, `encryptAndSend()` |
 | `index.ts` | Agent startup orchestration | `start()` (connects, writes runtime state, handles shutdown) |
 
 ### Claude CLI Integration (agent/claude.ts)
@@ -413,9 +417,12 @@ interface ConversationState {
 
 **Registration flow:**
 1. Agent connects: `ws://server/?type=agent&id=NAME&name=NAME&workDir=PATH`
-2. Server sends `{ type: 'registered', sessionId }` (base64url session ID)
-3. Web client connects: `ws://server/?type=web&sessionId=SID`
-4. Server sends `{ type: 'connected', agent: { name, workDir } }` to web client
+2. Server generates 32-byte session key, sends `{ type: 'registered', sessionId, sessionKey }` (plain text, key in base64)
+3. Agent decodes sessionKey; all subsequent messages are encrypted with XSalsa20-Poly1305 secretbox
+4. Web client connects: `ws://server/?type=web&sessionId=SID`
+5. Server generates separate session key for client, sends `{ type: 'connected', sessionKey, agent: { name, workDir } }` (plain text)
+6. Web client decodes sessionKey; all subsequent messages are encrypted
+7. Encrypted message envelope: `{ n: "base64-nonce-24B", c: "base64-ciphertext", z?: true }` (z = gzip compressed)
 
 **Message types (Web → Agent):**
 
@@ -599,7 +606,7 @@ agentlink-client --help
 - [x] Web UI: sidebar session history grouped by time (Today/Yesterday/This week/Earlier)
 - [x] Web UI: light/dark theme toggle with localStorage persistence
 - [x] Web UI: change working directory (folder picker modal, filesystem browsing)
-- [ ] Message protocol (encrypted relay)
+- [x] Message protocol (encrypted relay — TweetNaCl XSalsa20-Poly1305)
 - [x] Web UI: file upload (paperclip button, drag-drop, paste; base64 over WebSocket; images inline, non-images saved to `~/.agentlink/tmp-attachments/`)
 - [ ] Web UI: workbench panel (terminal, files, git)
 - [ ] Agent: terminal (PTY) support
