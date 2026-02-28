@@ -780,6 +780,16 @@ const App = {
       loadFolderPickerDir(newPath);
     }
 
+    function folderPickerGoToPath() {
+      const path = folderPickerPath.value.trim();
+      if (!path) {
+        loadFolderPickerDir('');
+        return;
+      }
+      folderPickerSelected.value = '';
+      loadFolderPickerDir(path);
+    }
+
     function confirmFolderPicker() {
       let path = folderPickerPath.value;
       if (!path) return;
@@ -815,6 +825,12 @@ const App = {
     });
 
     // ── WebSocket ──
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 50;
+    const RECONNECT_BASE_DELAY = 1000;
+    const RECONNECT_MAX_DELAY = 15000;
+    let reconnectTimer = null;
+
     function connect() {
       const sid = getSessionId();
       if (!sid) {
@@ -823,12 +839,14 @@ const App = {
         return;
       }
       sessionId.value = sid;
+      status.value = 'Connecting...';
+      error.value = '';
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/?type=web&sessionId=${sid}`;
       ws = new WebSocket(wsUrl);
 
-      ws.onopen = () => { error.value = ''; };
+      ws.onopen = () => { error.value = ''; reconnectAttempts = 0; };
 
       ws.onmessage = (event) => {
         let msg;
@@ -856,6 +874,11 @@ const App = {
             agentName.value = msg.agent.name;
             hostname.value = msg.agent.hostname || '';
             workDir.value = msg.agent.workDir;
+            // If we have a saved workDir from a previous session, restore it
+            const savedDir = localStorage.getItem('agentlink-workdir');
+            if (savedDir && savedDir !== msg.agent.workDir) {
+              wsSend({ type: 'change_workdir', workDir: savedDir });
+            }
             // Request session list once connected
             requestSessionList();
           } else {
@@ -863,13 +886,21 @@ const App = {
             error.value = 'Agent is not connected yet.';
           }
         } else if (msg.type === 'agent_disconnected') {
-          status.value = 'Disconnected';
+          status.value = 'Waiting';
           agentName.value = '';
           hostname.value = '';
-          workDir.value = '';
-          error.value = 'Agent has disconnected.';
+          error.value = 'Agent disconnected. Waiting for reconnect...';
           isProcessing.value = false;
           isCompacting.value = false;
+        } else if (msg.type === 'agent_reconnected') {
+          status.value = 'Connected';
+          error.value = '';
+          if (msg.agent) {
+            agentName.value = msg.agent.name;
+            hostname.value = msg.agent.hostname || '';
+            workDir.value = msg.agent.workDir;
+          }
+          requestSessionList();
         } else if (msg.type === 'error') {
           status.value = 'Error';
           error.value = msg.message;
@@ -1000,6 +1031,7 @@ const App = {
           if (msg.dirPath != null) folderPickerPath.value = msg.dirPath;
         } else if (msg.type === 'workdir_changed') {
           workDir.value = msg.workDir;
+          localStorage.setItem('agentlink-workdir', msg.workDir);
           messages.value = [];
           visibleLimit.value = 50;
           messageIdCounter = 0;
@@ -1019,15 +1051,30 @@ const App = {
 
       ws.onclose = () => {
         sessionKey = null;
-        if (status.value === 'Connected' || status.value === 'Connecting...') {
-          status.value = 'Disconnected';
-          error.value = 'Connection to server lost.';
-        }
+        const wasConnected = status.value === 'Connected' || status.value === 'Connecting...';
         isProcessing.value = false;
         isCompacting.value = false;
+
+        if (wasConnected || reconnectAttempts > 0) {
+          scheduleReconnect();
+        }
       };
 
       ws.onerror = () => {};
+    }
+
+    function scheduleReconnect() {
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        status.value = 'Disconnected';
+        error.value = 'Unable to reconnect. Please refresh the page.';
+        return;
+      }
+      const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(1.5, reconnectAttempts), RECONNECT_MAX_DELAY);
+      reconnectAttempts++;
+      status.value = 'Reconnecting...';
+      error.value = 'Connection lost. Reconnecting... (attempt ' + reconnectAttempts + ')';
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, delay);
     }
 
     function handleClaudeOutput(msg) {
@@ -1095,7 +1142,7 @@ const App = {
     watch(messageCount, () => { nextTick(scheduleHighlight); });
 
     onMounted(() => { connect(); });
-    onUnmounted(() => { if (ws) ws.close(); });
+    onUnmounted(() => { if (reconnectTimer) clearTimeout(reconnectTimer); if (ws) ws.close(); });
 
     return {
       status, agentName, hostname, workDir, sessionId, error,
@@ -1116,7 +1163,7 @@ const App = {
       folderPickerOpen, folderPickerPath, folderPickerEntries,
       folderPickerLoading, folderPickerSelected,
       openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
-      folderPickerEnter, confirmFolderPicker,
+      folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
       // File attachments
       attachments, fileInputRef, dragOver,
       triggerFileInput, handleFileSelect, removeAttachment, formatFileSize,
@@ -1142,7 +1189,7 @@ const App = {
         </div>
       </header>
 
-      <div v-if="status === 'No Session' || (status !== 'Connected' && status !== 'Connecting...' && messages.length === 0)" class="center-card">
+      <div v-if="status === 'No Session' || (status !== 'Connected' && status !== 'Connecting...' && status !== 'Reconnecting...' && messages.length === 0)" class="center-card">
         <div class="status-card">
           <p class="status">
             <span class="label">Status:</span>
@@ -1424,7 +1471,7 @@ const App = {
             <button class="folder-picker-up" @click="folderPickerNavigateUp" :disabled="!folderPickerPath" title="Go to parent directory">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             </button>
-            <span class="folder-picker-current" :title="folderPickerPath">{{ folderPickerPath || 'Drives' }}</span>
+            <input class="folder-picker-path-input" type="text" v-model="folderPickerPath" @keydown.enter="folderPickerGoToPath" placeholder="Enter path..." spellcheck="false" />
           </div>
           <div class="folder-picker-list">
             <div v-if="folderPickerLoading" class="folder-picker-loading">

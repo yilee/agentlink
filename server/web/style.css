@@ -191,6 +191,11 @@ body {
   background: rgba(245, 158, 11, 0.1);
 }
 
+.badge.reconnecting\.\.\. {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
 .badge.waiting {
   color: var(--warning);
   background: rgba(245, 158, 11, 0.1);
@@ -1493,6 +1498,22 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+}
+
+.folder-picker-path-input {
+  flex: 1;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  font-family: monospace;
+  outline: none;
+}
+
+.folder-picker-path-input:focus {
+  border-color: var(--accent);
 }
 
 .folder-picker-list {
