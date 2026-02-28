@@ -23,6 +23,23 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
 }
 
+/* ── Light theme ── */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b7280;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --success: #16a34a;
+  --warning: #d97706;
+  --error: #dc2626;
+  --border: #d1d5db;
+  --code-bg: #f1f3f5;
+  --code-header-bg: #e9ecef;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -89,6 +106,26 @@ body {
 .agent-label {
   color: var(--text-secondary);
   font-size: 0.85rem;
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.theme-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
 }
 
 /* ── Center card (no session / waiting) ── */
@@ -304,21 +341,39 @@ body {
   gap: 2px;
 }
 
+.session-group {
+  margin-bottom: 0.5rem;
+}
+
+.session-group-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  padding: 0.4rem 8px 0.2rem;
+  opacity: 0.7;
+}
+
 .session-item {
-  padding: 8px 8px;
-  border-radius: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, transform 0.1s;
+  border-left: 3px solid transparent;
 }
 
 .session-item:hover {
   background: var(--bg-tertiary);
 }
 
+.session-item:active {
+  transform: scale(0.98);
+}
+
 .session-item.active {
   background: var(--bg-tertiary);
-  border-left: 2px solid var(--accent);
-  padding-left: 6px;
+  border-left-color: var(--accent);
 }
 
 .session-title {
@@ -348,10 +403,19 @@ body {
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem 1rem 0.5rem;
+  padding: 1.5rem 1.5rem 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.25rem;
+}
+
+.message-list-inner {
+  max-width: 768px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .empty-state {
@@ -360,8 +424,14 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
   color: var(--text-secondary);
+}
+
+.empty-state-icon {
+  font-size: 2.5rem;
+  opacity: 0.5;
+  margin-bottom: 0.5rem;
 }
 
 .empty-state strong {
@@ -371,52 +441,61 @@ body {
 /* ── Messages ── */
 .message {
   display: flex;
+  flex-direction: column;
 }
 
 .message-user {
-  justify-content: flex-end;
+  margin-top: 1.25rem;
 }
 
-.message-assistant,
-.message-tool,
-.message-system {
-  justify-content: flex-start;
+.message-role-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.3rem;
+  padding-left: 0.1rem;
+}
+
+.message-role-label.user-label {
+  color: var(--text-secondary);
+}
+
+.message-role-label.assistant-label {
+  color: var(--accent);
 }
 
 .message-bubble {
-  max-width: 70%;
   padding: 0.6rem 0.9rem;
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 0.92rem;
-  line-height: 1.5;
+  line-height: 1.55;
   word-wrap: break-word;
   position: relative;
 }
 
 .user-bubble {
-  background: var(--accent);
-  color: #fff;
-  border-bottom-right-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .assistant-bubble {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-bottom-left-radius: 4px;
+  background: transparent;
+  padding: 0.2rem 0;
 }
 
 /* ── Message actions (copy button, shown on hover) ── */
 .message-actions {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 0;
+  right: 0;
   display: flex;
   gap: 2px;
   opacity: 0;
   transition: opacity 0.15s;
 }
 
-.assistant-bubble:hover .message-actions {
+.message-bubble:hover .message-actions {
   opacity: 1;
 }
 
@@ -563,7 +642,7 @@ body {
 
 /* ── Tool use lines (collapsible, compact) ── */
 .tool-line-wrapper {
-  max-width: 80%;
+  max-width: 100%;
 }
 
 .tool-line {
@@ -718,53 +797,78 @@ body {
 /* ── Input area ── */
 .input-area {
   flex-shrink: 0;
-  padding: 0.75rem 1rem;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border);
+  padding: 0 1.5rem 1rem;
+  background: transparent;
+  position: relative;
 }
 
-.input-wrapper {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 900px;
+.input-area::before {
+  content: '';
+  position: absolute;
+  top: -2rem;
+  left: 0;
+  right: 0;
+  height: 2rem;
+  background: linear-gradient(to top, var(--bg-primary), transparent);
+  pointer-events: none;
+}
+
+.input-card {
+  max-width: 768px;
   margin: 0 auto;
-  align-items: flex-end;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.input-wrapper textarea {
-  flex: 1;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+.input-card:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 2px 16px rgba(37, 99, 235, 0.12);
+}
+
+.input-card textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
   color: var(--text-primary);
-  padding: 0.6rem 0.8rem;
+  padding: 0.4rem 0.6rem;
   font-family: inherit;
   font-size: 0.92rem;
   resize: none;
   outline: none;
-  line-height: 1.4;
+  line-height: 1.5;
   max-height: 160px;
   overflow-y: auto;
 }
 
-.input-wrapper textarea:focus {
-  border-color: var(--accent);
+.input-card textarea::placeholder {
+  color: var(--text-secondary);
+}
+
+.input-bottom-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.1rem 0.25rem 0;
 }
 
 .send-btn {
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 0 1.2rem;
-  height: 36px;
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.15s, opacity 0.15s;
 }
 
 .send-btn:hover:not(:disabled) {
@@ -772,14 +876,13 @@ body {
 }
 
 .send-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 /* ── Stop button ── */
 .stop-btn {
   background: var(--error);
-  padding: 0 0.8rem;
 }
 
 .stop-btn:hover {
@@ -787,12 +890,13 @@ body {
 }
 
 /* ── Streaming cursor ── */
-.assistant-bubble.streaming .message-content::after {
+.assistant-bubble.streaming .markdown-body > *:last-child::after,
+.assistant-bubble.streaming .message-content:not(.markdown-body)::after {
   content: '';
   display: inline-block;
   width: 2px;
   height: 1em;
-  background: var(--text-primary);
+  background: var(--accent);
   margin-left: 2px;
   vertical-align: text-bottom;
   animation: blink-cursor 0.8s steps(2) infinite;

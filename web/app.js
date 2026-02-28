@@ -98,6 +98,22 @@ const App = {
     const loadingSessions = ref(false);
     const loadingHistory = ref(false);
 
+    // Theme state
+    const theme = ref(localStorage.getItem('agentlink-theme') || 'dark');
+    function applyTheme() {
+      document.documentElement.setAttribute('data-theme', theme.value);
+      const link = document.getElementById('hljs-theme');
+      if (link) link.href = theme.value === 'light'
+        ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css'
+        : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+    }
+    function toggleTheme() {
+      theme.value = theme.value === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('agentlink-theme', theme.value);
+      applyTheme();
+    }
+    applyTheme();
+
     let ws = null;
     let messageIdCounter = 0;
     let streamingMessageId = null;
@@ -232,6 +248,14 @@ const App = {
       } catch {}
     }
 
+    // ── Check if previous message is also assistant (to suppress repeated label) ──
+    function isPrevAssistant(msg) {
+      const idx = messages.value.indexOf(msg);
+      if (idx <= 0) return false;
+      const prev = messages.value[idx - 1];
+      return prev.role === 'assistant' || prev.role === 'tool';
+    }
+
     // ── Tool expand/collapse ──
     function toggleTool(msg) {
       msg.expanded = !msg.expanded;
@@ -297,6 +321,29 @@ const App = {
     function toggleSidebar() {
       sidebarOpen.value = !sidebarOpen.value;
     }
+
+    // ── Sidebar: grouped sessions by time ──
+    const groupedSessions = computed(() => {
+      if (!historySessions.value.length) return [];
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const yesterdayStart = todayStart - 86400000;
+      const weekStart = todayStart - 6 * 86400000;
+
+      const groups = {};
+      for (const s of historySessions.value) {
+        let label;
+        if (s.lastModified >= todayStart) label = 'Today';
+        else if (s.lastModified >= yesterdayStart) label = 'Yesterday';
+        else if (s.lastModified >= weekStart) label = 'This week';
+        else label = 'Earlier';
+        if (!groups[label]) groups[label] = [];
+        groups[label].push(s);
+      }
+      // Return in a consistent order
+      const order = ['Today', 'Yesterday', 'This week', 'Earlier'];
+      return order.filter(k => groups[k]).map(k => ({ label: k, sessions: groups[k] }));
+    });
 
     // ── WebSocket ──
     function connect() {
@@ -480,12 +527,14 @@ const App = {
       status, agentName, workDir, sessionId, error,
       messages, inputText, isProcessing, canSend, inputRef,
       sendMessage, handleKeydown, cancelExecution,
-      getRenderedContent, copyMessage, toggleTool,
+      getRenderedContent, copyMessage, toggleTool, isPrevAssistant,
       getToolIcon, getToolSummary, autoResize,
+      // Theme
+      theme, toggleTheme,
       // Sidebar
       sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
       toggleSidebar, resumeSession, newConversation, requestSessionList,
-      formatRelativeTime,
+      formatRelativeTime, groupedSessions,
     };
   },
   template: `
@@ -500,6 +549,10 @@ const App = {
         <div class="top-bar-info">
           <span :class="['badge', status.toLowerCase()]">{{ status }}</span>
           <span v-if="agentName" class="agent-label">{{ agentName }}</span>
+          <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+            <svg v-if="theme === 'dark'" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
+            <svg v-else viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+          </button>
         </div>
       </header>
 
@@ -546,14 +599,17 @@ const App = {
               No previous sessions found.
             </div>
             <div v-else class="session-list">
-              <div
-                v-for="s in historySessions" :key="s.sessionId"
-                :class="['session-item', { active: currentClaudeSessionId === s.sessionId }]"
-                @click="resumeSession(s)"
-                :title="s.preview"
-              >
-                <div class="session-title">{{ s.title }}</div>
-                <div class="session-meta">{{ formatRelativeTime(s.lastModified) }}</div>
+              <div v-for="group in groupedSessions" :key="group.label" class="session-group">
+                <div class="session-group-label">{{ group.label }}</div>
+                <div
+                  v-for="s in group.sessions" :key="s.sessionId"
+                  :class="['session-item', { active: currentClaudeSessionId === s.sessionId }]"
+                  @click="resumeSession(s)"
+                  :title="s.preview"
+                >
+                  <div class="session-title">{{ s.title }}</div>
+                  <div class="session-meta">{{ formatRelativeTime(s.lastModified) }}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -562,66 +618,77 @@ const App = {
         <!-- Chat area -->
         <div class="chat-area">
           <div class="message-list">
-            <div v-if="messages.length === 0 && status === 'Connected' && !loadingHistory" class="empty-state">
-              <p>Connected to <strong>{{ agentName }}</strong></p>
-              <p class="muted">Working directory: {{ workDir }}</p>
-              <p class="muted">Send a message to start.</p>
-            </div>
-
-            <div v-if="loadingHistory" class="history-loading">
-              <div class="history-loading-spinner"></div>
-              <span>Loading conversation history...</span>
-            </div>
-
-            <div v-for="msg in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">
-
-              <!-- User message -->
-              <div v-if="msg.role === 'user'" class="message-bubble user-bubble">
-                <div class="message-content">{{ msg.content }}</div>
-              </div>
-
-              <!-- Assistant message (markdown) -->
-              <div v-else-if="msg.role === 'assistant'" :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
-                <div class="message-actions">
-                  <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? 'Copied!' : 'Copy'">
-                    <svg v-if="!msg.copied" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                    <svg v-else viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-                  </button>
+            <div class="message-list-inner">
+              <div v-if="messages.length === 0 && status === 'Connected' && !loadingHistory" class="empty-state">
+                <div class="empty-state-icon">
+                  <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" opacity="0.4" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
                 </div>
-                <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
+                <p>Connected to <strong>{{ agentName }}</strong></p>
+                <p class="muted">{{ workDir }}</p>
+                <p class="muted" style="margin-top: 0.5rem;">Send a message to start.</p>
               </div>
 
-              <!-- Tool use block (collapsible) -->
-              <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
-                <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
-                  <span class="tool-icon">{{ getToolIcon(msg.toolName) }}</span>
-                  <span class="tool-name">{{ msg.toolName }}</span>
-                  <span class="tool-summary">{{ getToolSummary(msg) }}</span>
-                  <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>
-                  <span class="tool-status-icon running-dots" v-else>
-                    <span></span><span></span><span></span>
-                  </span>
-                  <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
+              <div v-if="loadingHistory" class="history-loading">
+                <div class="history-loading-spinner"></div>
+                <span>Loading conversation history...</span>
+              </div>
+
+              <div v-for="msg in messages" :key="msg.id" :class="['message', 'message-' + msg.role]">
+
+                <!-- User message -->
+                <template v-if="msg.role === 'user'">
+                  <div class="message-role-label user-label">You</div>
+                  <div class="message-bubble user-bubble">
+                    <div class="message-content">{{ msg.content }}</div>
+                  </div>
+                </template>
+
+                <!-- Assistant message (markdown) -->
+                <template v-else-if="msg.role === 'assistant'">
+                  <div v-if="!isPrevAssistant(msg)" class="message-role-label assistant-label">Claude</div>
+                  <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
+                    <div class="message-actions">
+                      <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? 'Copied!' : 'Copy'">
+                        <svg v-if="!msg.copied" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                        <svg v-else viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                      </button>
+                    </div>
+                    <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
+                  </div>
+                </template>
+
+                <!-- Tool use block (collapsible) -->
+                <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
+                  <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
+                    <span class="tool-icon">{{ getToolIcon(msg.toolName) }}</span>
+                    <span class="tool-name">{{ msg.toolName }}</span>
+                    <span class="tool-summary">{{ getToolSummary(msg) }}</span>
+                    <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>
+                    <span class="tool-status-icon running-dots" v-else>
+                      <span></span><span></span><span></span>
+                    </span>
+                    <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
+                  </div>
+                  <div v-if="msg.expanded" class="tool-expand">
+                    <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
+                    <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
+                  </div>
                 </div>
-                <div v-if="msg.expanded" class="tool-expand">
-                  <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
-                  <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
+
+                <!-- System message -->
+                <div v-else-if="msg.role === 'system'" class="system-msg">
+                  {{ msg.content }}
                 </div>
               </div>
 
-              <!-- System message -->
-              <div v-else-if="msg.role === 'system'" class="system-msg">
-                {{ msg.content }}
+              <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
+                <span></span><span></span><span></span>
               </div>
-            </div>
-
-            <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
-              <span></span><span></span><span></span>
             </div>
           </div>
 
           <div class="input-area">
-            <div class="input-wrapper">
+            <div class="input-card">
               <textarea
                 ref="inputRef"
                 v-model="inputText"
@@ -631,10 +698,14 @@ const App = {
                 placeholder="Send a message..."
                 rows="1"
               ></textarea>
-              <button v-if="isProcessing" @click="cancelExecution" class="send-btn stop-btn" title="Stop generation">
-                <svg viewBox="0 0 24 24" width="16" height="16"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
-              </button>
-              <button v-else @click="sendMessage" :disabled="!canSend" class="send-btn">Send</button>
+              <div class="input-bottom-row">
+                <button v-if="isProcessing" @click="cancelExecution" class="send-btn stop-btn" title="Stop generation">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+                </button>
+                <button v-else @click="sendMessage" :disabled="!canSend" class="send-btn" title="Send">
+                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>

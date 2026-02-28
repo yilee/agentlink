@@ -433,29 +433,47 @@ interface ConversationState {
 
 ### Web UI Architecture
 
-**Layout:** Top bar + main body (sidebar + chat area)
+**Layout:** Top bar (with theme toggle) + main body (sidebar + chat area)
+
+**Top bar:**
+- Sidebar toggle button, "AgentLink" title
+- Status badge, agent name, light/dark theme toggle (sun/moon icon)
+- Theme persisted to `localStorage('agentlink-theme')`, applied before first paint via inline script
 
 **Sidebar (left, 260px, toggleable):**
 - Working directory display
 - "New conversation" button
-- Session history list (from `list_sessions` / `sessions_list` protocol)
+- Session history list grouped by time (Today / Yesterday / This week / Earlier)
+- `groupedSessions` computed property handles grouping
 - Click session → `resume_conversation` → loads history messages into chat
 
 **Chat area:**
-- Message list with roles: user, assistant (markdown), tool (collapsible), system
+- Centered `message-list-inner` container (max-width: 768px)
+- Unified left-aligned message layout with role labels ("YOU" / "CLAUDE")
+- User messages: `bg-tertiary` rounded box; Assistant messages: transparent, no border
+- `isPrevAssistant()` suppresses repeated "Claude" label for consecutive assistant/tool messages
 - Markdown rendering: marked.js + highlight.js, code block copy buttons
 - Streaming text: progressive reveal (3 chars/tick, 12ms interval)
 - Tool display: icon + name + summary line, expandable input/output
 - Stop button during processing
-- Auto-resizing textarea input
 
-**CDN dependencies:** Vue 3, marked.js 12, highlight.js 11.9 (github-dark theme)
+**Input area:**
+- Floating card (`input-card`) with 16px border-radius, shadow, accent focus ring
+- Textarea + embedded icon send button inside the card
+- Gradient fade at bottom of message list (`input-area::before`)
+
+**Theme system:**
+- CSS variables in `:root` (dark default) and `[data-theme="light"]`
+- highlight.js stylesheet switches between `github-dark` and `github` themes
+- Inline `<script>` in index.html prevents flash on load
+
+**CDN dependencies:** Vue 3, marked.js 12, highlight.js 11.9 (github-dark / github themes)
 
 **Key reactive state:**
 ```javascript
 {
   status, agentName, workDir, sessionId, error,
-  messages, inputText, isProcessing,
+  messages, inputText, isProcessing, theme,
   sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions,
 }
 ```
@@ -520,6 +538,10 @@ node agent/dist/cli.js --help
 - [x] Web UI: session history list (reads Claude's JSONL files)
 - [x] Session resume (load history from JSONL, `--resume` flag to Claude CLI)
 - [x] Multi-turn conversation management (persistent Claude process across turns)
+- [x] Web UI: unified left-aligned layout with role labels + centered max-width container
+- [x] Web UI: floating input card with embedded send button
+- [x] Web UI: sidebar session history grouped by time (Today/Yesterday/This week/Earlier)
+- [x] Web UI: light/dark theme toggle with localStorage persistence
 - [ ] Message protocol (encrypted relay)
 - [ ] Web UI: file upload
 - [ ] Web UI: workbench panel (terminal, files, git)
