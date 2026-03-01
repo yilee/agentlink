@@ -304,6 +304,7 @@ conversations.set(conversationId, {
 agentlink/
 ├── package.json              # Monorepo root (npm workspaces: server, agent)
 ├── tsconfig.base.json        # Shared TS config (ES2022, Node16, strict)
+├── vitest.config.ts          # Vitest test runner config
 ├── .gitignore
 ├── requirements.md           # Product requirements
 ├── CLAUDE.md                 # This file
@@ -346,6 +347,15 @@ agentlink/
 │       ├── encryption.ts     # TweetNaCl encryption (XSalsa20-Poly1305 secretbox)
 │       ├── service.ts        # OS auto-start service (systemd/launchd/Startup folder)
 │       └── index.ts          # Agent core (start function, graceful shutdown)
+├── test/                     # Vitest unit tests
+│   ├── server/
+│   │   ├── encryption.test.ts
+│   │   └── context.test.ts
+│   └── agent/
+│       ├── encryption.test.ts
+│       ├── stream.test.ts
+│       ├── history.test.ts
+│       └── config.test.ts
 ```
 
 ### Agent Source Files Reference
@@ -589,6 +599,11 @@ npm run dev:server       # server only
 npm run dev:agent        # agent only
 npm run dev              # both (concurrently)
 
+# Tests
+npm test                 # run all tests (vitest)
+npm run test:watch       # watch mode
+npm run test:coverage    # with v8 coverage report
+
 # Server management (agentlink-server CLI)
 agentlink-server start                         # start server in foreground (port 3456)
 agentlink-server start --daemon                # start server in background
@@ -724,6 +739,7 @@ agentlink-client start --daemon
 - [x] CLI: dynamic version from package.json (`createRequire` in cli.ts)
 - [x] History: filter internal CLI commands (`/compact`, etc.) from session list and message history
 - [x] Web UI: modularized frontend (app.js split into 7 ES modules under `modules/`)
+- [x] Unit tests: vitest (encryption, stream, history, config, context — 60 tests)
 - [ ] Web UI: workbench panel (terminal, files, git)
 - [ ] Agent: terminal (PTY) support
 - [ ] Agent: file/git operations

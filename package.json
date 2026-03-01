@@ -15,12 +15,16 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:agent\"",
     "start:server": "npm run start --workspace=server",
     "start:agent": "npm run start --workspace=agent",
-    "clean": "rimraf server/dist agent/dist"
+    "clean": "rimraf server/dist agent/dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
     "rimraf": "^5.0.5",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.0.18"
   },
   "engines": {
     "node": ">=18.0.0"
