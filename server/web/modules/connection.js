@@ -24,6 +24,7 @@ export function createConnection(deps) {
   let sessionKey = null;
   let reconnectAttempts = 0;
   let reconnectTimer = null;
+  const toolMsgMap = new Map(); // toolId -> message (for fast tool_result lookup)
 
   function wsSend(msg) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -70,12 +71,14 @@ export function createConnection(deps) {
       finalizeStreamingMsg(scheduleHighlight);
 
       for (const tool of data.tools) {
-        messages.value.push({
+        const toolMsg = {
           id: streaming.nextId(), role: 'tool',
           toolId: tool.id, toolName: tool.name || 'unknown',
           toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
           hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite'), timestamp: new Date(),
-        });
+        };
+        messages.value.push(toolMsg);
+        if (tool.id) toolMsgMap.set(tool.id, toolMsg);
       }
       scrollToBottom();
       return;
@@ -85,9 +88,7 @@ export function createConnection(deps) {
       const result = data.tool_use_result;
       const results = Array.isArray(result) ? result : [result];
       for (const r of results) {
-        const toolMsg = [...messages.value].reverse().find(
-          m => m.role === 'tool' && m.toolId === r.tool_use_id
-        );
+        const toolMsg = toolMsgMap.get(r.tool_use_id);
         if (toolMsg) {
           toolMsg.toolOutput = typeof r.content === 'string'
             ? r.content : JSON.stringify(r.content, null, 2);
@@ -272,6 +273,7 @@ export function createConnection(deps) {
             }
           }
           messages.value = batch;
+          toolMsgMap.clear();
         }
         loadingHistory.value = false;
         messages.value.push({
@@ -290,6 +292,7 @@ export function createConnection(deps) {
         workDir.value = msg.workDir;
         localStorage.setItem('agentlink-workdir', msg.workDir);
         messages.value = [];
+        toolMsgMap.clear();
         visibleLimit.value = 50;
         streaming.setMessageIdCounter(0);
         streaming.setStreamingMessageId(null);

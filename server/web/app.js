@@ -35,7 +35,12 @@ const App = {
       return messages.value.slice(messages.value.length - visibleLimit.value);
     });
     function loadMoreMessages() {
+      const el = document.querySelector('.message-list');
+      const prevHeight = el ? el.scrollHeight : 0;
       visibleLimit.value += 50;
+      nextTick(() => {
+        if (el) el.scrollTop += el.scrollHeight - prevHeight;
+      });
     }
     const inputText = ref('');
     const isProcessing = ref(false);
