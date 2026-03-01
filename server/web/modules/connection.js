@@ -183,7 +183,7 @@ export function createConnection(deps) {
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
         messages.value.push({
-          id: streaming.nextId(), role: 'user',
+          id: streaming.nextId(), role: 'system',
           content: msg.content, isCommandOutput: true,
           timestamp: new Date(),
         });
@@ -263,10 +263,16 @@ export function createConnection(deps) {
                   content: h.content, contextExpanded: false,
                   timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
                 });
+              } else if (h.isCommandOutput) {
+                batch.push({
+                  id: streaming.nextId(), role: 'system',
+                  content: h.content, isCommandOutput: true,
+                  timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                });
               } else {
                 batch.push({
                   id: streaming.nextId(), role: 'user',
-                  content: h.content, isCommandOutput: !!h.isCommandOutput,
+                  content: h.content,
                   timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
                 });
               }

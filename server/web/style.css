@@ -1190,6 +1190,13 @@ body {
   padding: 0.25rem 0;
 }
 
+.system-msg.command-output-msg {
+  text-align: left;
+  font-style: normal;
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+}
+
 /* ── History loading indicator ── */
 .history-loading {
   display: flex;

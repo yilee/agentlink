@@ -403,8 +403,7 @@ const App = {
                 <template v-if="msg.role === 'user'">
                   <div class="message-role-label user-label">You</div>
                   <div class="message-bubble user-bubble" :title="formatTimestamp(msg.timestamp)">
-                    <div v-if="msg.isCommandOutput" class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
-                    <div v-else class="message-content">{{ msg.content }}</div>
+                    <div class="message-content">{{ msg.content }}</div>
                     <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
                       <div v-for="(att, ai) in msg.attachments" :key="ai" class="message-attachment-chip">
                         <img v-if="att.isImage && att.thumbUrl" :src="att.thumbUrl" class="message-attachment-thumb" />
@@ -506,14 +505,15 @@ const App = {
                 </div>
 
                 <!-- System message -->
-                <div v-else-if="msg.role === 'system'" :class="['system-msg', { 'compact-msg': msg.isCompactStart }]">
+                <div v-else-if="msg.role === 'system'" :class="['system-msg', { 'compact-msg': msg.isCompactStart, 'command-output-msg': msg.isCommandOutput }]">
                   <template v-if="msg.isCompactStart && !msg.compactDone">
                     <span class="compact-inline-spinner"></span>
                   </template>
                   <template v-if="msg.isCompactStart && msg.compactDone">
                     <span class="compact-done-icon">✓</span>
                   </template>
-                  {{ msg.content }}
+                  <div v-if="msg.isCommandOutput" class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
+                  <template v-else>{{ msg.content }}</template>
                 </div>
               </div>
 
