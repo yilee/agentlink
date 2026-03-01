@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { resolve, isAbsolute, join } from 'path';
 import type { AgentConfig } from './config.js';
+import { loadRuntimeState } from './config.js';
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
@@ -40,6 +41,13 @@ export function connect(config: AgentConfig): Promise<string> {
   state.workDir = config.dir;
   state.config = config;
   state.shouldReconnect = true;
+
+  // Restore previous sessionId so the session URL survives agent restarts (e.g. upgrade)
+  const prev = loadRuntimeState();
+  if (prev?.sessionId && prev.server === config.server) {
+    state.sessionId = prev.sessionId;
+    console.log(`[AgentLink] Restoring session: ${prev.sessionId}`);
+  }
 
   // Wire up the Claude module to send messages through our WebSocket
   setSendFn(send);

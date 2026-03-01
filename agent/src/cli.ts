@@ -44,8 +44,7 @@ program
           console.log('Use "agentlink-client stop" to stop it first.');
           process.exit(1);
         }
-        // Stale state, clean up
-        clearRuntimeState();
+        // Stale state — leave it so the new process can restore sessionId
       }
 
       // Spawn detached child process running daemon.js
@@ -276,7 +275,8 @@ program
         await new Promise(r => setTimeout(r, 200));
         if (!isProcessAlive(wasRunning!.pid)) break;
       }
-      clearRuntimeState();
+      // Don't clear runtime state — new process reads sessionId from agent.json
+      // to preserve the session URL across upgrades
       console.log('Agent stopped.');
     }
 
