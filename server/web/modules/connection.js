@@ -14,7 +14,7 @@ export function createConnection(deps) {
   const {
     status, agentName, hostname, workDir, sessionId, error,
     messages, isProcessing, isCompacting, visibleLimit,
-    historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
+    historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
     streaming, sidebar,
     scrollToBottom,
@@ -141,15 +141,6 @@ export function createConnection(deps) {
           agentName.value = msg.agent.name;
           hostname.value = msg.agent.hostname || '';
           workDir.value = msg.agent.workDir;
-          // Restore processing state (e.g. page refresh mid-turn)
-          if (msg.agent.processing) {
-            isProcessing.value = true;
-          }
-          // Restore active Claude session so next message resumes it
-          if (msg.agent.claudeSessionId) {
-            currentClaudeSessionId.value = msg.agent.claudeSessionId;
-            needsResume.value = true;
-          }
           const savedDir = localStorage.getItem('agentlink-workdir');
           if (savedDir && savedDir !== msg.agent.workDir) {
             wsSend({ type: 'change_workdir', workDir: savedDir });
@@ -238,74 +229,9 @@ export function createConnection(deps) {
           timestamp: new Date(),
         });
         scrollToBottom();
-      } else if (msg.type === 'buffered_messages' && Array.isArray(msg.messages)) {
-        // Replay buffered messages instantly (no streaming animation)
-        let textAcc = '';
-        const toolBatch = [];
-        for (const m of msg.messages) {
-          if (m.type === 'session_started' && m.claudeSessionId) {
-            currentClaudeSessionId.value = m.claudeSessionId;
-          } else if (m.type === 'claude_output' && m.data) {
-            const data = m.data;
-            if (data.type === 'content_block_delta' && data.delta) {
-              textAcc += data.delta;
-            } else if (data.type === 'tool_use' && data.tools) {
-              // Flush accumulated text before tools
-              if (textAcc) {
-                streaming.flushReveal();
-                finalizeStreamingMsg(scheduleHighlight);
-                messages.value.push({
-                  id: streaming.nextId(), role: 'assistant',
-                  content: textAcc, timestamp: new Date(),
-                });
-                textAcc = '';
-              }
-              for (const tool of data.tools) {
-                messages.value.push({
-                  id: streaming.nextId(), role: 'tool',
-                  toolId: tool.id, toolName: tool.name || 'unknown',
-                  toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
-                  hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite'), timestamp: new Date(),
-                });
-              }
-            } else if (data.type === 'user' && data.tool_use_result) {
-              const result = data.tool_use_result;
-              const results = Array.isArray(result) ? result : [result];
-              for (const r of results) {
-                const toolMsg = [...messages.value].reverse().find(
-                  m2 => m2.role === 'tool' && m2.toolId === r.tool_use_id
-                );
-                if (toolMsg) {
-                  toolMsg.toolOutput = typeof r.content === 'string'
-                    ? r.content : JSON.stringify(r.content, null, 2);
-                  toolMsg.hasResult = true;
-                }
-              }
-            }
-          } else if (m.type === 'turn_completed' || m.type === 'execution_cancelled') {
-            isProcessing.value = false;
-            isCompacting.value = false;
-          } else if (m.type === 'context_compaction') {
-            if (m.status === 'completed') isCompacting.value = false;
-          }
-        }
-        // Flush remaining text
-        if (textAcc) {
-          streaming.flushReveal();
-          finalizeStreamingMsg(scheduleHighlight);
-          messages.value.push({
-            id: streaming.nextId(), role: 'assistant',
-            content: textAcc, timestamp: new Date(),
-          });
-        }
-        // Finalize so subsequent real-time messages create fresh streaming entries
-        finalizeStreamingMsg(scheduleHighlight);
-        scrollToBottom();
       } else if (msg.type === 'sessions_list') {
         historySessions.value = msg.sessions || [];
         loadingSessions.value = false;
-      } else if (msg.type === 'session_started') {
-        currentClaudeSessionId.value = msg.claudeSessionId;
       } else if (msg.type === 'conversation_resumed') {
         currentClaudeSessionId.value = msg.claudeSessionId;
         if (msg.history && Array.isArray(msg.history)) {
@@ -384,9 +310,6 @@ export function createConnection(deps) {
       const wasConnected = status.value === 'Connected' || status.value === 'Connecting...';
       isProcessing.value = false;
       isCompacting.value = false;
-      // Finalize any in-flight streaming message so reconnect starts clean
-      streaming.flushReveal();
-      finalizeStreamingMsg(scheduleHighlight);
 
       if (wasConnected || reconnectAttempts > 0) {
         scheduleReconnect(scheduleHighlight);

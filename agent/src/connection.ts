@@ -135,18 +135,9 @@ export function disconnect(): void {
   }
 }
 
-// Serialize async sends to preserve message ordering.
-// Without this, concurrent encryptAndSend calls can complete out of order
-// because gzip compression is async and variable-latency.
-let sendChain = Promise.resolve();
-
 export function send(msg: Record<string, unknown>): void {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-    sendChain = sendChain.then(() =>
-      encryptAndSend(state.ws!, msg, state.sessionKey).catch(err => {
-        console.error('[AgentLink] Failed to send message:', (err as Error).message);
-      })
-    );
+    encryptAndSend(state.ws, msg, state.sessionKey);
   }
 }
 

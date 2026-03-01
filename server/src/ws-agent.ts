@@ -32,9 +32,6 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     sessionKey,
     connectedAt: new Date(),
     isAlive: true,
-    claudeSessionId: null,
-    processing: false,
-    messageBuffer: [],
   };
 
   agents.set(agentId, agent);
@@ -95,45 +92,14 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
   // Intercept workdir_changed to keep server state in sync
   if (msg.type === 'workdir_changed' && typeof msg.workDir === 'string') {
     agent.workDir = msg.workDir;
-    agent.claudeSessionId = null;
-    agent.processing = false;
-    agent.messageBuffer = [];
     console.log(`[Agent] ${agent.name} changed workDir to: ${msg.workDir}`);
   }
 
-  // Track current Claude session ID
-  if (msg.type === 'session_started' && typeof msg.claudeSessionId === 'string') {
-    agent.claudeSessionId = msg.claudeSessionId;
-  }
-
-  // Track processing state
-  if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
-    agent.processing = false;
-  }
-  // Only mark as processing for actual content output, not the final result signal
-  if (msg.type === 'claude_output' && (msg as Record<string, unknown>).data) {
-    const data = (msg as Record<string, unknown>).data as Record<string, unknown>;
-    if (data.type !== 'result') {
-      agent.processing = true;
-    }
-  }
-
-  // Forward to connected web clients, or buffer if none are connected
-  let forwarded = false;
+  // Forward agent messages to all web clients connected to this session
+  // Re-encrypt with each client's own session key
   for (const [, client] of webClients) {
     if (client.sessionId === agent.sessionId && client.ws.readyState === WebSocket.OPEN) {
-      try {
-        await encryptAndSend(client.ws, msg, client.sessionKey);
-        forwarded = true;
-      } catch (err) {
-        console.error(`[Agent] Failed to forward ${msg.type} to client ${client.clientId.slice(0, 8)}: ${(err as Error).message}`);
-      }
-    }
-  }
-
-  if (!forwarded) {
-    if (agent.messageBuffer.length < 2000) {
-      agent.messageBuffer.push(msg);
+      encryptAndSend(client.ws, msg, client.sessionKey);
     }
   }
 }

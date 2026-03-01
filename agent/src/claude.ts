@@ -326,11 +326,10 @@ async function processOutput(
         try {
           const msg: ClaudeMessage = JSON.parse(line);
 
-          // Capture session ID from system init and notify web client
+          // Capture session ID from system init
           if (msg.type === 'system' && msg.session_id) {
             state.claudeSessionId = msg.session_id as string;
             console.log(`[Claude] Session ID: ${state.claudeSessionId}`);
-            sendFn({ type: 'session_started', claudeSessionId: state.claudeSessionId });
           }
 
           // Handle control_request (tool permission checks)

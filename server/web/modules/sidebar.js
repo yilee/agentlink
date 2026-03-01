@@ -7,7 +7,6 @@ const { computed } = Vue;
  * @param {Function} deps.wsSend
  * @param {import('vue').Ref} deps.messages
  * @param {import('vue').Ref} deps.isProcessing
- * @param {import('vue').Ref} deps.isCompacting
  * @param {import('vue').Ref} deps.sidebarOpen
  * @param {import('vue').Ref} deps.historySessions
  * @param {import('vue').Ref} deps.currentClaudeSessionId
@@ -25,7 +24,7 @@ const { computed } = Vue;
  */
 export function createSidebar(deps) {
   const {
-    wsSend, messages, isProcessing, isCompacting, sidebarOpen,
+    wsSend, messages, isProcessing, sidebarOpen,
     historySessions, currentClaudeSessionId, needsResume,
     loadingSessions, loadingHistory, workDir, visibleLimit,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
@@ -40,12 +39,7 @@ export function createSidebar(deps) {
   }
 
   function resumeSession(session) {
-    if (session.sessionId === currentClaudeSessionId.value) return;
-    if (isProcessing.value || isCompacting.value) {
-      wsSend({ type: 'cancel_execution' });
-      isProcessing.value = false;
-      isCompacting.value = false;
-    }
+    if (isProcessing.value) return;
     if (window.innerWidth <= 768) sidebarOpen.value = false;
     messages.value = [];
     visibleLimit.value = 50;
@@ -64,11 +58,7 @@ export function createSidebar(deps) {
   }
 
   function newConversation() {
-    if (isProcessing.value || isCompacting.value) {
-      wsSend({ type: 'cancel_execution' });
-      isProcessing.value = false;
-      isCompacting.value = false;
-    }
+    if (isProcessing.value) return;
     if (window.innerWidth <= 768) sidebarOpen.value = false;
     messages.value = [];
     visibleLimit.value = 50;
