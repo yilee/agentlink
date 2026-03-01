@@ -305,6 +305,7 @@ agentlink/
 ├── package.json              # Monorepo root (npm workspaces: server, agent)
 ├── tsconfig.base.json        # Shared TS config (ES2022, Node16, strict)
 ├── vitest.config.ts          # Vitest test runner config
+├── vitest.e2e.config.ts      # Vitest config for functional/e2e tests
 ├── .gitignore
 ├── requirements.md           # Product requirements
 ├── CLAUDE.md                 # This file
@@ -351,11 +352,13 @@ agentlink/
 │   ├── server/
 │   │   ├── encryption.test.ts
 │   │   └── context.test.ts
-│   └── agent/
-│       ├── encryption.test.ts
-│       ├── stream.test.ts
-│       ├── history.test.ts
-│       └── config.test.ts
+│   ├── agent/
+│   │   ├── encryption.test.ts
+│   │   ├── stream.test.ts
+│   │   ├── history.test.ts
+│   │   └── config.test.ts
+│   └── functional/
+│       └── e2e.test.ts       # Playwright + mock-agent functional tests
 ```
 
 ### Agent Source Files Reference
@@ -601,6 +604,7 @@ npm run dev              # both (concurrently)
 
 # Tests
 npm test                 # run all tests (vitest)
+npm run test:e2e         # functional tests (Playwright, spawns server)
 npm run test:watch       # watch mode
 npm run test:coverage    # with v8 coverage report
 
@@ -740,6 +744,7 @@ agentlink-client start --daemon
 - [x] History: filter internal CLI commands (`/compact`, etc.) from session list and message history
 - [x] Web UI: modularized frontend (app.js split into 7 ES modules under `modules/`)
 - [x] Unit tests: vitest (encryption, stream, history, config, context — 60 tests)
+- [x] Functional tests: Playwright + mock agent (health, registration, web UI — 8 tests)
 - [ ] Web UI: workbench panel (terminal, files, git)
 - [ ] Agent: terminal (PTY) support
 - [ ] Agent: file/git operations
