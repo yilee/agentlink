@@ -322,7 +322,15 @@ agentlink/
 │       ├── index.html        # Vue 3 SPA shell (CDN: Vue 3, marked.js, highlight.js)
 │       ├── style.css         # Dark/light theme + responsive mobile CSS
 │       ├── encryption.js     # Browser-side TweetNaCl encryption (CDN globals)
-│       └── app.js            # Vue 3 app (sidebar, chat, streaming, session resume)
+│       ├── app.js            # Vue 3 coordinator (state, wiring, template; ~606 lines)
+│       └── modules/          # Extracted ES modules (imported by app.js)
+│           ├── markdown.js       # marked.js setup, renderMarkdown, tool icons (~82 lines)
+│           ├── messageHelpers.js # Message formatting, tool display, diff rendering (~185 lines)
+│           ├── fileAttachments.js # File upload, drag-drop, paste, base64 encoding (~125 lines)
+│           ├── askQuestion.js    # AskUserQuestion option selection & submission (~63 lines)
+│           ├── streaming.js      # Progressive text reveal (5 chars/16ms) (~93 lines)
+│           ├── sidebar.js        # Session list, folder picker, navigation (~186 lines)
+│           └── connection.js     # WebSocket connect/reconnect, message routing (~342 lines)
 ├── agent/
 │   ├── package.json          # Commander.js 12 + ws 8.16, bin: agentlink-client
 │   ├── tsconfig.json         # extends ../tsconfig.base.json
@@ -462,6 +470,26 @@ interface ConversationState {
 | `result` | Turn complete (triggers `turn_completed`) |
 
 ### Web UI Architecture
+
+**Module structure:** The web frontend uses Vue 3 Composition API with browser ES modules (no bundler). The monolithic `app.js` was split into focused modules under `modules/`.
+
+**Module pattern:**
+- **Stateful modules** use a factory function pattern: `createFoo(deps)` receives Vue reactive refs, returns methods. Encapsulates mutable state internally.
+- **Stateless modules** export pure functions that take explicit parameters.
+- **Circular dependency** between sidebar (needs `wsSend`) and connection (needs `sidebar.requestSessionList`) is resolved with a forwarding function in `app.js`.
+
+**Web UI Source Files Reference:**
+
+| File | Pattern | Key exports |
+|------|---------|-------------|
+| `app.js` | Coordinator | Declares all reactive state, creates module instances, wires dependencies, contains template |
+| `modules/markdown.js` | Pure exports | `renderMarkdown(text)`, `getToolIcon(toolName)` |
+| `modules/messageHelpers.js` | Pure exports | `isPrevAssistant(msgs, idx)`, `getRenderedContent(msg)`, `formatTimestamp(ts)`, `copyMessage(msg)`, `toggleTool(msg)`, `getToolSummary(msg)`, `getEditDiffHtml(msg)` |
+| `modules/fileAttachments.js` | Factory | `createFileAttachments(attachments, fileInputRef, dragOver)` → `{addFiles, removeFile, triggerFileInput, onFileInputChange, onDragOver, onDragLeave, onDrop, onPaste, prepareFilesForSend}` |
+| `modules/askQuestion.js` | Pure exports | `selectQuestionOption(msg, qi, opt)`, `submitQuestionAnswer(msg, wsSend)`, `hasQuestionAnswer(q)`, `getQuestionResponseSummary(q)` |
+| `modules/streaming.js` | Factory | `createStreaming({messages, scrollToBottom})` → `{startReveal, flushReveal, appendPending, reset, cleanup, nextId, ...}` |
+| `modules/sidebar.js` | Factory | `createSidebar(deps)` → `{requestSessionList, resumeSession, newConversation, toggleSidebar, openFolderPicker, confirmFolderPicker, groupedSessions, ...}` |
+| `modules/connection.js` | Factory | `createConnection(deps)` → `{connect, wsSend, closeWs}` |
 
 **Layout:** Top bar (with theme toggle) + main body (sidebar + chat area)
 
@@ -695,6 +723,7 @@ agentlink-client start --daemon
 - [x] Web UI: mobile responsive (sidebar overlay, constrained overflow, reduced padding at 768px/480px breakpoints)
 - [x] CLI: dynamic version from package.json (`createRequire` in cli.ts)
 - [x] History: filter internal CLI commands (`/compact`, etc.) from session list and message history
+- [x] Web UI: modularized frontend (app.js split into 7 ES modules under `modules/`)
 - [ ] Web UI: workbench panel (terminal, files, git)
 - [ ] Agent: terminal (PTY) support
 - [ ] Agent: file/git operations
