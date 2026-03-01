@@ -71,7 +71,7 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
   // Install new version
   console.log(`[AutoUpdate] Installing @agent-link/agent@${latestVersion}...`);
   try {
-    execSync('npm install -g @agent-link/agent@latest', {
+    execSync(`npm install -g @agent-link/agent@${latestVersion}`, {
       stdio: 'ignore',
       timeout: 120_000,
       windowsHide: true,

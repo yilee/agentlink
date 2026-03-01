@@ -290,7 +290,7 @@ program
     // Install latest version
     console.log(`Installing @agent-link/agent@${latestVersion}...`);
     try {
-      execSync('npm install -g @agent-link/agent@latest', { stdio: 'inherit' });
+      execSync(`npm install -g @agent-link/agent@${latestVersion}`, { stdio: 'inherit' });
     } catch {
       console.error('Failed to install. You may need to run with elevated permissions.');
       process.exit(1);
