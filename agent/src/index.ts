@@ -1,8 +1,9 @@
 import type { AgentConfig } from './config.js';
 import { saveRuntimeState, clearRuntimeState } from './config.js';
 import { connect, disconnect } from './connection.js';
+import { startAutoUpdate, stopAutoUpdate } from './auto-update.js';
 
-export async function start(config: AgentConfig): Promise<void> {
+export async function start(config: AgentConfig, daemon = false): Promise<void> {
   console.log('[AgentLink] Starting agent...');
   console.log(`[AgentLink] Working directory: ${config.dir}`);
   console.log(`[AgentLink] Relay server: ${config.server}`);
@@ -32,9 +33,15 @@ export async function start(config: AgentConfig): Promise<void> {
     console.log(`[AgentLink] Session URL: ${sessionUrl}`);
     console.log('[AgentLink] Waiting for connections...');
 
+    // Start auto-update checker (unless disabled)
+    if (config.autoUpdate !== false) {
+      startAutoUpdate(daemon);
+    }
+
     // Keep process alive, handle graceful shutdown
     const shutdown = () => {
       console.log('\n[AgentLink] Shutting down...');
+      stopAutoUpdate();
       clearRuntimeState();
       disconnect();
       process.exit(0);

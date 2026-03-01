@@ -1,6 +1,6 @@
 {
   "name": "@agent-link/agent",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "description": "AgentLink local agent CLI",
   "type": "module",
   "main": "dist/index.js",

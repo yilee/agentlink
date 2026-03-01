@@ -19,7 +19,7 @@ try {
   process.exit(1);
 }
 
-start(config).catch((err) => {
+start(config, true).catch((err) => {
   console.error(`daemon: ${(err as Error).message}`);
   process.exit(1);
 });
