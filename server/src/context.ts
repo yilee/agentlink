@@ -11,6 +11,9 @@ export interface AgentSession {
   sessionKey: Uint8Array | null;  // encryption key for this agent
   connectedAt: Date;
   isAlive: boolean;
+  claudeSessionId: string | null;  // current Claude Code session ID
+  processing: boolean;             // whether a turn is in progress
+  messageBuffer: Record<string, unknown>[];  // messages buffered while no web client connected
 }
 
 export interface WebClient {

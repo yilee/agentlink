@@ -32,6 +32,9 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     sessionKey,
     connectedAt: new Date(),
     isAlive: true,
+    claudeSessionId: null,
+    processing: false,
+    messageBuffer: [],
   };
 
   agents.set(agentId, agent);
@@ -92,14 +95,35 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
   // Intercept workdir_changed to keep server state in sync
   if (msg.type === 'workdir_changed' && typeof msg.workDir === 'string') {
     agent.workDir = msg.workDir;
+    agent.claudeSessionId = null;
+    agent.processing = false;
+    agent.messageBuffer = [];
     console.log(`[Agent] ${agent.name} changed workDir to: ${msg.workDir}`);
   }
 
-  // Forward agent messages to all web clients connected to this session
-  // Re-encrypt with each client's own session key
+  // Track current Claude session ID
+  if (msg.type === 'session_started' && typeof msg.claudeSessionId === 'string') {
+    agent.claudeSessionId = msg.claudeSessionId;
+  }
+
+  // Track processing state
+  if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
+    agent.processing = false;
+  }
+  if (msg.type === 'claude_output') {
+    agent.processing = true;
+  }
+
+  // Forward to connected web clients, or buffer if none are connected
+  let forwarded = false;
   for (const [, client] of webClients) {
     if (client.sessionId === agent.sessionId && client.ws.readyState === WebSocket.OPEN) {
       encryptAndSend(client.ws, msg, client.sessionKey);
+      forwarded = true;
     }
+  }
+
+  if (!forwarded && agent.messageBuffer.length < 2000) {
+    agent.messageBuffer.push(msg);
   }
 }

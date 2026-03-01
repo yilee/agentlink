@@ -14,7 +14,7 @@ export function createConnection(deps) {
   const {
     status, agentName, hostname, workDir, sessionId, error,
     messages, isProcessing, isCompacting, visibleLimit,
-    historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
+    historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
     streaming, sidebar,
     scrollToBottom,
@@ -141,6 +141,15 @@ export function createConnection(deps) {
           agentName.value = msg.agent.name;
           hostname.value = msg.agent.hostname || '';
           workDir.value = msg.agent.workDir;
+          // Restore processing state (e.g. page refresh mid-turn)
+          if (msg.agent.processing) {
+            isProcessing.value = true;
+          }
+          // Restore active Claude session so next message resumes it
+          if (msg.agent.claudeSessionId) {
+            currentClaudeSessionId.value = msg.agent.claudeSessionId;
+            needsResume.value = true;
+          }
           const savedDir = localStorage.getItem('agentlink-workdir');
           if (savedDir && savedDir !== msg.agent.workDir) {
             wsSend({ type: 'change_workdir', workDir: savedDir });
@@ -232,6 +241,8 @@ export function createConnection(deps) {
       } else if (msg.type === 'sessions_list') {
         historySessions.value = msg.sessions || [];
         loadingSessions.value = false;
+      } else if (msg.type === 'session_started') {
+        currentClaudeSessionId.value = msg.claudeSessionId;
       } else if (msg.type === 'conversation_resumed') {
         currentClaudeSessionId.value = msg.claudeSessionId;
         if (msg.history && Array.isArray(msg.history)) {

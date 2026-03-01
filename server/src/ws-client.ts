@@ -47,11 +47,21 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
       name: agent.name,
       hostname: agent.hostname,
       workDir: agent.workDir,
+      claudeSessionId: agent.claudeSessionId,
+      processing: agent.processing,
     } : null,
   }));
 
   console.log(`[Web] Client ${clientId.slice(0, 8)} connected to session ${sessionId}, agent: ${agent ? agent.name : 'none'}`);
 
+  // Flush buffered messages that arrived while no web client was connected
+  if (agent && agent.messageBuffer.length > 0) {
+    console.log(`[Web] Flushing ${agent.messageBuffer.length} buffered messages to ${clientId.slice(0, 8)}`);
+    for (const buffered of agent.messageBuffer) {
+      encryptAndSend(client.ws, buffered, client.sessionKey);
+    }
+    agent.messageBuffer = [];
+  }
   ws.on('message', (data) => {
     handleWebMessage(clientId, data.toString());
   });

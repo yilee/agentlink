@@ -134,7 +134,7 @@ const App = {
     const { connect, wsSend, closeWs } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       messages, isProcessing, isCompacting, visibleLimit,
-      historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
+      historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
       folderPickerLoading, folderPickerEntries, folderPickerPath,
       streaming, sidebar, scrollToBottom,
     });
