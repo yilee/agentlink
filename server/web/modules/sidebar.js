@@ -79,6 +79,33 @@ export function createSidebar(deps) {
     sidebarOpen.value = !sidebarOpen.value;
   }
 
+  // ── Delete session ──
+
+  /** Session pending delete confirmation (null = dialog closed) */
+  let pendingDeleteSession = null;
+  const deleteConfirmOpen = deps.deleteConfirmOpen;
+  const deleteConfirmTitle = deps.deleteConfirmTitle;
+
+  function deleteSession(session) {
+    if (isProcessing.value) return;
+    if (currentClaudeSessionId.value === session.sessionId) return; // guard
+    pendingDeleteSession = session;
+    deleteConfirmTitle.value = session.title || session.sessionId.slice(0, 8);
+    deleteConfirmOpen.value = true;
+  }
+
+  function confirmDeleteSession() {
+    if (!pendingDeleteSession) return;
+    wsSend({ type: 'delete_session', sessionId: pendingDeleteSession.sessionId });
+    deleteConfirmOpen.value = false;
+    pendingDeleteSession = null;
+  }
+
+  function cancelDeleteSession() {
+    deleteConfirmOpen.value = false;
+    pendingDeleteSession = null;
+  }
+
   // ── Folder picker ──
 
   function openFolderPicker() {
@@ -179,6 +206,7 @@ export function createSidebar(deps) {
 
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
+    deleteSession, confirmDeleteSession, cancelDeleteSession,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
     groupedSessions,

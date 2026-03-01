@@ -64,6 +64,10 @@ const App = {
     const folderPickerLoading = ref(false);
     const folderPickerSelected = ref('');
 
+    // Delete confirmation dialog state
+    const deleteConfirmOpen = ref(false);
+    const deleteConfirmTitle = ref('');
+
     // File attachment state
     const attachments = ref([]);
     const fileInputRef = ref(null);
@@ -136,6 +140,7 @@ const App = {
       loadingSessions, loadingHistory, workDir, visibleLimit,
       folderPickerOpen, folderPickerPath, folderPickerEntries,
       folderPickerLoading, folderPickerSelected, streaming,
+      deleteConfirmOpen, deleteConfirmTitle,
     });
 
     const { connect, wsSend, closeWs } = createConnection({
@@ -268,6 +273,11 @@ const App = {
       folderPickerEnter: sidebar.folderPickerEnter,
       folderPickerGoToPath: sidebar.folderPickerGoToPath,
       confirmFolderPicker: sidebar.confirmFolderPicker,
+      // Delete session
+      deleteConfirmOpen, deleteConfirmTitle,
+      deleteSession: sidebar.deleteSession,
+      confirmDeleteSession: sidebar.confirmDeleteSession,
+      cancelDeleteSession: sidebar.cancelDeleteSession,
       // File attachments
       attachments, fileInputRef, dragOver,
       triggerFileInput: fileAttach.triggerFileInput,
@@ -362,7 +372,17 @@ const App = {
                   :title="s.preview"
                 >
                   <div class="session-title">{{ s.title }}</div>
-                  <div class="session-meta">{{ formatRelativeTime(s.lastModified) }}</div>
+                  <div class="session-meta">
+                    <span>{{ formatRelativeTime(s.lastModified) }}</span>
+                    <button
+                      v-if="currentClaudeSessionId !== s.sessionId"
+                      class="session-delete-btn"
+                      @click.stop="deleteSession(s)"
+                      title="Delete session"
+                    >
+                      <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -611,6 +631,22 @@ const App = {
           <div class="folder-picker-footer">
             <button class="folder-picker-cancel" @click="folderPickerOpen = false">Cancel</button>
             <button class="folder-picker-confirm" @click="confirmFolderPicker" :disabled="!folderPickerPath">Open</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete Session Confirmation Dialog -->
+      <div class="folder-picker-overlay" v-if="deleteConfirmOpen" @click.self="cancelDeleteSession">
+        <div class="delete-confirm-dialog">
+          <div class="delete-confirm-header">Delete Session</div>
+          <div class="delete-confirm-body">
+            <p>Are you sure you want to delete this session?</p>
+            <p class="delete-confirm-title">{{ deleteConfirmTitle }}</p>
+            <p class="delete-confirm-warning">This action cannot be undone.</p>
+          </div>
+          <div class="delete-confirm-footer">
+            <button class="folder-picker-cancel" @click="cancelDeleteSession">Cancel</button>
+            <button class="delete-confirm-btn" @click="confirmDeleteSession">Delete</button>
           </div>
         </div>
       </div>

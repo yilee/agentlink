@@ -6,7 +6,7 @@
  */
 
 import { homedir } from 'os';
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
 
 export interface SessionInfo {
@@ -212,4 +212,25 @@ export function readSessionMessages(workDir: string, sessionId: string): History
   } catch { /* skip unreadable files */ }
 
   return result;
+}
+
+/**
+ * Delete a session's JSONL file.
+ * Returns true if the file was deleted, false if it didn't exist.
+ */
+export function deleteSession(workDir: string, sessionId: string): boolean {
+  const projectsDir = getClaudeProjectsDir();
+  const projectFolder = pathToProjectFolder(workDir);
+  const filePath = join(projectsDir, projectFolder, `${sessionId}.jsonl`);
+
+  if (!existsSync(filePath)) {
+    return false;
+  }
+
+  try {
+    unlinkSync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }

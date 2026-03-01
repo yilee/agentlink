@@ -10,7 +10,7 @@ import { loadRuntimeState } from './config.js';
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getIsCompacting, clearSessionId, type ChatFile } from './claude.js';
-import { listSessions, readSessionMessages } from './history.js';
+import { listSessions, readSessionMessages, deleteSession } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
 const RECONNECT_BASE_DELAY = 1000;
@@ -235,6 +235,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       handleUserAnswer(m.requestId, m.answers);
       break;
     }
+    case 'delete_session': {
+      const m = msg as unknown as { sessionId: string };
+      handleDeleteSession(m.sessionId);
+      break;
+    }
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
   }
@@ -243,6 +248,20 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
 function handleListSessions(): void {
   const sessions = listSessions(state.workDir);
   send({ type: 'sessions_list', sessions, workDir: state.workDir });
+}
+
+function handleDeleteSession(sessionId: string): void {
+  const conv = getConversation();
+  if (conv && conv.claudeSessionId === sessionId) {
+    send({ type: 'error', message: 'Cannot delete the active session.' });
+    return;
+  }
+  const deleted = deleteSession(state.workDir, sessionId);
+  if (deleted) {
+    send({ type: 'session_deleted', sessionId });
+  } else {
+    send({ type: 'error', message: 'Session not found or could not be deleted.' });
+  }
 }
 
 async function handleListDirectory(msg: { dirPath: string }): Promise<void> {
