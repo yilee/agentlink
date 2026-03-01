@@ -9,7 +9,7 @@ import { loadRuntimeState } from './config.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, clearSessionId, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
@@ -297,8 +297,9 @@ function handleChangeWorkDir(msg: { workDir: string }): void {
     return;
   }
 
-  // Kill any existing Claude process
+  // Kill any existing Claude process and clear session
   abortClaude();
+  clearSessionId();
 
   // Update agent-side workDir
   state.workDir = newDir;

@@ -70,6 +70,7 @@ interface PendingControlRequest {
 // ── Module state ───────────────────────────────────────────────────────────
 
 let conversation: ConversationState | null = null;
+let lastClaudeSessionId: string | null = null;
 let sendFn: SendFn = () => {};
 const pendingControlRequests = new Map<string, PendingControlRequest>();
 
@@ -81,6 +82,10 @@ export function getConversation(): ConversationState | null {
   return conversation;
 }
 
+export function clearSessionId(): void {
+  lastClaudeSessionId = null;
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────
 
 /**
@@ -90,7 +95,9 @@ export function getConversation(): ConversationState | null {
  */
 export function handleChat(prompt: string, workDir: string, resumeSessionId?: string, files?: ChatFile[]): void {
   if (!conversation || !conversation.inputStream) {
-    startQuery(workDir, resumeSessionId);
+    // If the process exited but we still know the session ID, resume it
+    const sessionToResume = resumeSessionId || conversation?.claudeSessionId || lastClaudeSessionId || undefined;
+    startQuery(workDir, sessionToResume);
   }
 
   const state = conversation!;
@@ -329,6 +336,7 @@ async function processOutput(
           // Capture session ID from system init
           if (msg.type === 'system' && msg.session_id) {
             state.claudeSessionId = msg.session_id as string;
+            lastClaudeSessionId = state.claudeSessionId;
             console.log(`[Claude] Session ID: ${state.claudeSessionId}`);
           }
 
@@ -558,6 +566,10 @@ function cleanup(): void {
   pendingControlRequests.clear();
 
   if (conversation) {
+    // Preserve session ID so the next message can resume
+    if (conversation.claudeSessionId) {
+      lastClaudeSessionId = conversation.claudeSessionId;
+    }
     if (conversation.child && !conversation.child.killed) {
       const pid = conversation.child.pid;
       // On Windows, kill the entire process tree (child.kill() won't kill grandchildren)
