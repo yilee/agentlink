@@ -191,8 +191,21 @@ export function createConnection(deps) {
       } else if (msg.type === 'context_compaction') {
         if (msg.status === 'started') {
           isCompacting.value = true;
+          messages.value.push({
+            id: streaming.nextId(), role: 'system',
+            content: 'Context compacting...', isCompactStart: true,
+            timestamp: new Date(),
+          });
+          scrollToBottom();
         } else if (msg.status === 'completed') {
           isCompacting.value = false;
+          // Update the start message to show completed
+          const startMsg = [...messages.value].reverse().find(m => m.isCompactStart && !m.compactDone);
+          if (startMsg) {
+            startMsg.content = 'Context compacted';
+            startMsg.compactDone = true;
+          }
+          scrollToBottom();
         }
       } else if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
         isProcessing.value = false;

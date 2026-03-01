@@ -506,18 +506,19 @@ const App = {
                 </div>
 
                 <!-- System message -->
-                <div v-else-if="msg.role === 'system'" class="system-msg">
+                <div v-else-if="msg.role === 'system'" :class="['system-msg', { 'compact-msg': msg.isCompactStart }]">
+                  <template v-if="msg.isCompactStart && !msg.compactDone">
+                    <span class="compact-inline-spinner"></span>
+                  </template>
+                  <template v-if="msg.isCompactStart && msg.compactDone">
+                    <span class="compact-done-icon">✓</span>
+                  </template>
                   {{ msg.content }}
                 </div>
               </div>
 
-              <div v-if="isProcessing && !isCompacting && !messages.some(m => m.isStreaming)" class="typing-indicator">
+              <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
                 <span></span><span></span><span></span>
-              </div>
-
-              <div v-if="isCompacting" class="compacting-banner">
-                <div class="compacting-spinner"></div>
-                <span class="compacting-text">Context compacting in progress...</span>
               </div>
             </div>
           </div>
