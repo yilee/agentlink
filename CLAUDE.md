@@ -346,6 +346,7 @@ agentlink/
 │       ├── history.ts        # Read Claude session JSONL files (list + message history)
 │       ├── daemon.ts         # Daemon mode (detached process spawning)
 │       ├── encryption.ts     # TweetNaCl encryption (XSalsa20-Poly1305 secretbox)
+│       ├── auto-update.ts    # npm auto-update check + install in daemon mode
 │       ├── service.ts        # OS auto-start service (systemd/launchd/Startup folder)
 │       └── index.ts          # Agent core (start function, graceful shutdown)
 ├── test/                     # Vitest unit tests
@@ -368,8 +369,9 @@ agentlink/
 | `cli.ts` | Commander.js CLI entry point | `start`, `stop`, `status`, `config`, `service` subcommands |
 | `config.ts` | Persistent config (`~/.agentlink/config.json`) | `loadConfig()`, `saveConfig()`, `resolveConfig()`, `killProcess()`, `isProcessAlive()` |
 | `connection.ts` | WebSocket client to server | `connect()`, `disconnect()`, `send()` + message router |
-| `claude.ts` | Claude CLI subprocess lifecycle | `handleChat()`, `abort()`, `cancelExecution()`, `setSendFn()`, `handleUserAnswer()` |
+| `claude.ts` | Claude CLI subprocess lifecycle | `handleChat()`, `abort()`, `cancelExecution()`, `setSendFn()`, `handleUserAnswer()`, `clearSessionId()` |
 | `sdk.ts` | Resolves `claude` command location | `resolveClaudeCommand()`, `getCleanEnv()`, `streamToStdin()` |
+| `auto-update.ts` | npm auto-update in daemon mode | `startAutoUpdate(daemon)`, `stopAutoUpdate()` |
 | `stream.ts` | AsyncIterable\<T\> with enqueue/done | `Stream` class (used for stdin/stdout piping) |
 | `history.ts` | Reads `~/.claude/projects/` JSONL files | `listSessions()`, `readSessionMessages()` |
 | `daemon.ts` | Background process management | Spawns/kills detached agent process |
@@ -386,6 +388,12 @@ agentlink/
 4. Stdout parsed as JSON lines by `readline` → forwarded to web client
 5. On `result` message → turn complete, process stays alive for next turn
 6. On `--resume <sessionId>` → resumes previous Claude session
+
+**Session persistence:**
+- `lastClaudeSessionId` (module-level) tracks the most recent session ID across process restarts
+- When `handleChat()` needs to spawn a new process (e.g. after turn completion or cancel), it auto-resumes: `resumeSessionId || conversation?.claudeSessionId || lastClaudeSessionId`
+- `cleanup()` saves `claudeSessionId` to `lastClaudeSessionId` before nulling the conversation
+- `clearSessionId()` resets `lastClaudeSessionId` (called on workdir change)
 
 **Permission & control_request protocol:**
 - `--permission-mode bypassPermissions` auto-approves all regular tool calls
@@ -467,6 +475,9 @@ interface ConversationState {
 | `claude_output` | Streaming output | `data: { type, delta?, tools? }` |
 | `turn_completed` | Claude turn finished | — |
 | `execution_cancelled` | Execution was stopped | — |
+| `command_output` | CLI command output (/cost, /help, etc.) | `content` |
+| `context_compaction` | Context compaction status | `status: 'started' \| 'completed'` |
+| `error` | Error message | `message` |
 | `sessions_list` | Historical sessions | `sessions[], workDir` |
 | `conversation_resumed` | Session resumed with history | `claudeSessionId, history[]` |
 | `directory_listing` | Filesystem directory contents | `dirPath, entries[], error?` |
@@ -500,7 +511,7 @@ interface ConversationState {
 | `modules/messageHelpers.js` | Pure exports | `isPrevAssistant(msgs, idx)`, `getRenderedContent(msg)`, `formatTimestamp(ts)`, `copyMessage(msg)`, `toggleTool(msg)`, `getToolSummary(msg)`, `getEditDiffHtml(msg)` |
 | `modules/fileAttachments.js` | Factory | `createFileAttachments(attachments, fileInputRef, dragOver)` → `{addFiles, removeFile, triggerFileInput, onFileInputChange, onDragOver, onDragLeave, onDrop, onPaste, prepareFilesForSend}` |
 | `modules/askQuestion.js` | Pure exports | `selectQuestionOption(msg, qi, opt)`, `submitQuestionAnswer(msg, wsSend)`, `hasQuestionAnswer(q)`, `getQuestionResponseSummary(q)` |
-| `modules/streaming.js` | Factory | `createStreaming({messages, scrollToBottom})` → `{startReveal, flushReveal, appendPending, reset, cleanup, nextId, ...}` |
+| `modules/streaming.js` | Factory | `createStreaming({messages, scrollToBottom})` → `{startReveal, flushReveal, appendPending, reset, cleanup, nextId, ...}` (5 chars/16ms) |
 | `modules/sidebar.js` | Factory | `createSidebar(deps)` → `{requestSessionList, resumeSession, newConversation, toggleSidebar, openFolderPicker, confirmFolderPicker, groupedSessions, ...}` |
 | `modules/connection.js` | Factory | `createConnection(deps)` → `{connect, wsSend, closeWs}` |
 
@@ -517,6 +528,7 @@ interface ConversationState {
 - Session history list grouped by time (Today / Yesterday / This week / Earlier)
 - `groupedSessions` computed property handles grouping
 - Click session → `resume_conversation` → loads history messages into chat
+- Version footer: shows server and agent versions (e.g. "server 0.1.47 / agent 0.1.40")
 - Mobile (≤768px): sidebar defaults to hidden, opens as fixed overlay with backdrop, auto-closes on session select or new conversation
 
 **Chat area:**
@@ -525,9 +537,12 @@ interface ConversationState {
 - User messages: `bg-tertiary` rounded box; Assistant messages: transparent, no border
 - `isPrevAssistant()` suppresses repeated "Claude" label for consecutive assistant/tool messages
 - Markdown rendering: marked.js + highlight.js, code block copy buttons
-- Streaming text: progressive reveal (3 chars/tick, 12ms interval)
+- Streaming text: progressive reveal (5 chars/tick, 16ms interval)
 - Tool display: icon + name + summary line, expandable input/output
 - AskUserQuestion: interactive card with selectable options, custom text input, submit button
+- System messages: centered, italic, dimmed (compact status, generation stopped)
+- Command output (/cost, /help, etc.): rendered as system message with markdown, left-aligned
+- Context compaction: inline spinner → checkmark transition in system message
 - Stop button during processing
 
 **Input area:**
@@ -559,9 +574,10 @@ interface ConversationState {
 ```javascript
 {
   status, agentName, workDir, sessionId, error,
-  messages, inputText, isProcessing, theme,
+  messages, inputText, isProcessing, isCompacting, theme,
   sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions,
   folderPickerOpen, folderPickerPath, folderPickerEntries, folderPickerLoading, folderPickerSelected,
+  serverVersion, agentVersion, hostname,
 }
 ```
 
@@ -576,6 +592,7 @@ Priority: **CLI flags > config file > defaults**
 | `server` | `wss://msclaude.ai` | Relay server WebSocket URL |
 | `dir` | `process.cwd()` | Working directory |
 | `name` | `Agent-{platform}-{pid}` | Agent display name |
+| `autoUpdate` | `true` | Auto-install npm updates in daemon mode (`--no-auto-update` to disable) |
 
 **Runtime & data files (`~/.agentlink/`):**
 
@@ -743,8 +760,13 @@ agentlink-client start --daemon
 - [x] CLI: dynamic version from package.json (`createRequire` in cli.ts)
 - [x] History: filter internal CLI commands (`/compact`, etc.) from session list and message history
 - [x] Web UI: modularized frontend (app.js split into 7 ES modules under `modules/`)
-- [x] Unit tests: vitest (encryption, stream, history, config, context — 60 tests)
+- [x] Unit tests: vitest (encryption, stream, history, config, context — 64 tests)
 - [x] Functional tests: Playwright + mock agent (health, registration, web UI — 8 tests)
+- [x] Auto-update: npm update check in daemon mode (`--no-auto-update` flag, `autoUpdate` config)
+- [x] Web UI: server/agent version display in sidebar footer
+- [x] Web UI: context compaction inline UX (spinner → checkmark in chat timeline)
+- [x] Web UI: command output (/cost, /help, etc.) rendered as system messages with markdown
+- [x] Agent: session ID persistence across process restarts (`lastClaudeSessionId`)
 - [ ] Web UI: workbench panel (terminal, files, git)
 - [ ] Agent: terminal (PTY) support
 - [ ] Agent: file/git operations
