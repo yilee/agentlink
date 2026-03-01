@@ -27,6 +27,8 @@ const App = {
     const workDir = ref('');
     const sessionId = ref('');
     const error = ref('');
+    const serverVersion = ref('');
+    const agentVersion = ref('');
     const messages = ref([]);
     const visibleLimit = ref(50);
     const hasMoreMessages = computed(() => messages.value.length > visibleLimit.value);
@@ -138,6 +140,7 @@ const App = {
 
     const { connect, wsSend, closeWs } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
+      serverVersion, agentVersion,
       messages, isProcessing, isCompacting, visibleLimit,
       historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
       folderPickerLoading, folderPickerEntries, folderPickerPath,
@@ -234,6 +237,7 @@ const App = {
 
     return {
       status, agentName, hostname, workDir, sessionId, error,
+      serverVersion, agentVersion,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
       inputText, isProcessing, isCompacting, canSend, inputRef,
       sendMessage, handleKeydown, cancelExecution, onMessageListScroll,
@@ -362,6 +366,12 @@ const App = {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div v-if="serverVersion || agentVersion" class="sidebar-version-footer">
+            <span v-if="serverVersion">server {{ serverVersion }}</span>
+            <span v-if="serverVersion && agentVersion" class="sidebar-version-sep">/</span>
+            <span v-if="agentVersion">agent {{ agentVersion }}</span>
           </div>
         </aside>
 

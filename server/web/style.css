@@ -290,6 +290,20 @@ body {
   overflow: hidden;
 }
 
+.sidebar-version-footer {
+  padding: 6px 12px;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sidebar-version-sep {
+  margin: 0 3px;
+}
+
 .sidebar-section-header {
   display: flex;
   align-items: center;

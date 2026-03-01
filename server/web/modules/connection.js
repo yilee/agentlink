@@ -13,6 +13,7 @@ const RECONNECT_MAX_DELAY = 15000;
 export function createConnection(deps) {
   const {
     status, agentName, hostname, workDir, sessionId, error,
+    serverVersion, agentVersion,
     messages, isProcessing, isCompacting, visibleLimit,
     historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
@@ -137,11 +138,13 @@ export function createConnection(deps) {
       }
 
       if (msg.type === 'connected') {
+        if (msg.serverVersion) serverVersion.value = msg.serverVersion;
         if (msg.agent) {
           status.value = 'Connected';
           agentName.value = msg.agent.name;
           hostname.value = msg.agent.hostname || '';
           workDir.value = msg.agent.workDir;
+          agentVersion.value = msg.agent.version || '';
           const savedDir = localStorage.getItem('agentlink-workdir');
           if (savedDir && savedDir !== msg.agent.workDir) {
             wsSend({ type: 'change_workdir', workDir: savedDir });
@@ -164,6 +167,8 @@ export function createConnection(deps) {
         if (msg.agent) {
           agentName.value = msg.agent.name;
           hostname.value = msg.agent.hostname || '';
+          workDir.value = msg.agent.workDir;
+          agentVersion.value = msg.agent.version || '';
           workDir.value = msg.agent.workDir;
         }
         sidebar.requestSessionList();

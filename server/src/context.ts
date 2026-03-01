@@ -7,6 +7,7 @@ export interface AgentSession {
   name: string;
   hostname: string;
   workDir: string;
+  version: string;
   sessionId: string;    // unique session ID for URL
   sessionKey: Uint8Array | null;  // encryption key for this agent
   connectedAt: Date;

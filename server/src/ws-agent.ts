@@ -16,6 +16,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   const name = url.searchParams.get('name') || `Agent-${agentId.slice(0, 8)}`;
   const workDir = url.searchParams.get('workDir') || 'unknown';
   const hostname = url.searchParams.get('hostname') || '';
+  const version = url.searchParams.get('version') || '';
 
   // Reuse requested sessionId (agent reconnecting) or generate a new one
   const requestedSessionId = url.searchParams.get('sessionId');
@@ -28,6 +29,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     name,
     hostname,
     workDir,
+    version,
     sessionId,
     sessionKey,
     connectedAt: new Date(),
@@ -52,7 +54,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     if (client.sessionId === sessionId && client.ws.readyState === WebSocket.OPEN) {
       encryptAndSend(client.ws, {
         type: 'agent_reconnected',
-        agent: { agentId, name, hostname, workDir },
+        agent: { agentId, name, hostname, workDir, version },
       }, client.sessionKey);
     }
   }

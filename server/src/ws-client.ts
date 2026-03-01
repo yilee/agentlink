@@ -1,6 +1,7 @@
 import { WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { randomUUID } from 'crypto';
+import { createRequire } from 'module';
 import {
   agents,
   sessionToAgent,
@@ -8,6 +9,9 @@ import {
   type WebClient,
 } from './context.js';
 import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
+
+const require = createRequire(import.meta.url);
+const serverPkg = require('../package.json');
 
 export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
@@ -42,11 +46,13 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
     type: 'connected',
     clientId,
     sessionKey: encodeKey(sessionKey),
+    serverVersion: serverPkg.version,
     agent: agent ? {
       agentId: agent.agentId,
       name: agent.name,
       hostname: agent.hostname,
       workDir: agent.workDir,
+      version: agent.version,
     } : null,
   }));
 

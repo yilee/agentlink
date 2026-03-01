@@ -3,8 +3,12 @@ import os from 'os';
 import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { resolve, isAbsolute, join } from 'path';
+import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
 import { loadRuntimeState } from './config.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
@@ -149,6 +153,7 @@ function buildWsUrl(config: AgentConfig): string {
     name: config.name,
     workDir: state.workDir,
     hostname: os.hostname(),
+    version: pkg.version,
   });
   // On reconnect, send previous sessionId so the URL stays valid
   if (state.sessionId) {
