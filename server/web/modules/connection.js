@@ -298,6 +298,8 @@ export function createConnection(deps) {
             content: textAcc, timestamp: new Date(),
           });
         }
+        // Finalize so subsequent real-time messages create fresh streaming entries
+        finalizeStreamingMsg(scheduleHighlight);
         scrollToBottom();
       } else if (msg.type === 'sessions_list') {
         historySessions.value = msg.sessions || [];
@@ -382,6 +384,9 @@ export function createConnection(deps) {
       const wasConnected = status.value === 'Connected' || status.value === 'Connecting...';
       isProcessing.value = false;
       isCompacting.value = false;
+      // Finalize any in-flight streaming message so reconnect starts clean
+      streaming.flushReveal();
+      finalizeStreamingMsg(scheduleHighlight);
 
       if (wasConnected || reconnectAttempts > 0) {
         scheduleReconnect(scheduleHighlight);
