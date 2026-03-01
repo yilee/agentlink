@@ -74,7 +74,7 @@ export function createConnection(deps) {
           id: streaming.nextId(), role: 'tool',
           toolId: tool.id, toolName: tool.name || 'unknown',
           toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
-          hasResult: false, expanded: (tool.name === 'Edit'), timestamp: new Date(),
+          hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite'), timestamp: new Date(),
         });
       }
       scrollToBottom();
@@ -267,7 +267,7 @@ export function createConnection(deps) {
                 id: streaming.nextId(), role: 'tool',
                 toolId: h.toolId || '', toolName: h.toolName || 'unknown',
                 toolInput: h.toolInput || '', hasResult: true,
-                expanded: h.toolName === 'Edit', timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                expanded: (h.toolName === 'Edit' || h.toolName === 'TodoWrite'), timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
               });
             }
           }
