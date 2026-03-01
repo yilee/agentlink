@@ -238,6 +238,67 @@ export function createConnection(deps) {
           timestamp: new Date(),
         });
         scrollToBottom();
+      } else if (msg.type === 'buffered_messages' && Array.isArray(msg.messages)) {
+        // Replay buffered messages instantly (no streaming animation)
+        let textAcc = '';
+        const toolBatch = [];
+        for (const m of msg.messages) {
+          if (m.type === 'session_started' && m.claudeSessionId) {
+            currentClaudeSessionId.value = m.claudeSessionId;
+          } else if (m.type === 'claude_output' && m.data) {
+            const data = m.data;
+            if (data.type === 'content_block_delta' && data.delta) {
+              textAcc += data.delta;
+            } else if (data.type === 'tool_use' && data.tools) {
+              // Flush accumulated text before tools
+              if (textAcc) {
+                streaming.flushReveal();
+                finalizeStreamingMsg(scheduleHighlight);
+                messages.value.push({
+                  id: streaming.nextId(), role: 'assistant',
+                  content: textAcc, timestamp: new Date(),
+                });
+                textAcc = '';
+              }
+              for (const tool of data.tools) {
+                messages.value.push({
+                  id: streaming.nextId(), role: 'tool',
+                  toolId: tool.id, toolName: tool.name || 'unknown',
+                  toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
+                  hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite'), timestamp: new Date(),
+                });
+              }
+            } else if (data.type === 'user' && data.tool_use_result) {
+              const result = data.tool_use_result;
+              const results = Array.isArray(result) ? result : [result];
+              for (const r of results) {
+                const toolMsg = [...messages.value].reverse().find(
+                  m2 => m2.role === 'tool' && m2.toolId === r.tool_use_id
+                );
+                if (toolMsg) {
+                  toolMsg.toolOutput = typeof r.content === 'string'
+                    ? r.content : JSON.stringify(r.content, null, 2);
+                  toolMsg.hasResult = true;
+                }
+              }
+            }
+          } else if (m.type === 'turn_completed' || m.type === 'execution_cancelled') {
+            isProcessing.value = false;
+            isCompacting.value = false;
+          } else if (m.type === 'context_compaction') {
+            if (m.status === 'completed') isCompacting.value = false;
+          }
+        }
+        // Flush remaining text
+        if (textAcc) {
+          streaming.flushReveal();
+          finalizeStreamingMsg(scheduleHighlight);
+          messages.value.push({
+            id: streaming.nextId(), role: 'assistant',
+            content: textAcc, timestamp: new Date(),
+          });
+        }
+        scrollToBottom();
       } else if (msg.type === 'sessions_list') {
         historySessions.value = msg.sessions || [];
         loadingSessions.value = false;

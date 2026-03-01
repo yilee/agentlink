@@ -55,11 +55,13 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   console.log(`[Web] Client ${clientId.slice(0, 8)} connected to session ${sessionId}, agent: ${agent ? agent.name : 'none'}`);
 
   // Flush buffered messages that arrived while no web client was connected
+  // Send as a single batch to avoid per-message encryption overhead on the client
   if (agent && agent.messageBuffer.length > 0) {
     console.log(`[Web] Flushing ${agent.messageBuffer.length} buffered messages to ${clientId.slice(0, 8)}`);
-    for (const buffered of agent.messageBuffer) {
-      encryptAndSend(client.ws, buffered, client.sessionKey);
-    }
+    encryptAndSend(client.ws, {
+      type: 'buffered_messages',
+      messages: agent.messageBuffer,
+    }, client.sessionKey);
     agent.messageBuffer = [];
   }
   ws.on('message', (data) => {
