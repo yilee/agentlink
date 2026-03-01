@@ -208,10 +208,10 @@ export function createConnection(deps) {
           scrollToBottom();
         }
       } else if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
-        isProcessing.value = false;
-        isCompacting.value = false;
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
+        isProcessing.value = false;
+        isCompacting.value = false;
         if (msg.type === 'execution_cancelled') {
           messages.value.push({
             id: streaming.nextId(), role: 'system',
