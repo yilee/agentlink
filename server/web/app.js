@@ -505,7 +505,7 @@ const App = {
                 </div>
 
                 <!-- System message -->
-                <div v-else-if="msg.role === 'system'" :class="['system-msg', { 'compact-msg': msg.isCompactStart, 'command-output-msg': msg.isCommandOutput }]">
+                <div v-else-if="msg.role === 'system'" :class="['system-msg', { 'compact-msg': msg.isCompactStart, 'command-output-msg': msg.isCommandOutput, 'error-msg': msg.isError }]">
                   <template v-if="msg.isCompactStart && !msg.compactDone">
                     <span class="compact-inline-spinner"></span>
                   </template>

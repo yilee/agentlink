@@ -295,22 +295,22 @@ function startQuery(workDir: string, resumeSessionId?: string): void {
   // Pipe user messages → stdin
   streamToStdin(inputStream, child.stdin, abortController.signal);
 
-  // Capture stderr for debugging
-  let stderrBuf = '';
+  // Capture stderr for debugging (use object so processOutput sees updates)
+  const stderr = { buf: '' };
   child.stderr.on('data', (data: Buffer) => {
     const text = data.toString();
-    stderrBuf += text;
+    stderr.buf += text;
     if (process.env.DEBUG) console.error('[Claude stderr]', text);
   });
 
   // Process stdout (JSON lines)
-  processOutput(child, state, stderrBuf);
+  processOutput(child, state, stderr);
 
   // Handle process exit
   child.on('close', (code) => {
     if (code !== 0 && code !== null && !abortController.signal.aborted) {
-      const msg = stderrBuf
-        ? `Claude process exited with code ${code}: ${stderrBuf.trim()}`
+      const msg = stderr.buf
+        ? `Claude process exited with code ${code}: ${stderr.buf.trim()}`
         : `Claude process exited with code ${code}`;
       console.error(`[Claude] ${msg}`);
     }
@@ -326,7 +326,7 @@ function startQuery(workDir: string, resumeSessionId?: string): void {
 async function processOutput(
   child: ChildProcess,
   state: ConversationState,
-  _stderrBuf: string,
+  stderr: { buf: string },
 ): Promise<void> {
   const rl = createInterface({ input: child.stdout! });
   const messageStream = new Stream<ClaudeMessage>();
@@ -399,6 +399,16 @@ async function processOutput(
 
         // Reset streaming text tracker
         lastSentText = '';
+
+        // If the result contains an error, send it as an error message for the chat
+        if (msg.is_error || (msg.subtype === 'error_response')) {
+          const errorText = typeof msg.result === 'string' ? msg.result
+            : typeof msg.error === 'string' ? msg.error
+            : '';
+          if (errorText) {
+            sendFn({ type: 'error', message: errorText });
+          }
+        }
 
         // Forward the result, then signal turn_completed
         sendOutput(msg);
@@ -513,8 +523,11 @@ async function processOutput(
       });
     }
   } finally {
-    // If the process exited mid-turn without a result, notify web client
+    // If the process exited mid-turn without a result, notify web client with error
     if (!resultHandled && state.turnActive) {
+      if (stderr.buf.trim()) {
+        sendFn({ type: 'error', message: stderr.buf.trim() });
+      }
       sendFn({ type: 'turn_completed' });
     }
     state.turnActive = false;

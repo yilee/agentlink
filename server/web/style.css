@@ -693,6 +693,7 @@ body {
 .tool-line-wrapper {
   max-width: 100%;
   padding-left: 0.25rem;
+  overflow: hidden;
 }
 
 .tool-line {
@@ -706,6 +707,8 @@ body {
   user-select: none;
   transition: background 0.15s;
   color: var(--text-secondary);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .tool-line:hover {
@@ -723,7 +726,10 @@ body {
 .tool-name {
   font-weight: 500;
   color: var(--text-secondary);
-  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .tool-summary {
@@ -1195,6 +1201,19 @@ body {
   font-style: normal;
   font-size: 0.85rem;
   padding: 0.5rem 0;
+}
+
+.system-msg.error-msg {
+  text-align: left;
+  font-style: normal;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ── History loading indicator ── */

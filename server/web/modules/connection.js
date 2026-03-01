@@ -173,8 +173,14 @@ export function createConnection(deps) {
         }
         sidebar.requestSessionList();
       } else if (msg.type === 'error') {
-        status.value = 'Error';
-        error.value = msg.message;
+        streaming.flushReveal();
+        finalizeStreamingMsg(scheduleHighlight);
+        messages.value.push({
+          id: streaming.nextId(), role: 'system',
+          content: msg.message, isError: true,
+          timestamp: new Date(),
+        });
+        scrollToBottom();
         isProcessing.value = false;
         isCompacting.value = false;
       } else if (msg.type === 'claude_output') {
