@@ -298,13 +298,21 @@ program
 
     console.log(`Upgraded: v${currentVersion} → v${latestVersion}`);
 
-    // Restart daemon if it was running
+    // Restart daemon if it was running — use the newly installed binary
     if (daemonAlive) {
       console.log('Restarting agent...');
       try {
-        execSync('agentlink-client start --daemon', { stdio: 'inherit' });
+        // Resolve the new binary path from npm global prefix to avoid stale shell cache
+        const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
+        const newBin = join(npmPrefix, 'bin', 'agentlink-client');
+        execSync(`"${newBin}" start --daemon`, { stdio: 'inherit' });
       } catch {
-        console.error('Failed to restart agent. Start manually with: agentlink-client start --daemon');
+        // Fallback to PATH-based command
+        try {
+          execSync('agentlink-client start --daemon', { stdio: 'inherit' });
+        } catch {
+          console.error('Failed to restart agent. Start manually with: agentlink-client start --daemon');
+        }
       }
     }
   });

@@ -220,14 +220,22 @@ program
 
     console.log(`Upgraded: v${currentVersion} → v${latestVersion}`);
 
-    // Restart daemon if it was running
+    // Restart daemon if it was running — use the newly installed binary
     if (daemonAlive) {
       console.log('Restarting server...');
       const portArg = port ? ` --port ${port}` : '';
       try {
-        execSync(`agentlink-server start --daemon${portArg}`, { stdio: 'inherit' });
+        // Resolve the new binary path from npm global prefix to avoid stale shell cache
+        const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
+        const newBin = join(npmPrefix, 'bin', 'agentlink-server');
+        execSync(`"${newBin}" start --daemon${portArg}`, { stdio: 'inherit' });
       } catch {
-        console.error('Failed to restart server. Start manually with: agentlink-server start --daemon');
+        // Fallback to PATH-based command
+        try {
+          execSync(`agentlink-server start --daemon${portArg}`, { stdio: 'inherit' });
+        } catch {
+          console.error('Failed to restart server. Start manually with: agentlink-server start --daemon');
+        }
       }
     }
   });
