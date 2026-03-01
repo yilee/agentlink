@@ -5,7 +5,7 @@ import { readdir } from 'fs/promises';
 import { resolve, isAbsolute, join } from 'path';
 import type { AgentConfig } from './config.js';
 import { loadRuntimeState } from './config.js';
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
@@ -206,9 +206,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       handleChangeWorkDir(msg as unknown as { workDir: string });
       break;
     case 'resume_conversation': {
-      // Kill existing Claude process and start fresh with resume
-      abortClaude();
       const m = msg as unknown as { claudeSessionId: string };
+      const conv = getConversation();
+      // Only kill Claude if switching to a different session
+      if (!conv || conv.claudeSessionId !== m.claudeSessionId) {
+        abortClaude();
+      }
       const history = readSessionMessages(state.workDir, m.claudeSessionId);
       send({ type: 'conversation_resumed', claudeSessionId: m.claudeSessionId, history });
       break;
