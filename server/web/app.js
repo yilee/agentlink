@@ -124,7 +124,7 @@ const App = {
 
     const sidebar = createSidebar({
       wsSend: (msg) => _wsSend(msg),
-      messages, isProcessing, sidebarOpen,
+      messages, isProcessing, isCompacting, sidebarOpen,
       historySessions, currentClaudeSessionId, needsResume,
       loadingSessions, loadingHistory, workDir, visibleLimit,
       folderPickerOpen, folderPickerPath, folderPickerEntries,
@@ -316,7 +316,7 @@ const App = {
               </div>
               <div class="sidebar-workdir-header">
                 <div class="sidebar-workdir-label">Working Directory</div>
-                <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory" :disabled="isProcessing">
+                <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory">
                   <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
                 </button>
               </div>
@@ -332,7 +332,7 @@ const App = {
               </button>
             </div>
 
-            <button class="new-conversation-btn" @click="newConversation" :disabled="isProcessing">
+            <button class="new-conversation-btn" @click="newConversation">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               New conversation
             </button>
