@@ -15,6 +15,12 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 
+/** Highlight a URL with bold + underline ANSI codes if stdout supports color. */
+function highlightUrl(url: string): string {
+  if (!process.stdout.isTTY) return url;
+  return `\x1b[1;4;36m${url}\x1b[0m`;
+}
+
 const program = new Command();
 
 program
@@ -41,7 +47,7 @@ program
         try { process.kill(existing.pid, 0); alive = true; } catch {}
         if (alive) {
           console.log(`Agent is already running (PID ${existing.pid}).`);
-          console.log(`  URL: ${existing.sessionUrl}`);
+          console.log(`  URL: ${highlightUrl(existing.sessionUrl)}`);
           console.log('Use "agentlink-client stop" to stop it first.');
           process.exit(1);
         }
@@ -81,7 +87,7 @@ program
 
       if (state && state.pid !== process.pid) {
         console.log(`Agent started in background (PID ${state.pid}).`);
-        console.log(`  URL: ${state.sessionUrl}`);
+        console.log(`  URL: ${highlightUrl(state.sessionUrl)}`);
         console.log(`  Log: ${logFile}`);
       } else {
         console.error('Agent may have failed to start. Check logs:');
@@ -154,7 +160,7 @@ program
       console.log(`  Directory:  ${agentState.dir}`);
       console.log(`  Server:     ${agentState.server}`);
       console.log(`  Session:    ${agentState.sessionId}`);
-      console.log(`  URL:        ${agentState.sessionUrl}`);
+      console.log(`  URL:        ${highlightUrl(agentState.sessionUrl)}`);
       console.log(`  Started:    ${agentState.startedAt}`);
     }
   });

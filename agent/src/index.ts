@@ -3,6 +3,12 @@ import { saveRuntimeState, clearRuntimeState } from './config.js';
 import { connect, disconnect } from './connection.js';
 import { startAutoUpdate, stopAutoUpdate } from './auto-update.js';
 
+/** Highlight a URL with bold + underline ANSI codes if stdout supports color. */
+function highlightUrl(url: string): string {
+  if (!process.stdout.isTTY) return url;
+  return `\x1b[1;4;36m${url}\x1b[0m`;
+}
+
 export async function start(config: AgentConfig, daemon = false): Promise<void> {
   console.log('[AgentLink] Starting agent...');
   console.log(`[AgentLink] Working directory: ${config.dir}`);
@@ -30,7 +36,7 @@ export async function start(config: AgentConfig, daemon = false): Promise<void> 
     });
 
     console.log('');
-    console.log(`[AgentLink] Session URL: ${sessionUrl}`);
+    console.log(`[AgentLink] Session URL: ${highlightUrl(sessionUrl)}`);
     console.log('[AgentLink] Waiting for connections...');
 
     // Start auto-update checker (unless disabled)
