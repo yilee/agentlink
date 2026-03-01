@@ -58,11 +58,14 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   // Send as a single batch to avoid per-message encryption overhead on the client
   if (agent && agent.messageBuffer.length > 0) {
     console.log(`[Web] Flushing ${agent.messageBuffer.length} buffered messages to ${clientId.slice(0, 8)}`);
+    const buffered = agent.messageBuffer;
+    agent.messageBuffer = [];
     encryptAndSend(client.ws, {
       type: 'buffered_messages',
-      messages: agent.messageBuffer,
-    }, client.sessionKey);
-    agent.messageBuffer = [];
+      messages: buffered,
+    }, client.sessionKey).catch(err => {
+      console.error(`[Web] Failed to flush buffered messages to ${clientId.slice(0, 8)}:`, (err as Error).message);
+    });
   }
   ws.on('message', (data) => {
     handleWebMessage(clientId, data.toString());
@@ -93,10 +96,10 @@ async function handleWebMessage(clientId: string, raw: string): Promise<void> {
   const agent = agentId ? agents.get(agentId) : undefined;
 
   if (!agent || agent.ws.readyState !== WebSocket.OPEN) {
-    encryptAndSend(client.ws, { type: 'error', message: 'Agent not connected' }, client.sessionKey);
+    await encryptAndSend(client.ws, { type: 'error', message: 'Agent not connected' }, client.sessionKey);
     return;
   }
 
   // Forward web client message to agent, encrypted with agent's session key
-  encryptAndSend(agent.ws, msg, agent.sessionKey);
+  await encryptAndSend(agent.ws, msg, agent.sessionKey);
 }

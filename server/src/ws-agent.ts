@@ -110,20 +110,30 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
   if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
     agent.processing = false;
   }
-  if (msg.type === 'claude_output') {
-    agent.processing = true;
+  // Only mark as processing for actual content output, not the final result signal
+  if (msg.type === 'claude_output' && (msg as Record<string, unknown>).data) {
+    const data = (msg as Record<string, unknown>).data as Record<string, unknown>;
+    if (data.type !== 'result') {
+      agent.processing = true;
+    }
   }
 
   // Forward to connected web clients, or buffer if none are connected
   let forwarded = false;
   for (const [, client] of webClients) {
     if (client.sessionId === agent.sessionId && client.ws.readyState === WebSocket.OPEN) {
-      encryptAndSend(client.ws, msg, client.sessionKey);
-      forwarded = true;
+      try {
+        await encryptAndSend(client.ws, msg, client.sessionKey);
+        forwarded = true;
+      } catch (err) {
+        console.error(`[Agent] Failed to forward ${msg.type} to client ${client.clientId.slice(0, 8)}: ${(err as Error).message}`);
+      }
     }
   }
 
-  if (!forwarded && agent.messageBuffer.length < 2000) {
-    agent.messageBuffer.push(msg);
+  if (!forwarded) {
+    if (agent.messageBuffer.length < 2000) {
+      agent.messageBuffer.push(msg);
+    }
   }
 }

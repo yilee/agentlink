@@ -87,7 +87,7 @@ setInterval(() => {
     if (!agent.isAlive) {
       console.log(`[Heartbeat] Agent ${agent.name} timed out`);
       agent.ws.terminate();
-      return;
+      continue;
     }
     agent.isAlive = false;
     agent.ws.ping();
@@ -97,7 +97,7 @@ setInterval(() => {
     if (!client.isAlive) {
       client.ws.terminate();
       webClients.delete(clientId);
-      return;
+      continue;
     }
     client.isAlive = false;
     client.ws.ping();
