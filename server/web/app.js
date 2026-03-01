@@ -356,7 +356,16 @@ const App = {
     }
 
     let _scrollTimer = null;
-    function scrollToBottom() {
+    let _userScrolledUp = false;
+
+    function onMessageListScroll(e) {
+      const el = e.target;
+      // Consider "at bottom" if within 80px of the bottom
+      _userScrolledUp = (el.scrollHeight - el.scrollTop - el.clientHeight) > 80;
+    }
+
+    function scrollToBottom(force) {
+      if (_userScrolledUp && !force) return;
       if (_scrollTimer) return;
       _scrollTimer = setTimeout(() => {
         _scrollTimer = null;
@@ -394,7 +403,7 @@ const App = {
         timestamp: new Date(),
       });
       isProcessing.value = true;
-      scrollToBottom();
+      scrollToBottom(true);
 
       // Build payload
       const payload = { type: 'chat', prompt: text || '(see attached files)' };
@@ -428,6 +437,12 @@ const App = {
     }
 
     // ── Rendered markdown for assistant messages ──
+    function formatTimestamp(ts) {
+      if (!ts) return '';
+      const d = ts instanceof Date ? ts : new Date(ts);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' · ' + d.toLocaleDateString();
+    }
+
     function getRenderedContent(msg) {
       if (msg.role !== 'assistant' && !msg.isCommandOutput) return msg.content;
       return renderMarkdown(msg.content);
@@ -1144,12 +1159,17 @@ const App = {
     onMounted(() => { connect(); });
     onUnmounted(() => { if (reconnectTimer) clearTimeout(reconnectTimer); if (ws) ws.close(); });
 
+    // Dynamic page title
+    watch(agentName, (name) => {
+      document.title = name ? `${name} — AgentLink` : 'AgentLink';
+    });
+
     return {
       status, agentName, hostname, workDir, sessionId, error,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
       inputText, isProcessing, isCompacting, canSend, inputRef,
-      sendMessage, handleKeydown, cancelExecution,
-      getRenderedContent, copyMessage, toggleTool, isPrevAssistant, toggleContextSummary,
+      sendMessage, handleKeydown, cancelExecution, onMessageListScroll,
+      getRenderedContent, copyMessage, toggleTool, isPrevAssistant, toggleContextSummary, formatTimestamp,
       getToolIcon, getToolSummary, isEditTool, getEditDiffHtml, getFormattedToolInput, autoResize,
       // AskUserQuestion
       selectQuestionOption, submitQuestionAnswer, hasQuestionAnswer, getQuestionResponseSummary,
@@ -1261,7 +1281,7 @@ const App = {
 
         <!-- Chat area -->
         <div class="chat-area">
-          <div class="message-list">
+          <div class="message-list" @scroll="onMessageListScroll">
             <div class="message-list-inner">
               <div v-if="messages.length === 0 && status === 'Connected' && !loadingHistory" class="empty-state">
                 <div class="empty-state-icon">
@@ -1286,7 +1306,7 @@ const App = {
                 <!-- User message -->
                 <template v-if="msg.role === 'user'">
                   <div class="message-role-label user-label">You</div>
-                  <div class="message-bubble user-bubble">
+                  <div class="message-bubble user-bubble" :title="formatTimestamp(msg.timestamp)">
                     <div v-if="msg.isCommandOutput" class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
                     <div v-else class="message-content">{{ msg.content }}</div>
                     <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
@@ -1304,7 +1324,7 @@ const App = {
                 <!-- Assistant message (markdown) -->
                 <template v-else-if="msg.role === 'assistant'">
                   <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">Claude</div>
-                  <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
+                  <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]" :title="formatTimestamp(msg.timestamp)">
                     <div class="message-actions">
                       <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? 'Copied!' : 'Copy'">
                         <svg v-if="!msg.copied" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
@@ -1327,7 +1347,7 @@ const App = {
                     </span>
                     <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                   </div>
-                  <div v-if="msg.expanded" class="tool-expand">
+                  <div v-show="msg.expanded" class="tool-expand">
                     <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
                     <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
                     <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
@@ -1428,7 +1448,7 @@ const App = {
                 @input="autoResize"
                 @paste="handlePaste"
                 :disabled="status !== 'Connected' || isCompacting"
-                :placeholder="isCompacting ? 'Context compacting in progress...' : 'Send a message...'"
+                :placeholder="isCompacting ? 'Context compacting in progress...' : 'Send a message · Enter to send'"
                 rows="1"
               ></textarea>
               <div v-if="attachments.length > 0" class="attachment-bar">

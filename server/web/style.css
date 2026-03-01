@@ -6,6 +6,16 @@
   padding: 0;
 }
 
+/* Keyboard focus outlines (visible only for keyboard navigation) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 :root {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
@@ -29,7 +39,7 @@
   --bg-secondary: #f8f9fa;
   --bg-tertiary: #e9ecef;
   --text-primary: #1a1a1a;
-  --text-secondary: #6b7280;
+  --text-secondary: #4b5563;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --success: #16a34a;
@@ -753,6 +763,13 @@ body {
   margin-left: 20px;
   border-left: 1px solid var(--border);
   padding-left: 8px;
+  overflow: hidden;
+  animation: toolExpand 0.15s ease-out;
+}
+
+@keyframes toolExpand {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 500px; }
 }
 
 .tool-block {
