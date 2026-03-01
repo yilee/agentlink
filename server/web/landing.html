@@ -228,9 +228,71 @@
   footer a { color: var(--accent); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
 
+  /* ── Device Showcase ── */
+  .showcase {
+    max-width: 900px;
+    margin: 0 auto 5rem;
+    padding: 0 2rem;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+  }
+
+  .device {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.06),
+      0 25px 80px rgba(0,0,0,0.55),
+      0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  .device img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .device-ipad {
+    width: 72%;
+    border-radius: 18px;
+    z-index: 1;
+  }
+
+  .device-iphone {
+    width: 22%;
+    border-radius: 24px;
+    z-index: 2;
+    margin-left: -8%;
+    margin-bottom: -2%;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 30px 90px rgba(0,0,0,0.6),
+      0 10px 40px rgba(0,0,0,0.35);
+  }
+
+  /* Subtle glow behind devices */
+  .showcase::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 70%;
+    background: radial-gradient(ellipse, rgba(108,99,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
   @media (max-width: 640px) {
     .hero { padding: 4rem 1.5rem 3rem; }
     .install { padding: 1.5rem; margin: 0 1rem 3rem; }
+    .showcase { margin-bottom: 3rem; }
+    .device-ipad { width: 78%; }
+    .device-iphone { width: 26%; margin-left: -10%; border-radius: 16px; }
   }
 </style>
 </head>
@@ -246,6 +308,15 @@
 <section class="hero">
   <h1>Claude Code,<br><em>in your browser</em></h1>
   <p>Run Claude Code on your machine, use it from any browser.</p>
+</section>
+
+<section class="showcase">
+  <div class="device device-ipad">
+    <img src="/iPad.png" alt="AgentLink on iPad" loading="eager">
+  </div>
+  <div class="device device-iphone">
+    <img src="/iPhone.png" alt="AgentLink on iPhone" loading="eager">
+  </div>
 </section>
 
 <section class="install">
