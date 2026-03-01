@@ -9,7 +9,7 @@ import { loadRuntimeState } from './config.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, clearSessionId, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getIsCompacting, clearSessionId, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
@@ -218,7 +218,16 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         abortClaude();
       }
       const history = readSessionMessages(state.workDir, m.claudeSessionId);
-      send({ type: 'conversation_resumed', claudeSessionId: m.claudeSessionId, history });
+      // Include live status so the web client can restore compacting/processing state
+      const currentConv = getConversation();
+      const isSameSession = currentConv?.claudeSessionId === m.claudeSessionId;
+      send({
+        type: 'conversation_resumed',
+        claudeSessionId: m.claudeSessionId,
+        history,
+        isCompacting: isSameSession && getIsCompacting(),
+        isProcessing: isSameSession && currentConv?.turnActive === true,
+      });
       break;
     }
     case 'ask_user_answer': {

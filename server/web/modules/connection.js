@@ -300,11 +300,29 @@ export function createConnection(deps) {
           toolMsgMap.clear();
         }
         loadingHistory.value = false;
-        messages.value.push({
-          id: streaming.nextId(), role: 'system',
-          content: 'Session restored. You can continue the conversation.',
-          timestamp: new Date(),
-        });
+        // Restore live status from agent (compacting / processing)
+        if (msg.isCompacting) {
+          isCompacting.value = true;
+          isProcessing.value = true;
+          messages.value.push({
+            id: streaming.nextId(), role: 'system',
+            content: 'Context compacting...', isCompactStart: true,
+            timestamp: new Date(),
+          });
+        } else if (msg.isProcessing) {
+          isProcessing.value = true;
+          messages.value.push({
+            id: streaming.nextId(), role: 'system',
+            content: 'Agent is processing...',
+            timestamp: new Date(),
+          });
+        } else {
+          messages.value.push({
+            id: streaming.nextId(), role: 'system',
+            content: 'Session restored. You can continue the conversation.',
+            timestamp: new Date(),
+          });
+        }
         scrollToBottom();
       } else if (msg.type === 'directory_listing') {
         folderPickerLoading.value = false;

@@ -71,6 +71,7 @@ interface PendingControlRequest {
 
 let conversation: ConversationState | null = null;
 let lastClaudeSessionId: string | null = null;
+let isCompacting = false;
 let sendFn: SendFn = () => {};
 const pendingControlRequests = new Map<string, PendingControlRequest>();
 
@@ -80,6 +81,11 @@ export function setSendFn(fn: SendFn): void {
 
 export function getConversation(): ConversationState | null {
   return conversation;
+}
+
+/** Whether context compaction is currently in progress. */
+export function getIsCompacting(): boolean {
+  return isCompacting;
 }
 
 export function clearSessionId(): void {
@@ -473,16 +479,20 @@ async function processOutput(
         // Forward context compaction events to web client
         // New format: subtype='status', status='compacting'
         if (sub === 'status' && msg.status === 'compacting') {
+          isCompacting = true;
           sendFn({ type: 'context_compaction', status: 'started' });
         }
         // Compact boundary = compaction completed
         else if (sub === 'compact_boundary') {
+          isCompacting = false;
           sendFn({ type: 'context_compaction', status: 'completed' });
         }
         // Legacy subtypes
         else if (sub === 'compact_start') {
+          isCompacting = true;
           sendFn({ type: 'context_compaction', status: 'started' });
         } else if (sub === 'compact_complete' || sub === 'compact_end') {
+          isCompacting = false;
           sendFn({ type: 'context_compaction', status: 'completed' });
         }
         continue;
@@ -564,6 +574,7 @@ function handleControlRequest(request: ControlRequest, child: ChildProcess): voi
 function cleanup(): void {
   // Clear any pending control requests
   pendingControlRequests.clear();
+  isCompacting = false;
 
   if (conversation) {
     // Preserve session ID so the next message can resume
