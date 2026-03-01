@@ -20,10 +20,24 @@ function getNodePath(): string {
   return process.execPath;
 }
 
-// ── Linux (systemd user unit) ──
+// ── Linux (systemd) ──
+
+function isRoot(): boolean {
+  return process.getuid?.() === 0;
+}
 
 function getSystemdUnitPath(): string {
+  if (isRoot()) {
+    return join('/etc/systemd/system', `${SERVICE_NAME}.service`);
+  }
   return join(homedir(), '.config', 'systemd', 'user', `${SERVICE_NAME}.service`);
+}
+
+function systemctl(...args: string[]): void {
+  const cmd = isRoot()
+    ? `systemctl ${args.join(' ')}`
+    : `systemctl --user ${args.join(' ')}`;
+  execSync(cmd);
 }
 
 function generateSystemdUnit(port: number): string {
@@ -31,6 +45,10 @@ function generateSystemdUnit(port: number): string {
   const cliPath = getCliPath();
   const logDir = getLogDir();
   const nodeBinDir = dirname(nodePath);
+
+  const userSection = isRoot()
+    ? ''
+    : `Environment=PATH=${nodeBinDir}:${homedir()}/.local/bin:${homedir()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin\n`;
 
   return `[Unit]
 Description=AgentLink Relay Server
@@ -42,12 +60,11 @@ Type=simple
 ExecStart=${nodePath} ${cliPath} start --port ${port}
 Restart=on-failure
 RestartSec=10
-Environment=PATH=${nodeBinDir}:${homedir()}/.local/bin:${homedir()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
-StandardOutput=append:${logDir}/server.log
+${userSection}StandardOutput=append:${logDir}/server.log
 StandardError=append:${logDir}/server.err
 
 [Install]
-WantedBy=default.target
+WantedBy=${isRoot() ? 'multi-user.target' : 'default.target'}
 `;
 }
 
@@ -56,26 +73,31 @@ function linuxInstall(port: number): void {
   mkdirSync(dirname(unitPath), { recursive: true });
   mkdirSync(getLogDir(), { recursive: true });
   writeFileSync(unitPath, generateSystemdUnit(port));
-  execSync('systemctl --user daemon-reload');
-  execSync(`systemctl --user enable ${SERVICE_NAME}`);
-  execSync(`systemctl --user start ${SERVICE_NAME}`);
-  console.log('Service installed and started.');
+  systemctl('daemon-reload');
+  systemctl('enable', SERVICE_NAME);
+  systemctl('start', SERVICE_NAME);
+  const scope = isRoot() ? 'system' : 'user';
+  const ctl = isRoot() ? 'systemctl' : 'systemctl --user';
+  const jctl = isRoot() ? 'journalctl' : 'journalctl --user';
+  console.log(`Service installed and started (${scope}-level).`);
   console.log(`\nUnit file: ${unitPath}`);
   console.log('\nUseful commands:');
-  console.log(`  systemctl --user status ${SERVICE_NAME}`);
-  console.log(`  journalctl --user -u ${SERVICE_NAME} -f`);
-  console.log('\nTo run when not logged in:');
-  console.log('  sudo loginctl enable-linger $(whoami)');
+  console.log(`  ${ctl} status ${SERVICE_NAME}`);
+  console.log(`  ${jctl} -u ${SERVICE_NAME} -f`);
+  if (!isRoot()) {
+    console.log('\nTo run when not logged in:');
+    console.log('  sudo loginctl enable-linger $(whoami)');
+  }
 }
 
 function linuxUninstall(): void {
-  try { execSync(`systemctl --user stop ${SERVICE_NAME} 2>/dev/null`); } catch {}
-  try { execSync(`systemctl --user disable ${SERVICE_NAME} 2>/dev/null`); } catch {}
+  try { systemctl('stop', `${SERVICE_NAME} 2>/dev/null`); } catch {}
+  try { systemctl('disable', `${SERVICE_NAME} 2>/dev/null`); } catch {}
   const unitPath = getSystemdUnitPath();
   if (existsSync(unitPath)) {
     unlinkSync(unitPath);
   }
-  try { execSync('systemctl --user daemon-reload'); } catch {}
+  try { systemctl('daemon-reload'); } catch {}
   console.log('Service uninstalled.');
 }
 
