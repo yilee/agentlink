@@ -1,5 +1,6 @@
 import express from 'express';
 import { createServer } from 'http';
+import { createRequire } from 'module';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -9,6 +10,9 @@ import { handleWebConnection } from './ws-client.js';
 import { saveServerRuntimeState, clearServerRuntimeState } from './config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
+const startedAt = new Date();
 
 const PORT = parseInt(process.env.PORT || '3456', 10);
 
@@ -44,6 +48,45 @@ app.get('/api/health', (_req, res) => {
     agents: agents.size,
     webClients: webClients.size,
     timestamp: new Date().toISOString(),
+  });
+});
+
+// Server status (aggregate stats, no session IDs exposed)
+app.get('/api/status', (_req, res) => {
+  // Count web clients per agent session
+  const clientsBySession = new Map<string, number>();
+  for (const [, client] of webClients) {
+    clientsBySession.set(client.sessionId, (clientsBySession.get(client.sessionId) || 0) + 1);
+  }
+
+  const agentList = [];
+  for (const [, agent] of agents) {
+    agentList.push({
+      name: agent.name,
+      hostname: agent.hostname,
+      workDir: agent.workDir,
+      version: agent.version,
+      hasPassword: !!agent.passwordHash,
+      connectedAt: agent.connectedAt.toISOString(),
+      webClients: clientsBySession.get(agent.sessionId) || 0,
+    });
+  }
+
+  const mem = process.memoryUsage();
+  res.json({
+    server: {
+      version: pkg.version,
+      startedAt: startedAt.toISOString(),
+      uptimeSeconds: Math.floor((Date.now() - startedAt.getTime()) / 1000),
+      memoryMB: Math.round(mem.rss / 1024 / 1024),
+    },
+    agents: {
+      connected: agents.size,
+      list: agentList,
+    },
+    webClients: {
+      connected: webClients.size,
+    },
   });
 });
 
