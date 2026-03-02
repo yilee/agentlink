@@ -59,15 +59,6 @@ export function createSidebar(deps) {
     wsSend({ type: 'change_workdir', workDir: dir });
   }
 
-  function selectRecentDir(dir) {
-    if (dir === workDir.value) {
-      folderPickerOpen.value = false;
-      return;
-    }
-    folderPickerOpen.value = false;
-    wsSend({ type: 'change_workdir', workDir: dir });
-  }
-
   function removeWorkDirHistory(dir) {
     const list = workDirHistory.value.filter(d => d !== dir);
     workDirHistory.value = list;
@@ -255,7 +246,6 @@ export function createSidebar(deps) {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
     deleteSession, confirmDeleteSession, cancelDeleteSession,
     addToWorkDirHistory, selectWorkDirHistory, removeWorkDirHistory, toggleWorkDirHistory,
-    selectRecentDir,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
     groupedSessions,

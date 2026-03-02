@@ -331,8 +331,8 @@ describe('Functional: Delete Session', () => {
   });
 });
 
-describe('Functional: WorkDir History in Folder Picker', () => {
-  it('shows recent directories inside folder picker dialog', async () => {
+describe('Functional: WorkDir History', () => {
+  it('records workdir on connect and shows history dropdown', async () => {
     const agent = await connectMockAgentEncrypted('HistAgent', '/project-a');
     const page = await browser.newPage();
     try {
@@ -354,56 +354,56 @@ describe('Functional: WorkDir History in Folder Picker', () => {
       const workdirPath = await page.textContent('.sidebar-workdir-path');
       expect(workdirPath).toContain('/project-a');
 
-      // Simulate a second workdir entry by injecting into localStorage directly
-      // This avoids complex message sequencing for workdir_changed
-      await page.evaluate(() => {
-        localStorage.setItem('agentlink-workdir-history', JSON.stringify(['/project-b', '/project-a']));
-      });
+      // History button should NOT be visible yet (only 1 entry)
+      const histBtnCount = await page.locator('.sidebar-workdir-actions .sidebar-change-dir-btn').count();
+      // Only the folder picker button should be visible (1 button), no history button yet
+      expect(histBtnCount).toBe(1);
 
-      // Reload to pick up the localStorage change
-      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
-      await page.waitForSelector('text=Connected', { timeout: 5000 });
+      // Simulate workdir change — send workdir_changed from agent
+      agent.sendEncrypted({ type: 'workdir_changed', workDir: '/project-b' });
 
-      // Respond to list_sessions
-      await agent.waitForMessage((m) => m.type === 'list_sessions');
-      agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/project-a' });
+      // Wait for the UI to update
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.sidebar-workdir-path');
+        return el && el.textContent?.includes('/project-b');
+      }, { timeout: 3000 });
 
-      // Open the folder picker
-      await page.click('.sidebar-change-dir-btn');
+      // Now there are 2 entries in history, so the history button should appear
+      await page.waitForSelector('.sidebar-workdir-actions', { timeout: 3000 });
+      const actionsButtons = await page.locator('.sidebar-workdir-actions .sidebar-change-dir-btn').count();
+      expect(actionsButtons).toBe(2); // history button + folder button
 
-      // Wait for the folder picker dialog & respond to list_directory
-      await page.waitForSelector('.folder-picker-dialog', { timeout: 3000 });
-      await agent.waitForMessage((m) => m.type === 'list_directory');
-      agent.sendEncrypted({ type: 'directory_listing', dirPath: '/project-a', entries: [] });
+      // Click the history button (first one in the actions)
+      await page.locator('.sidebar-workdir-actions .sidebar-change-dir-btn').first().click();
 
-      // The Recent section should be visible inside the folder picker
-      await page.waitForSelector('.folder-picker-recent', { timeout: 3000 });
+      // Dropdown should appear
+      await page.waitForSelector('.workdir-history-dropdown', { timeout: 3000 });
 
-      // Should have 2 recent items
-      // Note: /project-a is first because addToWorkDirHistory runs on connect,
-      // moving the current workDir to the top of the list
-      const items = await page.locator('.folder-picker-recent-item').count();
+      // Should have 2 items
+      const items = await page.locator('.workdir-history-item').count();
       expect(items).toBe(2);
 
-      const firstItemText = await page.locator('.folder-picker-recent-path').nth(0).textContent();
-      const secondItemText = await page.locator('.folder-picker-recent-path').nth(1).textContent();
-      expect(firstItemText).toContain('/project-a');
-      expect(secondItemText).toContain('/project-b');
+      // First item should be /project-b (most recent), second /project-a
+      const firstItemText = await page.locator('.workdir-history-item').nth(0).textContent();
+      const secondItemText = await page.locator('.workdir-history-item').nth(1).textContent();
+      expect(firstItemText).toContain('/project-b');
+      expect(secondItemText).toContain('/project-a');
 
-      // The active item (/project-a = current workDir) should have the active class
-      const firstClass = await page.locator('.folder-picker-recent-item').nth(0).getAttribute('class');
+      // The active item (/project-b) should have the active class
+      const firstClass = await page.locator('.workdir-history-item').nth(0).getAttribute('class');
       expect(firstClass).toContain('active');
 
-      // Click the second item (/project-b) to switch
+      // Click the second item to switch back to /project-a
       const switchPromise = agent.waitForMessage((m) => m.type === 'change_workdir');
-      await page.locator('.folder-picker-recent-item').nth(1).click();
+      await page.locator('.workdir-history-item').nth(1).click();
 
       const switchReq = await switchPromise;
       expect(switchReq.type).toBe('change_workdir');
-      expect(switchReq.workDir).toBe('/project-b');
+      expect(switchReq.workDir).toBe('/project-a');
 
-      // Folder picker should close after selection
-      await page.waitForSelector('.folder-picker-dialog', { state: 'detached', timeout: 3000 });
+      // Dropdown should close after selection
+      const dropdownGone = await page.locator('.workdir-history-dropdown').count();
+      expect(dropdownGone).toBe(0);
     } finally {
       await page.close();
       agent.ws.close();
