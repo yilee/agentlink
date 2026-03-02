@@ -55,6 +55,7 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   min-height: 100dvh;
+  overscroll-behavior: none;
 }
 
 #app {
