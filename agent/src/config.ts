@@ -8,6 +8,7 @@ export interface AgentConfig {
   dir: string;
   name: string;
   autoUpdate: boolean;
+  password?: string;
 }
 
 const DEFAULTS: AgentConfig = {
@@ -58,6 +59,7 @@ export function resolveConfig(cliOptions: Partial<AgentConfig>): AgentConfig {
     dir: cliOptions.dir || fileConfig.dir || DEFAULTS.dir,
     name: cliOptions.name || fileConfig.name || DEFAULTS.name,
     autoUpdate: cliOptions.autoUpdate ?? fileConfig.autoUpdate ?? true,
+    password: cliOptions.password || fileConfig.password || undefined,
   };
 }
 

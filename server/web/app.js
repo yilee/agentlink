@@ -72,6 +72,13 @@ const App = {
     const workDirHistory = ref([]);
     const workDirHistoryOpen = ref(false);
 
+    // Authentication state
+    const authRequired = ref(false);
+    const authPassword = ref('');
+    const authError = ref('');
+    const authAttempts = ref(null);
+    const authLocked = ref(false);
+
     // File attachment state
     const attachments = ref([]);
     const fileInputRef = ref(null);
@@ -148,12 +155,13 @@ const App = {
       workDirHistory, workDirHistoryOpen,
     });
 
-    const { connect, wsSend, closeWs } = createConnection({
+    const { connect, wsSend, closeWs, submitPassword } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion,
       messages, isProcessing, isCompacting, visibleLimit,
       historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
       folderPickerLoading, folderPickerEntries, folderPickerPath,
+      authRequired, authPassword, authError, authAttempts, authLocked,
       streaming, sidebar, scrollToBottom,
     });
 
@@ -289,6 +297,9 @@ const App = {
       removeWorkDirHistory: sidebar.removeWorkDirHistory,
       toggleWorkDirHistory: sidebar.toggleWorkDirHistory,
       selectRecentDir: sidebar.selectRecentDir,
+      // Authentication
+      authRequired, authPassword, authError, authAttempts, authLocked,
+      submitPassword,
       // File attachments
       attachments, fileInputRef, dragOver,
       triggerFileInput: fileAttach.triggerFileInput,
@@ -675,6 +686,46 @@ const App = {
           <div class="delete-confirm-footer">
             <button class="folder-picker-cancel" @click="cancelDeleteSession">Cancel</button>
             <button class="delete-confirm-btn" @click="confirmDeleteSession">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Password Authentication Dialog -->
+      <div class="folder-picker-overlay" v-if="authRequired && !authLocked">
+        <div class="auth-dialog">
+          <div class="auth-dialog-header">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+            <span>Session Protected</span>
+          </div>
+          <div class="auth-dialog-body">
+            <p>This session requires a password to access.</p>
+            <input
+              type="password"
+              class="auth-password-input"
+              v-model="authPassword"
+              @keydown.enter="submitPassword"
+              placeholder="Enter password..."
+              autofocus
+            />
+            <p v-if="authError" class="auth-error">{{ authError }}</p>
+            <p v-if="authAttempts" class="auth-attempts">{{ authAttempts }}</p>
+          </div>
+          <div class="auth-dialog-footer">
+            <button class="auth-submit-btn" @click="submitPassword" :disabled="!authPassword.trim()">Unlock</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auth Locked Out -->
+      <div class="folder-picker-overlay" v-if="authLocked">
+        <div class="auth-dialog auth-dialog-locked">
+          <div class="auth-dialog-header">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+            <span>Access Locked</span>
+          </div>
+          <div class="auth-dialog-body">
+            <p>{{ authError }}</p>
+            <p class="auth-locked-hint">Close this tab and try again later.</p>
           </div>
         </div>
       </div>

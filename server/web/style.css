@@ -534,6 +534,104 @@ body {
   background: #dc2626;
 }
 
+/* ── Auth Dialog ── */
+.auth-dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 360px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.auth-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 24px 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.auth-dialog-header svg {
+  color: var(--accent);
+}
+
+.auth-dialog-locked .auth-dialog-header svg {
+  color: var(--error);
+}
+
+.auth-dialog-body {
+  padding: 0 24px 16px;
+}
+
+.auth-dialog-body p {
+  margin: 0 0 12px 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.auth-password-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+  margin-bottom: 4px;
+}
+
+.auth-password-input:focus {
+  border-color: var(--accent);
+}
+
+.auth-error {
+  color: var(--error) !important;
+  font-size: 0.82rem !important;
+  margin-top: 8px !important;
+}
+
+.auth-attempts {
+  color: var(--text-secondary) !important;
+  font-size: 0.78rem !important;
+}
+
+.auth-locked-hint {
+  font-size: 0.78rem !important;
+  color: var(--text-secondary) !important;
+}
+
+.auth-dialog-footer {
+  padding: 12px 24px 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.auth-submit-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Chat area (message list + input) ── */
 .chat-area {
   flex: 1;

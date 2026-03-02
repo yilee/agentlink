@@ -12,6 +12,8 @@ export interface AgentSession {
   sessionKey: Uint8Array | null;  // encryption key for this agent
   connectedAt: Date;
   isAlive: boolean;
+  passwordHash: string | null;
+  passwordSalt: string | null;
 }
 
 export interface WebClient {
@@ -31,6 +33,19 @@ export const sessionToAgent = new Map<string, string>();
 
 // Web clients: clientId → WebClient
 export const webClients = new Map<string, WebClient>();
+
+// Brute-force tracking: sessionId → { failures, lockedUntil }
+export interface AuthAttemptState {
+  failures: number;
+  lockedUntil: Date | null;
+}
+export const authAttempts = new Map<string, AuthAttemptState>();
+
+// Pending auth: clientId → sessionId (web clients awaiting password verification)
+export const pendingAuth = new Map<string, string>();
+
+// Server secret for HMAC auth tokens (generated fresh on each server start)
+export const serverSecret = randomBytes(32);
 
 /**
  * Generate a short, URL-safe session ID

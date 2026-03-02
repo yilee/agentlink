@@ -35,6 +35,7 @@ program
   .option('-s, --server <url>', 'Relay server URL')
   .option('-n, --name <name>', 'Agent name')
   .option('-D, --daemon', 'Run agent in the background as a daemon')
+  .option('-p, --password <password>', 'Session password (clients must authenticate)')
   .option('--no-auto-update', 'Disable automatic update checks')
   .action(async (options) => {
     const config = resolveConfig(options);
@@ -189,7 +190,7 @@ configCmd
   .command('set <key> <value>')
   .description('Set a configuration value (server, dir, name)')
   .action((key: string, value: string) => {
-    const validKeys = ['server', 'dir', 'name', 'autoUpdate'];
+    const validKeys = ['server', 'dir', 'name', 'autoUpdate', 'password'];
     if (!validKeys.includes(key)) {
       console.error(`Invalid key "${key}". Valid keys: ${validKeys.join(', ')}`);
       process.exit(1);

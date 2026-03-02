@@ -9,6 +9,7 @@ import {
   type AgentSession,
 } from './context.js';
 import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
+import { hashPassword } from './auth.js';
 
 export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
@@ -17,6 +18,16 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   const workDir = url.searchParams.get('workDir') || 'unknown';
   const hostname = url.searchParams.get('hostname') || '';
   const version = url.searchParams.get('version') || '';
+  const password = url.searchParams.get('password') || '';
+
+  // Hash password if provided (agent sends plaintext over WSS)
+  let passwordHash: string | null = null;
+  let passwordSalt: string | null = null;
+  if (password) {
+    const h = hashPassword(password);
+    passwordHash = h.hash;
+    passwordSalt = h.salt;
+  }
 
   // Reuse requested sessionId (agent reconnecting) or generate a new one
   const requestedSessionId = url.searchParams.get('sessionId');
@@ -34,12 +45,14 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     sessionKey,
     connectedAt: new Date(),
     isAlive: true,
+    passwordHash,
+    passwordSalt,
   };
 
   agents.set(agentId, agent);
   sessionToAgent.set(sessionId, agentId);
 
-  console.log(`[Agent] Registered: ${name} (${agentId}), session: ${sessionId}${requestedSessionId ? ' (reconnect)' : ''}`);
+  console.log(`[Agent] Registered: ${name} (${agentId}), session: ${sessionId}${requestedSessionId ? ' (reconnect)' : ''}${passwordHash ? ' (password protected)' : ''}`);
 
   // Send registration with session key (this initial message is plain text)
   ws.send(JSON.stringify({

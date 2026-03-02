@@ -17,6 +17,7 @@ export function createConnection(deps) {
     messages, isProcessing, isCompacting, visibleLimit,
     historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
+    authRequired, authPassword, authError, authAttempts, authLocked,
     streaming, sidebar,
     scrollToBottom,
   } = deps;
@@ -113,7 +114,12 @@ export function createConnection(deps) {
     error.value = '';
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/?type=web&sessionId=${sid}`;
+    let wsUrl = `${protocol}//${window.location.host}/?type=web&sessionId=${sid}`;
+    // Include saved auth token for automatic re-authentication
+    const savedToken = localStorage.getItem(`agentlink-auth-${sid}`);
+    if (savedToken) {
+      wsUrl += `&authToken=${encodeURIComponent(savedToken)}`;
+    }
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => { error.value = ''; reconnectAttempts = 0; };
@@ -121,6 +127,30 @@ export function createConnection(deps) {
     ws.onmessage = (event) => {
       let msg;
       const parsed = JSON.parse(event.data);
+
+      // Auth messages are always plaintext (before session key exchange)
+      if (parsed.type === 'auth_required') {
+        authRequired.value = true;
+        authError.value = '';
+        authLocked.value = false;
+        status.value = 'Authentication Required';
+        return;
+      }
+      if (parsed.type === 'auth_failed') {
+        authError.value = parsed.message || 'Incorrect password.';
+        authAttempts.value = parsed.attemptsRemaining != null
+          ? `${parsed.attemptsRemaining} attempt${parsed.attemptsRemaining !== 1 ? 's' : ''} remaining`
+          : null;
+        authPassword.value = '';
+        return;
+      }
+      if (parsed.type === 'auth_locked') {
+        authLocked.value = true;
+        authRequired.value = false;
+        authError.value = parsed.message || 'Too many failed attempts.';
+        status.value = 'Locked';
+        return;
+      }
 
       if (parsed.type === 'connected') {
         msg = parsed;
@@ -138,6 +168,16 @@ export function createConnection(deps) {
       }
 
       if (msg.type === 'connected') {
+        // Reset auth state
+        authRequired.value = false;
+        authPassword.value = '';
+        authError.value = '';
+        authAttempts.value = null;
+        authLocked.value = false;
+        // Save auth token for automatic re-authentication
+        if (msg.authToken) {
+          localStorage.setItem(`agentlink-auth-${sessionId.value}`, msg.authToken);
+        }
         if (msg.serverVersion) serverVersion.value = msg.serverVersion;
         if (msg.agent) {
           status.value = 'Connected';
@@ -366,6 +406,9 @@ export function createConnection(deps) {
       isProcessing.value = false;
       isCompacting.value = false;
 
+      // Don't auto-reconnect if auth-locked or still in auth prompt
+      if (authLocked.value || authRequired.value) return;
+
       if (wasConnected || reconnectAttempts > 0) {
         scheduleReconnect(scheduleHighlight);
       }
@@ -393,5 +436,12 @@ export function createConnection(deps) {
     if (ws) ws.close();
   }
 
-  return { connect, wsSend, closeWs };
+  function submitPassword() {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const pwd = authPassword.value.trim();
+    if (!pwd) return;
+    ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
+  }
+
+  return { connect, wsSend, closeWs, submitPassword };
 }

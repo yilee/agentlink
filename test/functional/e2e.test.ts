@@ -188,7 +188,7 @@ function decryptMsg(encrypted: { n: string; c: string }, key: Uint8Array): unkno
 }
 
 /** Connect a mock agent with encryption support */
-function connectMockAgentEncrypted(name = 'TestAgent', workDir = '/test'): Promise<{
+function connectMockAgentEncrypted(name = 'TestAgent', workDir = '/test', password?: string): Promise<{
   ws: WebSocket;
   sessionId: string;
   sessionKey: Uint8Array;
@@ -197,6 +197,7 @@ function connectMockAgentEncrypted(name = 'TestAgent', workDir = '/test'): Promi
 }> {
   return new Promise((resolve, reject) => {
     const params = new URLSearchParams({ type: 'agent', id: name, name, workDir, hostname: 'test-host' });
+    if (password) params.set('password', password);
     const ws = new WebSocket(`ws://localhost:${PORT}/?${params}`);
     let sessionKey: Uint8Array;
 
@@ -403,6 +404,111 @@ describe('Functional: WorkDir History in Folder Picker', () => {
 
       // Folder picker should close after selection
       await page.waitForSelector('.folder-picker-dialog', { state: 'detached', timeout: 3000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+});
+
+describe('Functional: Session Password Auth', () => {
+  it('shows password dialog for protected session and authenticates', async () => {
+    // Connect agent with password
+    const agent = await connectMockAgentEncrypted('AuthAgent', '/auth-test', 'mypassword');
+    const page = await browser.newPage();
+    try {
+      // Clear any saved auth token
+      await page.goto(BASE_URL);
+      await page.evaluate((sid) => {
+        localStorage.removeItem(`agentlink-auth-${sid}`);
+      }, agent.sessionId);
+
+      // Navigate to the protected session
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+
+      // Should show the auth dialog instead of Connected
+      await page.waitForSelector('.auth-dialog', { timeout: 5000 });
+      const headerText = await page.textContent('.auth-dialog-header');
+      expect(headerText).toContain('Session Protected');
+
+      // Try wrong password first
+      await page.fill('.auth-password-input', 'wrongpass');
+      await page.click('.auth-submit-btn');
+
+      // Should show error
+      await page.waitForSelector('.auth-error', { timeout: 3000 });
+      const errText = await page.textContent('.auth-error');
+      expect(errText).toContain('Incorrect password');
+
+      // Now enter correct password
+      await page.fill('.auth-password-input', 'mypassword');
+      await page.click('.auth-submit-btn');
+
+      // Should transition to Connected
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Auth dialog should be gone
+      const dialogCount = await page.locator('.auth-dialog').count();
+      expect(dialogCount).toBe(0);
+
+      // Auth token should be saved
+      const token = await page.evaluate((sid) => {
+        return localStorage.getItem(`agentlink-auth-${sid}`);
+      }, agent.sessionId);
+      expect(token).toBeTruthy();
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('auto-authenticates with saved token', async () => {
+    // Connect agent with password
+    const agent = await connectMockAgentEncrypted('TokenAgent', '/token-test', 'tokenpass');
+    const page = await browser.newPage();
+    try {
+      // First: authenticate to get a token
+      await page.goto(BASE_URL);
+      await page.evaluate((sid) => {
+        localStorage.removeItem(`agentlink-auth-${sid}`);
+      }, agent.sessionId);
+
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('.auth-dialog', { timeout: 5000 });
+      await page.fill('.auth-password-input', 'tokenpass');
+      await page.click('.auth-submit-btn');
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Token should now be saved
+      const token = await page.evaluate((sid) => {
+        return localStorage.getItem(`agentlink-auth-${sid}`);
+      }, agent.sessionId);
+      expect(token).toBeTruthy();
+
+      // Reload the page — should auto-connect without password dialog
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Auth dialog should never appear
+      const dialogCount = await page.locator('.auth-dialog').count();
+      expect(dialogCount).toBe(0);
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('skips auth for sessions without password', async () => {
+    // Connect agent WITHOUT password
+    const agent = await connectMockAgentEncrypted('NoAuthAgent', '/no-auth');
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // No auth dialog should appear
+      const dialogCount = await page.locator('.auth-dialog').count();
+      expect(dialogCount).toBe(0);
     } finally {
       await page.close();
       agent.ws.close();

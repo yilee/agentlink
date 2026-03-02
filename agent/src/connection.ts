@@ -159,6 +159,10 @@ function buildWsUrl(config: AgentConfig): string {
   if (state.sessionId) {
     params.set('sessionId', state.sessionId);
   }
+  // Send password if configured (server will hash it)
+  if (config.password) {
+    params.set('password', config.password);
+  }
   return `${base}/?${params}`;
 }
 
