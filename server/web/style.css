@@ -1721,7 +1721,7 @@ body {
 
 .folder-picker-dialog {
   width: 440px;
-  max-height: 520px;
+  height: 520px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 12px;
