@@ -5,7 +5,7 @@ import { readdir } from 'fs/promises';
 import { resolve, isAbsolute, join } from 'path';
 import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
-import { loadRuntimeState } from './config.js';
+import { loadRuntimeState, saveRuntimeState } from './config.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -93,13 +93,29 @@ function doConnect(
     }
 
     if (parsed.type === 'registered') {
-      state.sessionId = parsed.sessionId as string;
+      const newSessionId = parsed.sessionId as string;
+      const previousSessionId = state.sessionId;
+      state.sessionId = newSessionId;
       if (typeof parsed.sessionKey === 'string') {
         state.sessionKey = decodeKey(parsed.sessionKey);
       }
       if (!settled) {
         settled = true;
         onRegistered(state.sessionId);
+      } else if (previousSessionId && previousSessionId !== newSessionId) {
+        // Session ID changed on reconnect — update runtime state so status/URL stay correct
+        console.warn(`[AgentLink] Session ID changed: ${previousSessionId} → ${newSessionId}`);
+        const prev = loadRuntimeState();
+        if (prev) {
+          const httpBase = (state.config?.server || '')
+            .replace(/^wss:/, 'https:')
+            .replace(/^ws:/, 'http:');
+          saveRuntimeState({
+            ...prev,
+            sessionId: newSessionId,
+            sessionUrl: `${httpBase}/s/${newSessionId}`,
+          });
+        }
       }
       console.log(`[AgentLink] Registered, session: ${state.sessionId}`);
     } else {

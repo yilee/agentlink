@@ -78,13 +78,20 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
 
   ws.on('close', () => {
     console.log(`[Agent] Disconnected: ${name} (${agentId})`);
-    sessionToAgent.delete(sessionId);
-    agents.delete(agentId);
 
-    // Notify connected web clients that agent is gone
-    for (const [, client] of webClients) {
-      if (client.sessionId === sessionId && client.ws.readyState === WebSocket.OPEN) {
-        encryptAndSend(client.ws, { type: 'agent_disconnected' }, client.sessionKey);
+    // Only clean up if this WebSocket is still the current one for this agent.
+    // On reconnect, the new connection overwrites the agents Map entry before
+    // the old connection's close event fires — deleting would remove the new entry.
+    const current = agents.get(agentId);
+    if (current && current.ws === ws) {
+      sessionToAgent.delete(sessionId);
+      agents.delete(agentId);
+
+      // Notify connected web clients that agent is gone
+      for (const [, client] of webClients) {
+        if (client.sessionId === sessionId && client.ws.readyState === WebSocket.OPEN) {
+          encryptAndSend(client.ws, { type: 'agent_disconnected' }, client.sessionKey);
+        }
       }
     }
   });
