@@ -305,7 +305,9 @@ program
       try {
         // Resolve the new binary path from npm global prefix to avoid stale shell cache
         const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
-        const newBin = join(npmPrefix, 'bin', 'agentlink-client');
+        const newBin = process.platform === 'win32'
+          ? join(npmPrefix, 'agentlink-client.cmd')
+          : join(npmPrefix, 'bin', 'agentlink-client');
         execSync(`"${newBin}" start --daemon`, { stdio: 'inherit' });
       } catch {
         // Fallback to PATH-based command
