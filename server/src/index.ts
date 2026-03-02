@@ -51,27 +51,8 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Server status (aggregate stats, no session IDs exposed)
+// Server status (aggregate stats, no agent details exposed)
 app.get('/api/status', (_req, res) => {
-  // Count web clients per agent session
-  const clientsBySession = new Map<string, number>();
-  for (const [, client] of webClients) {
-    clientsBySession.set(client.sessionId, (clientsBySession.get(client.sessionId) || 0) + 1);
-  }
-
-  const agentList = [];
-  for (const [, agent] of agents) {
-    agentList.push({
-      name: agent.name,
-      hostname: agent.hostname,
-      workDir: agent.workDir,
-      version: agent.version,
-      hasPassword: !!agent.passwordHash,
-      connectedAt: agent.connectedAt.toISOString(),
-      webClients: clientsBySession.get(agent.sessionId) || 0,
-    });
-  }
-
   const mem = process.memoryUsage();
   res.json({
     server: {
@@ -82,7 +63,6 @@ app.get('/api/status', (_req, res) => {
     },
     agents: {
       connected: agents.size,
-      list: agentList,
     },
     webClients: {
       connected: webClients.size,

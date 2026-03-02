@@ -7,7 +7,7 @@
 
 import { execSync } from 'child_process';
 import { createRequire } from 'module';
-import type { AgentConfig } from './config.js';
+import { loadConfig } from './config.js';
 import { getConversation } from './claude.js';
 
 const require = createRequire(import.meta.url);
@@ -85,8 +85,11 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
 
   // Don't clear agent.json — the new process will restore sessionId from it.
   // Restart via agentlink-client start --daemon (new binary from the updated package)
+  // Preserve password if one is configured
+  const config = loadConfig();
+  const passwordArg = config.password ? ` --password ${config.password}` : '';
   try {
-    execSync('agentlink-client start --daemon', {
+    execSync(`agentlink-client start --daemon${passwordArg}`, {
       stdio: 'ignore',
       timeout: 15_000,
       windowsHide: true,

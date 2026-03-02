@@ -14,6 +14,7 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
+const qrcode = require('qrcode-terminal');
 
 /** Highlight a URL with bold + underline ANSI codes if stdout supports color. */
 function highlightUrl(url: string): string {
@@ -97,6 +98,9 @@ program
       if (state && state.pid !== process.pid) {
         console.log(`Agent started in background (PID ${state.pid}).`);
         console.log(`  URL: ${highlightUrl(state.sessionUrl)}`);
+        qrcode.generate(state.sessionUrl, { small: true }, (code: string) => {
+          console.log(code);
+        });
         console.log(`  Log: ${logFile}`);
       } else {
         console.error('Agent may have failed to start. Check logs:');

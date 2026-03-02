@@ -1,6 +1,6 @@
 {
   "name": "@agent-link/agent",
-  "version": "0.1.56",
+  "version": "0.1.58",
   "description": "AgentLink local agent CLI",
   "type": "module",
   "main": "dist/index.js",
@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "commander": "^12.0.0",
+    "qrcode-terminal": "^0.12.0",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "ws": "^8.16.0"

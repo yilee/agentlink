@@ -1,7 +1,11 @@
+import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
 import { saveRuntimeState, clearRuntimeState } from './config.js';
 import { connect, disconnect } from './connection.js';
 import { startAutoUpdate, stopAutoUpdate } from './auto-update.js';
+
+const require = createRequire(import.meta.url);
+const qrcode = require('qrcode-terminal');
 
 /** Highlight a URL with bold + underline ANSI codes if stdout supports color. */
 function highlightUrl(url: string): string {
@@ -37,6 +41,9 @@ export async function start(config: AgentConfig, daemon = false): Promise<void> 
 
     console.log('');
     console.log(`[AgentLink] Session URL: ${highlightUrl(sessionUrl)}`);
+    qrcode.generate(sessionUrl, { small: true }, (code: string) => {
+      console.log(code);
+    });
     console.log('[AgentLink] Waiting for connections...');
 
     // Start auto-update checker (unless disabled)

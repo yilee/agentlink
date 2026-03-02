@@ -58,7 +58,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${nodePath} ${cliPath} start --server ${config.server} --dir ${config.dir} --name ${config.name}
+ExecStart=${nodePath} ${cliPath} start --server "${config.server}" --dir "${config.dir}" --name "${config.name}"
 WorkingDirectory=${config.dir}
 Restart=on-failure
 RestartSec=10
@@ -189,7 +189,7 @@ function getStartupBatPath(): string {
 function generateStartupBat(config: AgentConfig): string {
   const nodePath = getNodePath();
   const cliPath = getCliPath();
-  return `@echo off\r\n"${nodePath}" "${cliPath}" start --daemon --server ${config.server} --dir "${config.dir}" --name ${config.name}\r\n`;
+  return `@echo off\r\n"${nodePath}" "${cliPath}" start --daemon --server "${config.server}" --dir "${config.dir}" --name "${config.name}"\r\n`;
 }
 
 function winInstall(config: AgentConfig): void {
@@ -203,7 +203,7 @@ function winInstall(config: AgentConfig): void {
   console.log('\nStarting agent now...');
   try {
     execSync(
-      `"${getNodePath()}" "${getCliPath()}" start --daemon --server ${config.server} --dir "${config.dir}" --name ${config.name}`,
+      `"${getNodePath()}" "${getCliPath()}" start --daemon --server "${config.server}" --dir "${config.dir}" --name "${config.name}"`,
       { stdio: 'inherit' },
     );
   } catch {
