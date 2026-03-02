@@ -87,6 +87,24 @@ describe('History', () => {
       ]);
       expect(listSessions(TEST_WORK_DIR)).toEqual([]);
     });
+
+    it('handles paths with dots and special characters', () => {
+      // Simulate a path like C:\Users\user.DOMAIN\Desktop\project
+      const dotDir = process.platform === 'win32'
+        ? 'C:\\Users\\user.DOMAIN\\project'
+        : '/home/user.name/project';
+      const dotFolder = process.platform === 'win32'
+        ? 'C--Users-user-DOMAIN-project'
+        : '-home-user-name-project';
+      const dir = join(tempHome, '.claude', 'projects', dotFolder);
+      mkdirSync(dir, { recursive: true });
+      const filePath = join(dir, 'dot-session.jsonl');
+      writeFileSync(filePath, JSON.stringify({ type: 'user', message: { content: 'hello from dot path' } }) + '\n');
+
+      const sessions = listSessions(dotDir);
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].sessionId).toBe('dot-session');
+    });
   });
 
   describe('readSessionMessages', () => {

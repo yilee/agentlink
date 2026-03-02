@@ -31,10 +31,15 @@ function getClaudeProjectsDir(): string {
 }
 
 function pathToProjectFolder(workDir: string): string {
-  return workDir
-    .replace(/:/g, '-')
-    .replace(/[/\\]/g, '-')
-    .replace(/ /g, '-');
+  const sanitized = workDir.replace(/[^a-zA-Z0-9]/g, '-');
+  if (sanitized.length <= 200) return sanitized;
+  // Hash for long paths (matches Claude CLI's Java-style hashCode)
+  let hash = 0;
+  for (let i = 0; i < workDir.length; i++) {
+    hash = (hash << 5) - hash + workDir.charCodeAt(i);
+    hash |= 0;
+  }
+  return `${sanitized.slice(0, 200)}-${Math.abs(hash).toString(36)}`;
 }
 
 /** Messages that are pure CLI metadata — always hidden */
