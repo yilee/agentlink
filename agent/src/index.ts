@@ -46,8 +46,8 @@ export async function start(config: AgentConfig, daemon = false): Promise<void> 
     });
     console.log('[AgentLink] Waiting for connections...');
 
-    // Start auto-update checker (unless disabled)
-    if (config.autoUpdate !== false) {
+    // Start auto-update checker (opt-in, disabled by default)
+    if (config.autoUpdate === true) {
       startAutoUpdate(daemon);
     }
 

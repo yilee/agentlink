@@ -15,7 +15,7 @@ const DEFAULTS: AgentConfig = {
   server: 'wss://msclaude.ai',
   dir: process.cwd(),
   name: `Agent-${process.platform}-${process.pid}`,
-  autoUpdate: true,
+  autoUpdate: false,
 };
 
 export const CONFIG_DIR = join(homedir(), '.agentlink');
@@ -64,7 +64,7 @@ export function resolveConfig(cliOptions: Partial<AgentConfig>): AgentConfig {
     server: cliOptions.server || fileConfig.server || DEFAULTS.server,
     dir: cliOptions.dir || fileConfig.dir || DEFAULTS.dir,
     name: cliOptions.name || fileConfig.name || DEFAULTS.name,
-    autoUpdate: cliOptions.autoUpdate ?? fileConfig.autoUpdate ?? true,
+    autoUpdate: cliOptions.autoUpdate ?? fileConfig.autoUpdate ?? false,
     password: cliOptions.password || fileConfig.password || undefined,
   };
 }

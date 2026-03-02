@@ -37,15 +37,19 @@ program
   .option('-n, --name <name>', 'Agent name')
   .option('-D, --daemon', 'Run agent in the background as a daemon')
   .option('-p, --password <password>', 'Session password (clients must authenticate)')
-  .option('--no-auto-update', 'Disable automatic update checks')
+  .option('--auto-update', 'Enable automatic update checks (disabled by default)')
   .action(async (options) => {
-    // Persist password to config file so auto-update restarts preserve it
-    // If --password not passed, clear any saved password so session is unprotected
+    // Persist password and autoUpdate to config file so restarts preserve them
+    const configUpdates: Record<string, unknown> = {};
     if (options.password) {
-      saveConfig({ password: options.password });
+      configUpdates.password = options.password;
     } else {
-      saveConfig({ password: undefined });
+      configUpdates.password = undefined;
     }
+    if (options.autoUpdate) {
+      configUpdates.autoUpdate = true;
+    }
+    saveConfig(configUpdates);
 
     const config = resolveConfig(options);
 

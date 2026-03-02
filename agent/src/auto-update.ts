@@ -85,11 +85,12 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
 
   // Don't clear agent.json — the new process will restore sessionId from it.
   // Restart via agentlink-client start --daemon (new binary from the updated package)
-  // Preserve password if one is configured
+  // Preserve password and auto-update flag if configured
   const config = loadConfig();
   const passwordArg = config.password ? ` --password ${config.password}` : '';
+  const autoUpdateArg = config.autoUpdate ? ' --auto-update' : '';
   try {
-    execSync(`agentlink-client start --daemon${passwordArg}`, {
+    execSync(`agentlink-client start --daemon${passwordArg}${autoUpdateArg}`, {
       stdio: 'ignore',
       timeout: 15_000,
       windowsHide: true,

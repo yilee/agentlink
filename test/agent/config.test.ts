@@ -65,12 +65,12 @@ describe('Agent Config', () => {
       expect(config.server).toBe('wss://msclaude.ai');
       expect(config.dir).toBe(process.cwd());
       expect(config.name).toMatch(/^Agent-/);
-      expect(config.autoUpdate).toBe(true);
+      expect(config.autoUpdate).toBe(false);
     });
 
-    it('autoUpdate defaults to true', () => {
+    it('autoUpdate defaults to false', () => {
       const config = resolveConfig({});
-      expect(config.autoUpdate).toBe(true);
+      expect(config.autoUpdate).toBe(false);
     });
 
     it('autoUpdate can be disabled via CLI flag', () => {
