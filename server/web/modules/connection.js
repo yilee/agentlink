@@ -185,7 +185,7 @@ export function createConnection(deps) {
           hostname.value = msg.agent.hostname || '';
           workDir.value = msg.agent.workDir;
           agentVersion.value = msg.agent.version || '';
-          const savedDir = localStorage.getItem('agentlink-workdir');
+          const savedDir = localStorage.getItem(`agentlink-workdir-${sessionId.value}`);
           if (savedDir && savedDir !== msg.agent.workDir) {
             wsSend({ type: 'change_workdir', workDir: savedDir });
           }
@@ -380,7 +380,7 @@ export function createConnection(deps) {
         if (msg.dirPath != null) folderPickerPath.value = msg.dirPath;
       } else if (msg.type === 'workdir_changed') {
         workDir.value = msg.workDir;
-        localStorage.setItem('agentlink-workdir', msg.workDir);
+        localStorage.setItem(`agentlink-workdir-${sessionId.value}`, msg.workDir);
         messages.value = [];
         toolMsgMap.clear();
         visibleLimit.value = 50;
