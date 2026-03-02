@@ -185,6 +185,8 @@ export function createConnection(deps) {
           hostname.value = msg.agent.hostname || '';
           workDir.value = msg.agent.workDir;
           agentVersion.value = msg.agent.version || '';
+          sidebar.loadWorkdirHistory();
+          sidebar.addToWorkdirHistory(msg.agent.workDir);
           const savedDir = localStorage.getItem(`agentlink-workdir-${sessionId.value}`);
           if (savedDir && savedDir !== msg.agent.workDir) {
             wsSend({ type: 'change_workdir', workDir: savedDir });
@@ -210,6 +212,7 @@ export function createConnection(deps) {
           workDir.value = msg.agent.workDir;
           agentVersion.value = msg.agent.version || '';
           workDir.value = msg.agent.workDir;
+          sidebar.addToWorkdirHistory(msg.agent.workDir);
         }
         sidebar.requestSessionList();
       } else if (msg.type === 'error') {
@@ -381,6 +384,7 @@ export function createConnection(deps) {
       } else if (msg.type === 'workdir_changed') {
         workDir.value = msg.workDir;
         localStorage.setItem(`agentlink-workdir-${sessionId.value}`, msg.workDir);
+        sidebar.addToWorkdirHistory(msg.workDir);
         messages.value = [];
         toolMsgMap.clear();
         visibleLimit.value = 50;

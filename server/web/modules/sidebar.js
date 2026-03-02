@@ -21,6 +21,8 @@ const { computed } = Vue;
  * @param {import('vue').Ref} deps.folderPickerLoading
  * @param {import('vue').Ref} deps.folderPickerSelected
  * @param {object} deps.streaming - streaming controller
+ * @param {import('vue').Ref} deps.hostname
+ * @param {import('vue').Ref} deps.workdirHistory
  */
 export function createSidebar(deps) {
   const {
@@ -29,6 +31,7 @@ export function createSidebar(deps) {
     loadingSessions, loadingHistory, workDir, visibleLimit,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
+    hostname, workdirHistory,
   } = deps;
 
   // ── Session management ──
@@ -181,6 +184,49 @@ export function createSidebar(deps) {
     wsSend({ type: 'change_workdir', workDir: path });
   }
 
+  // ── Working directory history ──
+
+  const WORKDIR_HISTORY_MAX = 10;
+
+  function getWorkdirHistoryKey() {
+    return `agentlink-workdir-history-${hostname.value}`;
+  }
+
+  function loadWorkdirHistory() {
+    try {
+      const stored = localStorage.getItem(getWorkdirHistoryKey());
+      workdirHistory.value = stored ? JSON.parse(stored) : [];
+    } catch {
+      workdirHistory.value = [];
+    }
+  }
+
+  function saveWorkdirHistory() {
+    localStorage.setItem(getWorkdirHistoryKey(), JSON.stringify(workdirHistory.value));
+  }
+
+  function addToWorkdirHistory(path) {
+    if (!path) return;
+    const filtered = workdirHistory.value.filter(p => p !== path);
+    filtered.unshift(path);
+    workdirHistory.value = filtered.slice(0, WORKDIR_HISTORY_MAX);
+    saveWorkdirHistory();
+  }
+
+  function removeFromWorkdirHistory(path) {
+    workdirHistory.value = workdirHistory.value.filter(p => p !== path);
+    saveWorkdirHistory();
+  }
+
+  function switchToWorkdir(path) {
+    if (isProcessing.value) return;
+    wsSend({ type: 'change_workdir', workDir: path });
+  }
+
+  const filteredWorkdirHistory = computed(() => {
+    return workdirHistory.value.filter(p => p !== workDir.value);
+  });
+
   // ── Grouped sessions ──
 
   const groupedSessions = computed(() => {
@@ -210,5 +256,7 @@ export function createSidebar(deps) {
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
     groupedSessions,
+    loadWorkdirHistory, addToWorkdirHistory, removeFromWorkdirHistory,
+    switchToWorkdir, filteredWorkdirHistory,
   };
 }

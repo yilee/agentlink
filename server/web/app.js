@@ -68,6 +68,9 @@ const App = {
     const deleteConfirmOpen = ref(false);
     const deleteConfirmTitle = ref('');
 
+    // Working directory history
+    const workdirHistory = ref([]);
+
     // Authentication state
     const authRequired = ref(false);
     const authPassword = ref('');
@@ -148,6 +151,7 @@ const App = {
       folderPickerOpen, folderPickerPath, folderPickerEntries,
       folderPickerLoading, folderPickerSelected, streaming,
       deleteConfirmOpen, deleteConfirmTitle,
+      hostname, workdirHistory,
     });
 
     const { connect, wsSend, closeWs, submitPassword } = createConnection({
@@ -286,6 +290,10 @@ const App = {
       deleteSession: sidebar.deleteSession,
       confirmDeleteSession: sidebar.confirmDeleteSession,
       cancelDeleteSession: sidebar.cancelDeleteSession,
+      // Working directory history
+      filteredWorkdirHistory: sidebar.filteredWorkdirHistory,
+      switchToWorkdir: sidebar.switchToWorkdir,
+      removeFromWorkdirHistory: sidebar.removeFromWorkdirHistory,
       // Authentication
       authRequired, authPassword, authError, authAttempts, authLocked,
       submitPassword,
@@ -351,6 +359,22 @@ const App = {
                 </button>
               </div>
               <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
+              <div v-if="filteredWorkdirHistory.length > 0" class="workdir-history">
+                <div class="workdir-history-label">Recent Directories</div>
+                <div class="workdir-history-list">
+                  <div
+                    v-for="path in filteredWorkdirHistory" :key="path"
+                    class="workdir-history-item"
+                    @click="switchToWorkdir(path)"
+                    :title="path"
+                  >
+                    <span class="workdir-history-path">{{ path }}</span>
+                    <button class="workdir-history-delete" @click.stop="removeFromWorkdirHistory(path)" title="Remove from history">
+                      <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
