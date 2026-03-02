@@ -3,21 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AgentLink — Claude Code in Your Browser</title>
-<meta name="description" content="Run Claude Code on your local machine, access it from any browser. End-to-end encrypted, zero config, self-hostable. Install with npm and start coding in seconds.">
-<meta name="keywords" content="Claude Code, browser IDE, remote coding, AI coding assistant, AgentLink, end-to-end encrypted, self-hosted">
+<title>AgentLink — Remote Control for Claude Code</title>
+<meta name="description" content="Start Claude Code on your machine, walk away, and control it from your phone or any browser. End-to-end encrypted, zero config. npm install and go.">
+<meta name="keywords" content="Claude Code, remote control, browser IDE, AI coding assistant, AgentLink, end-to-end encrypted, self-hosted, mobile coding">
 <link rel="canonical" href="https://msclaude.ai/">
 <!-- Open Graph -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="AgentLink — Claude Code in Your Browser">
-<meta property="og:description" content="Run Claude Code on your local machine, access it from any browser. End-to-end encrypted, zero config, self-hostable.">
+<meta property="og:title" content="AgentLink — Remote Control for Claude Code">
+<meta property="og:description" content="Start Claude Code on your machine, walk away, and control it from your phone or any browser. End-to-end encrypted, zero config.">
 <meta property="og:url" content="https://msclaude.ai/">
 <meta property="og:image" content="https://msclaude.ai/iPad.png">
 <meta property="og:site_name" content="AgentLink">
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="AgentLink — Claude Code in Your Browser">
-<meta name="twitter:description" content="Run Claude Code on your local machine, access it from any browser. End-to-end encrypted, zero config.">
+<meta name="twitter:title" content="AgentLink — Remote Control for Claude Code">
+<meta name="twitter:description" content="Start Claude Code on your machine, walk away, and control it from your phone or any browser. End-to-end encrypted, zero config.">
 <meta name="twitter:image" content="https://msclaude.ai/iPad.png">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <script type="application/ld+json">
@@ -25,7 +25,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "AgentLink",
-  "description": "Run Claude Code on your local machine, access it from any browser. End-to-end encrypted, zero config, self-hostable.",
+  "description": "Start Claude Code on your machine, walk away, and control it from your phone or any browser. End-to-end encrypted, zero config.",
   "url": "https://msclaude.ai/",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Windows, macOS, Linux",
@@ -85,8 +85,8 @@
   /* ── Hero ── */
   .hero {
     text-align: center;
-    padding: 3.5rem 2rem 3rem;
-    max-width: 800px;
+    padding: 3.5rem 2rem 2rem;
+    max-width: 820px;
     margin: 0 auto;
   }
 
@@ -109,8 +109,20 @@
   .hero p {
     font-size: 1.15rem;
     color: var(--text-dim);
-    max-width: 550px;
-    margin: 0 auto 1.5rem;
+    max-width: 620px;
+    margin: 0 auto 0.75rem;
+  }
+
+  .hero p strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .hero-sub {
+    font-size: 1rem !important;
+    color: var(--text-dim);
+    max-width: 580px;
+    margin: 0 auto;
   }
 
   /* ── Install box ── */
@@ -120,7 +132,7 @@
     border-radius: 12px;
     padding: 2rem 2.5rem;
     max-width: 600px;
-    margin: 0 auto 4rem;
+    margin: 2.5rem auto 4rem;
     text-align: left;
   }
 
@@ -191,87 +203,10 @@
     text-align: center;
   }
 
-  /* ── Features ── */
-  .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
-    max-width: 1000px;
-    margin: 0 auto 5rem;
-    padding: 0 2rem;
-  }
-
-  .feature {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.5rem;
-  }
-
-  .feature-icon {
-    font-size: 1.5rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .feature h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-  }
-
-  .feature p {
-    font-size: 0.9rem;
-    color: var(--text-dim);
-    line-height: 1.5;
-  }
-
-  /* ── How it works ── */
-  .how {
-    text-align: center;
-    max-width: 800px;
-    margin: 0 auto 5rem;
-    padding: 0 2rem;
-  }
-
-  .how h2 {
-    font-size: 1.8rem;
-    font-weight: 700;
-    margin-bottom: 2rem;
-  }
-
-  .how p {
-    color: var(--text-dim);
-    font-size: 0.95rem;
-  }
-
-  /* ── Footer ── */
-  footer {
-    text-align: center;
-    padding: 2rem;
-    color: var(--text-dim);
-    font-size: 0.85rem;
-    border-top: 1px solid var(--border);
-  }
-
-  footer a { color: var(--accent); text-decoration: none; }
-  footer a:hover { text-decoration: underline; }
-
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-    white-space: nowrap;
-    border: 0;
-  }
-
   /* ── Device Showcase ── */
   .showcase {
     max-width: 900px;
-    margin: 0 auto 3.5rem;
+    margin: 0 auto 4rem;
     padding: 0 2rem;
     position: relative;
     display: flex;
@@ -313,7 +248,6 @@
       0 10px 40px rgba(0,0,0,0.35);
   }
 
-  /* Subtle glow behind devices */
   .showcase::before {
     content: '';
     position: absolute;
@@ -327,12 +261,131 @@
     z-index: 0;
   }
 
+  /* ── Workflow ── */
+  .workflow {
+    max-width: 800px;
+    margin: 0 auto 5rem;
+    padding: 0 2rem;
+  }
+
+  .workflow h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .workflow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .workflow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .workflow-step .step-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    width: 2rem;
+    text-align: center;
+    padding-top: 0.1rem;
+  }
+
+  .workflow-step h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+
+  .workflow-step p {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .workflow-step code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.85rem;
+    color: var(--green);
+    background: #1a1a2e;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+  }
+
+  /* ── Features ── */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    max-width: 1000px;
+    margin: 0 auto 5rem;
+    padding: 0 2rem;
+  }
+
+  .feature {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+
+  .feature-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .feature h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature p {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   @media (max-width: 640px) {
-    .hero { padding: 2rem 1.5rem 2rem; }
-    .install { padding: 1.5rem; margin: 0 1rem 3rem; }
+    .hero { padding: 2rem 1.5rem 1.5rem; }
+    .install { padding: 1.5rem; margin: 2rem 1rem 3rem; }
     .showcase { margin-bottom: 3rem; }
     .device-ipad { width: 78%; }
     .device-iphone { width: 26%; margin-left: -10%; border-radius: 16px; }
+    .workflow-step { flex-direction: column; gap: 0.75rem; }
+    .workflow-step .step-icon { width: auto; }
   }
 </style>
 </head>
@@ -349,8 +402,9 @@
 
 <main>
 <section class="hero">
-  <h1>Claude Code,<br><em>in your browser</em></h1>
-  <p>Run Claude Code on your machine, use it from any browser.</p>
+  <h1>Start a task. Walk away.<br><em>Control it from your phone.</em></h1>
+  <p>Run Claude Code on your machine, then <strong>pick up where you left off from any browser</strong> &mdash; your phone, your tablet, another laptop. No VPN, no SSH, no port forwarding.</p>
+  <p class="hero-sub">One command. One URL. End-to-end encrypted.</p>
 </section>
 
 <section class="showcase">
@@ -363,7 +417,7 @@
 </section>
 
 <section class="install">
-  <div class="install-label">Get started</div>
+  <div class="install-label">Get started in 30 seconds</div>
   <div class="install-step">
     <div class="step-num">1</div>
     <div class="install-cmd" onclick="copyCmd(this)">
@@ -381,43 +435,72 @@
   <div class="install-note">Open the URL it prints. That's it.</div>
 </section>
 
+<section class="workflow">
+  <h2>How it works</h2>
+  <div class="workflow-steps">
+    <div class="workflow-step">
+      <div class="step-icon">&#128187;</div>
+      <div>
+        <h3>Start the agent on your dev machine</h3>
+        <p>Run <code>agentlink-client start -D</code> in your project directory. It prints a URL like <code>https://msclaude.ai/s/abc123</code>.</p>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <div class="step-icon">&#128274;</div>
+      <div>
+        <h3>The relay encrypts everything</h3>
+        <p>Your messages and code travel through the relay server, but it can't read any of it. All traffic is end-to-end encrypted with XSalsa20-Poly1305. The server is a stateless, blind forwarder.</p>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <div class="step-icon">&#128241;</div>
+      <div>
+        <h3>Open the URL on any device</h3>
+        <p>Your phone, a tablet, a colleague's laptop &mdash; any browser works. Kick off a refactoring task from your desk, then monitor progress from the couch.</p>
+      </div>
+    </div>
+    <div class="workflow-step">
+      <div class="step-icon">&#128260;</div>
+      <div>
+        <h3>Pick up where you left off</h3>
+        <p>Full session history from Claude Code's own logs. Resume any past conversation, switch projects, change working directories &mdash; all from the browser.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="features">
   <h2 class="sr-only">Features</h2>
   <div class="feature">
     <div class="feature-icon">&#9889;</div>
     <h3>Zero config</h3>
-    <p>Install, start, open the URL. No accounts, no setup, no configuration files needed.</p>
+    <p>Install, start, open the URL. No accounts, no registration, no configuration files.</p>
   </div>
   <div class="feature">
     <div class="feature-icon">&#128274;</div>
-    <h3>Privacy first</h3>
-    <p>All messages are end-to-end encrypted. The relay server cannot read, store, or log any of your conversations or code. It's a blind forwarder.</p>
-  </div>
-  <div class="feature">
-    <div class="feature-icon">&#127760;</div>
-    <h3>Access anywhere</h3>
-    <p>Use Claude Code from your phone, tablet, or any device with a browser. Share the URL with teammates.</p>
+    <h3>Optional password protection</h3>
+    <p>Add <code style="color:var(--green)">--password</code> to lock your session. Brute-force protection built in.</p>
   </div>
   <div class="feature">
     <div class="feature-icon">&#128196;</div>
     <h3>Full Claude Code</h3>
-    <p>File editing, bash commands, search, multi-turn conversations, session history — everything Claude Code can do.</p>
+    <p>File editing, bash commands, search, multi-turn conversations &mdash; everything Claude Code can do, in your browser.</p>
   </div>
   <div class="feature">
-    <div class="feature-icon">&#128260;</div>
-    <h3>Session history</h3>
-    <p>Browse and resume any past conversation from any working directory. Switch projects without losing context.</p>
+    <div class="feature-icon">&#127760;</div>
+    <h3>Works on any device</h3>
+    <p>Responsive UI for phones, tablets, and desktops. Use Claude Code from anywhere with a browser.</p>
+  </div>
+  <div class="feature">
+    <div class="feature-icon">&#128640;</div>
+    <h3>Auto-updates</h3>
+    <p>The agent checks for updates and self-upgrades in daemon mode. Always on the latest version.</p>
   </div>
   <div class="feature">
     <div class="feature-icon">&#128679;</div>
     <h3>Self-hostable</h3>
     <p>Run your own relay server with <code style="color:var(--green)">@agent-link/server</code>. Full control over your infrastructure.</p>
   </div>
-</section>
-
-<section class="how">
-  <h2>How it works</h2>
-  <p>The agent on your machine spawns Claude Code, streams output through the relay server to your browser, and sends your messages back. All tool execution happens locally. <strong>All traffic is end-to-end encrypted — the server is a stateless relay that never decrypts, stores, or logs your data.</strong></p>
 </section>
 </main>
 
