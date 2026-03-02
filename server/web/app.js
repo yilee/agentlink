@@ -240,7 +240,7 @@ const App = {
     const messageCount = computed(() => messages.value.length);
     watch(messageCount, () => { nextTick(scheduleHighlight); });
 
-    watch(agentName, (name) => {
+    watch(hostname, (name) => {
       document.title = name ? `${name} — AgentLink` : 'AgentLink';
     });
 
