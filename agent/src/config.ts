@@ -42,6 +42,12 @@ export function saveConfig(partial: Partial<AgentConfig>): void {
   ensureConfigDir();
   const existing = loadConfig();
   const merged = { ...existing, ...partial };
+  // Remove keys explicitly set to undefined (e.g. clearing password)
+  for (const key of Object.keys(merged)) {
+    if ((merged as Record<string, unknown>)[key] === undefined) {
+      delete (merged as Record<string, unknown>)[key];
+    }
+  }
   writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
 }
 

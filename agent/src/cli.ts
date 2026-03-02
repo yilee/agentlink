@@ -38,12 +38,15 @@ program
   .option('-p, --password <password>', 'Session password (clients must authenticate)')
   .option('--no-auto-update', 'Disable automatic update checks')
   .action(async (options) => {
-    const config = resolveConfig(options);
-
     // Persist password to config file so auto-update restarts preserve it
+    // If --password not passed, clear any saved password so session is unprotected
     if (options.password) {
       saveConfig({ password: options.password });
+    } else {
+      saveConfig({ password: undefined });
     }
+
+    const config = resolveConfig(options);
 
     if (options.daemon) {
       // Check if agent is already running
