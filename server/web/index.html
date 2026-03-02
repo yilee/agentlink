@@ -6,11 +6,11 @@
   <title>AgentLink</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/style.css">
-  <link id="hljs-theme" rel="stylesheet" href="/vendor/github-dark.min.css">
+  <link id="hljs-theme" rel="stylesheet" href="/vendor/github.min.css">
   <script>
     // Apply saved theme immediately to prevent flash
     (function() {
-      var t = localStorage.getItem('agentlink-theme') || 'dark';
+      var t = localStorage.getItem('agentlink-theme') || 'light';
       document.documentElement.setAttribute('data-theme', t);
       var link = document.getElementById('hljs-theme');
       if (link) link.href = t === 'light'

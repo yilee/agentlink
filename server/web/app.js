@@ -81,7 +81,7 @@ const App = {
     const dragOver = ref(false);
 
     // Theme
-    const theme = ref(localStorage.getItem('agentlink-theme') || 'dark');
+    const theme = ref(localStorage.getItem('agentlink-theme') || 'light');
     function applyTheme() {
       document.documentElement.setAttribute('data-theme', theme.value);
       const link = document.getElementById('hljs-theme');
