@@ -35,9 +35,9 @@
 
 /* ── Light theme ── */
 [data-theme="light"] {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #e9ecef;
+  --bg-primary: #fefcf8;
+  --bg-secondary: #f5f3ef;
+  --bg-tertiary: #e8e6e1;
   --text-primary: #1a1a1a;
   --text-secondary: #4b5563;
   --accent: #2563eb;
