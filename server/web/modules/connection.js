@@ -145,6 +145,7 @@ export function createConnection(deps) {
           hostname.value = msg.agent.hostname || '';
           workDir.value = msg.agent.workDir;
           agentVersion.value = msg.agent.version || '';
+          sidebar.addToWorkDirHistory(msg.agent.workDir);
           const savedDir = localStorage.getItem('agentlink-workdir');
           if (savedDir && savedDir !== msg.agent.workDir) {
             wsSend({ type: 'change_workdir', workDir: savedDir });
@@ -341,6 +342,7 @@ export function createConnection(deps) {
       } else if (msg.type === 'workdir_changed') {
         workDir.value = msg.workDir;
         localStorage.setItem('agentlink-workdir', msg.workDir);
+        sidebar.addToWorkDirHistory(msg.workDir);
         messages.value = [];
         toolMsgMap.clear();
         visibleLimit.value = 50;

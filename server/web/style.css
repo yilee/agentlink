@@ -1543,6 +1543,79 @@ body {
   cursor: not-allowed;
 }
 
+.sidebar-workdir-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* ── Workdir history dropdown ── */
+.workdir-history-dropdown {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.workdir-history-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s;
+  gap: 4px;
+}
+
+.workdir-history-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.workdir-history-item.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.workdir-history-item + .workdir-history-item {
+  border-top: 1px solid var(--border);
+}
+
+.workdir-history-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workdir-history-remove {
+  flex-shrink: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.workdir-history-item:hover .workdir-history-remove {
+  display: flex;
+}
+
+.workdir-history-remove:hover {
+  color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* ── Folder Picker Modal ── */
 .folder-picker-overlay {
   position: fixed;

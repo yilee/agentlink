@@ -68,6 +68,10 @@ const App = {
     const deleteConfirmOpen = ref(false);
     const deleteConfirmTitle = ref('');
 
+    // Working directory history state
+    const workDirHistory = ref([]);
+    const workDirHistoryOpen = ref(false);
+
     // File attachment state
     const attachments = ref([]);
     const fileInputRef = ref(null);
@@ -141,6 +145,7 @@ const App = {
       folderPickerOpen, folderPickerPath, folderPickerEntries,
       folderPickerLoading, folderPickerSelected, streaming,
       deleteConfirmOpen, deleteConfirmTitle,
+      workDirHistory, workDirHistoryOpen,
     });
 
     const { connect, wsSend, closeWs } = createConnection({
@@ -278,6 +283,11 @@ const App = {
       deleteSession: sidebar.deleteSession,
       confirmDeleteSession: sidebar.confirmDeleteSession,
       cancelDeleteSession: sidebar.cancelDeleteSession,
+      // Working directory history
+      workDirHistory, workDirHistoryOpen,
+      selectWorkDirHistory: sidebar.selectWorkDirHistory,
+      removeWorkDirHistory: sidebar.removeWorkDirHistory,
+      toggleWorkDirHistory: sidebar.toggleWorkDirHistory,
       // File attachments
       attachments, fileInputRef, dragOver,
       triggerFileInput: fileAttach.triggerFileInput,
@@ -335,11 +345,33 @@ const App = {
               </div>
               <div class="sidebar-workdir-header">
                 <div class="sidebar-workdir-label">Working Directory</div>
-                <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory" :disabled="isProcessing">
-                  <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                </button>
+                <div class="sidebar-workdir-actions">
+                  <button class="sidebar-change-dir-btn" @click="toggleWorkDirHistory" title="Recent directories" :disabled="isProcessing" v-if="workDirHistory.length > 1">
+                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                  </button>
+                  <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory" :disabled="isProcessing">
+                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                  </button>
+                </div>
               </div>
               <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
+              <!-- Workdir history dropdown -->
+              <div v-if="workDirHistoryOpen && workDirHistory.length > 1" class="workdir-history-dropdown">
+                <div
+                  v-for="dir in workDirHistory" :key="dir"
+                  :class="['workdir-history-item', { active: dir === workDir }]"
+                  @click="selectWorkDirHistory(dir)"
+                  :title="dir"
+                >
+                  <span class="workdir-history-path">{{ dir }}</span>
+                  <button
+                    v-if="dir !== workDir"
+                    class="workdir-history-remove"
+                    @click.stop="removeWorkDirHistory(dir)"
+                    title="Remove from history"
+                  >&times;</button>
+                </div>
+              </div>
             </div>
           </div>
 

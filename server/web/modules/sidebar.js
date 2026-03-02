@@ -31,6 +31,44 @@ export function createSidebar(deps) {
     folderPickerLoading, folderPickerSelected, streaming,
   } = deps;
 
+  // ── Working directory history ──
+
+  const WORKDIR_HISTORY_KEY = 'agentlink-workdir-history';
+  const MAX_HISTORY = 10;
+  const workDirHistory = deps.workDirHistory;
+  const workDirHistoryOpen = deps.workDirHistoryOpen;
+
+  // Load from localStorage on init
+  try {
+    const saved = localStorage.getItem(WORKDIR_HISTORY_KEY);
+    if (saved) workDirHistory.value = JSON.parse(saved);
+  } catch { /* ignore */ }
+
+  function addToWorkDirHistory(dir) {
+    if (!dir) return;
+    const list = workDirHistory.value.filter(d => d !== dir);
+    list.unshift(dir);
+    if (list.length > MAX_HISTORY) list.length = MAX_HISTORY;
+    workDirHistory.value = list;
+    localStorage.setItem(WORKDIR_HISTORY_KEY, JSON.stringify(list));
+  }
+
+  function selectWorkDirHistory(dir) {
+    workDirHistoryOpen.value = false;
+    if (dir === workDir.value) return;
+    wsSend({ type: 'change_workdir', workDir: dir });
+  }
+
+  function removeWorkDirHistory(dir) {
+    const list = workDirHistory.value.filter(d => d !== dir);
+    workDirHistory.value = list;
+    localStorage.setItem(WORKDIR_HISTORY_KEY, JSON.stringify(list));
+  }
+
+  function toggleWorkDirHistory() {
+    workDirHistoryOpen.value = !workDirHistoryOpen.value;
+  }
+
   // ── Session management ──
 
   function requestSessionList() {
@@ -207,6 +245,7 @@ export function createSidebar(deps) {
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
     deleteSession, confirmDeleteSession, cancelDeleteSession,
+    addToWorkDirHistory, selectWorkDirHistory, removeWorkDirHistory, toggleWorkDirHistory,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
     groupedSessions,
