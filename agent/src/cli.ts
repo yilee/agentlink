@@ -40,6 +40,11 @@ program
   .action(async (options) => {
     const config = resolveConfig(options);
 
+    // Persist password to config file so auto-update restarts preserve it
+    if (options.password) {
+      saveConfig({ password: options.password });
+    }
+
     if (options.daemon) {
       // Check if agent is already running
       const existing = loadRuntimeState();

@@ -1,6 +1,6 @@
 {
   "name": "@agent-link/server",
-  "version": "0.1.71",
+  "version": "0.1.72",
   "description": "AgentLink relay server",
   "type": "module",
   "main": "dist/index.js",

@@ -86,8 +86,8 @@ const App = {
       document.documentElement.setAttribute('data-theme', theme.value);
       const link = document.getElementById('hljs-theme');
       if (link) link.href = theme.value === 'light'
-        ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css'
-        : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+        ? '/vendor/github.min.css'
+        : '/vendor/github-dark.min.css';
     }
     function toggleTheme() {
       theme.value = theme.value === 'dark' ? 'light' : 'dark';
