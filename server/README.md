@@ -1,5 +1,8 @@
 # AgentLink Server
 
+[![npm](https://img.shields.io/npm/v/@agent-link/server)](https://www.npmjs.com/package/@agent-link/server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Relay server for [AgentLink](https://github.com/yilee/agentlink) — use Claude Code from any browser.
 
 AgentLink lets you run Claude Code on your local machine and access it through a web interface. The server acts as an encrypted WebSocket relay between your browser and the local agent. No data is stored on the server.

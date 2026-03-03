@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "description": "Local agent that proxies a working directory to a cloud web interface",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yilee/agentlink.git"
+  },
+  "homepage": "https://github.com/yilee/agentlink",
+  "bugs": {
+    "url": "https://github.com/yilee/agentlink/issues"
+  },
   "type": "module",
   "workspaces": [
     "server",

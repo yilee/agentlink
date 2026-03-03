@@ -2,6 +2,17 @@
   "name": "@agent-link/server",
   "version": "0.1.84",
   "description": "AgentLink relay server",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yilee/agentlink.git",
+    "directory": "server"
+  },
+  "homepage": "https://github.com/yilee/agentlink",
+  "bugs": {
+    "url": "https://github.com/yilee/agentlink/issues"
+  },
+  "keywords": ["agentlink", "claude", "claude-code", "relay", "websocket", "ai-agent"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

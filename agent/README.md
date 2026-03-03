@@ -1,5 +1,8 @@
 # AgentLink Client
 
+[![npm](https://img.shields.io/npm/v/@agent-link/agent)](https://www.npmjs.com/package/@agent-link/agent)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Local agent CLI for [AgentLink](https://github.com/yilee/agentlink) — use Claude Code from any browser.
 
 AgentLink lets you run Claude Code on your local machine and access it through a web interface. The client runs on your dev machine, connects to a relay server, and gives you a URL to open in any browser.
