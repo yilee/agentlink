@@ -328,7 +328,7 @@ body {
   color: var(--text-primary);
 }
 .workdir-history-delete {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 18px;
@@ -341,9 +341,10 @@ body {
   padding: 0;
   flex-shrink: 0;
   transition: color 0.15s, background 0.15s;
+  visibility: hidden;
 }
 .workdir-history-item:hover .workdir-history-delete {
-  display: flex;
+  visibility: visible;
 }
 .workdir-history-delete:hover {
   color: var(--error);
@@ -511,13 +512,14 @@ body {
 }
 
 .session-actions {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 2px;
+  visibility: hidden;
 }
 
 .session-item:hover .session-actions {
-  display: flex;
+  visibility: visible;
 }
 
 .session-delete-btn {
