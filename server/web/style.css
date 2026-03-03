@@ -61,8 +61,7 @@ body {
 }
 
 #app {
-  position: fixed;
-  inset: 0;
+  height: 100%;
 }
 
 /* ── Layout ── */
@@ -464,8 +463,10 @@ body {
 }
 
 .session-list {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -787,8 +788,10 @@ body {
 
 /* ── Message list ── */
 .message-list {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
   padding: 1.5rem 1.5rem 1rem;
   display: flex;
   flex-direction: column;
