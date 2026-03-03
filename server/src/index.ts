@@ -1,6 +1,7 @@
 import express from 'express';
 import { createServer } from 'http';
 import { createRequire } from 'module';
+import { readFileSync } from 'fs';
 import { WebSocket, WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -15,6 +16,14 @@ const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 const startedAt = new Date();
 
+// Build versioned index.html at startup (cache-busting for browsers like iPhone Safari)
+const versionTag = `v=${pkg.version}`;
+const indexHtml = readFileSync(join(__dirname, '../web/index.html'), 'utf-8')
+  // Version-stamp local asset URLs in src="..." and href="..." attributes
+  .replace(/((?:src|href)\s*=\s*")(\/(?!\/)[^"?]+\.(?:js|css))(")/g, `$1$2?${versionTag}$3`)
+  // Version-stamp JS string literals referencing local .css/.js paths (e.g. theme switching)
+  .replace(/(')(\/(?!\/)[^'?]+\.(?:js|css))(')/g, `$1$2?${versionTag}$3`);
+
 const PORT = parseInt(process.env.PORT || '3456', 10);
 
 const app = express();
@@ -28,6 +37,16 @@ app.get('/', (_req, res) => {
   res.sendFile(join(webDir, 'landing.html'));
 });
 
+// Serve versioned index.html with no-store (cache-busting for browsers like iPhone Safari)
+const sendIndexHtml = (_req: express.Request, res: express.Response) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(indexHtml);
+};
+
+// Intercept /index.html before express.static to ensure versioned HTML is served
+app.get('/index.html', sendIndexHtml);
+
 // Serve static assets from web/ with no-cache for JS/CSS (ensures updates are picked up)
 app.use(express.static(webDir, {
   setHeaders(res, filePath) {
@@ -37,10 +56,8 @@ app.use(express.static(webDir, {
   },
 }));
 
-// SPA fallback: /s/:sessionId → serve index.html (Vue router handles the rest)
-app.get('/s/:sessionId', (_req, res) => {
-  res.sendFile(join(webDir, 'index.html'));
-});
+// SPA fallback: /s/:sessionId → serve versioned index.html
+app.get('/s/:sessionId', sendIndexHtml);
 
 // Health check
 app.get('/api/health', (_req, res) => {
