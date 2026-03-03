@@ -50,12 +50,14 @@
   --code-header-bg: #e9ecef;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  min-height: 100vh;
-  min-height: 100dvh;
-  overscroll-behavior: none;
+  height: 100%;
 }
 
 #app {
@@ -157,6 +159,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  min-height: 0;
 }
 
 .status-card {
@@ -365,6 +368,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 .sidebar-version-footer {
@@ -465,6 +469,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .session-group {
@@ -787,6 +793,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .message-list-inner {
