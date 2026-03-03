@@ -44,6 +44,10 @@ export const authAttempts = new Map<string, AuthAttemptState>();
 // Pending auth: clientId → sessionId (web clients awaiting password verification)
 export const pendingAuth = new Map<string, string>();
 
+// Session auth: sessionId → { passwordHash, passwordSalt }
+// Persists across agent disconnects so web clients can still be required to authenticate
+export const sessionAuth = new Map<string, { passwordHash: string; passwordSalt: string }>();
+
 // Server secret for HMAC auth tokens (generated fresh on each server start)
 export const serverSecret = randomBytes(32);
 

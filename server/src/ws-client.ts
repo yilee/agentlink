@@ -7,6 +7,7 @@ import {
   sessionToAgent,
   webClients,
   pendingAuth,
+  sessionAuth,
   type AgentSession,
   type WebClient,
 } from './context.js';
@@ -39,13 +40,16 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   const agentId = sessionToAgent.get(sessionId);
   const agent = agentId ? agents.get(agentId) : undefined;
 
-  // Password-protected session?
-  const requiresAuth = !!(agent?.passwordHash && agent?.passwordSalt);
+  // Password-protected session? Check persistent sessionAuth (survives agent disconnects)
+  const auth = sessionAuth.get(sessionId);
+  const requiresAuth = !!(auth?.passwordHash && auth?.passwordSalt);
 
   if (requiresAuth) {
     // Check saved auth token first
     if (authToken && verifyAuthToken(authToken, sessionId)) {
-      completeConnection(ws, clientId, sessionId, agent);
+      // Refresh the token so it doesn't expire during long sessions
+      const refreshedToken = generateAuthToken(sessionId);
+      completeConnection(ws, clientId, sessionId, agent, refreshedToken);
       return;
     }
 
@@ -94,9 +98,10 @@ function handlePendingAuthMessage(clientId: string, ws: WebSocket, raw: string):
 
   const agentId = sessionToAgent.get(sessionId);
   const agent = agentId ? agents.get(agentId) : undefined;
+  const auth = sessionAuth.get(sessionId);
 
-  if (!agent?.passwordHash || !agent?.passwordSalt) {
-    // Agent disconnected or password removed while authenticating
+  if (!auth?.passwordHash || !auth?.passwordSalt) {
+    // Password removed while authenticating
     ws.send(JSON.stringify({ type: 'error', message: 'Session no longer available.' }));
     pendingAuth.delete(clientId);
     ws.close();
@@ -114,7 +119,7 @@ function handlePendingAuthMessage(clientId: string, ws: WebSocket, raw: string):
     return;
   }
 
-  const valid = verifyPassword(msg.password, agent.passwordHash, agent.passwordSalt);
+  const valid = verifyPassword(msg.password, auth.passwordHash, auth.passwordSalt);
 
   if (!valid) {
     const { locked, remaining } = recordFailure(sessionId);

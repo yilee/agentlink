@@ -208,6 +208,7 @@ export function createConnection(deps) {
         isProcessing.value = false;
         isCompacting.value = false;
         queuedMessages.value = [];
+        loadingSessions.value = false;
       } else if (msg.type === 'agent_reconnected') {
         status.value = 'Connected';
         error.value = '';
@@ -231,6 +232,7 @@ export function createConnection(deps) {
         scrollToBottom();
         isProcessing.value = false;
         isCompacting.value = false;
+        loadingSessions.value = false;
         _dequeueNext();
       } else if (msg.type === 'claude_output') {
         handleClaudeOutput(msg, scheduleHighlight);
@@ -417,6 +419,8 @@ export function createConnection(deps) {
       isProcessing.value = false;
       isCompacting.value = false;
       queuedMessages.value = [];
+      loadingSessions.value = false;
+      loadingHistory.value = false;
 
       // Don't auto-reconnect if auth-locked or still in auth prompt
       if (authLocked.value || authRequired.value) return;

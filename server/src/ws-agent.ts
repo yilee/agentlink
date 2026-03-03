@@ -6,6 +6,7 @@ import {
   sessionToAgent,
   webClients,
   generateSessionId,
+  sessionAuth,
   type AgentSession,
 } from './context.js';
 import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
@@ -51,6 +52,11 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
 
   agents.set(agentId, agent);
   sessionToAgent.set(sessionId, agentId);
+
+  // Persist password auth per session so it survives agent disconnects
+  if (passwordHash && passwordSalt) {
+    sessionAuth.set(sessionId, { passwordHash, passwordSalt });
+  }
 
   console.log(`[Agent] Registered: ${name} (${agentId}), session: ${sessionId}${requestedSessionId ? ' (reconnect)' : ''}${passwordHash ? ' (password protected)' : ''}`);
 
