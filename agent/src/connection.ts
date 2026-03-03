@@ -71,7 +71,7 @@ function doConnect(
   onError: (err: Error) => void,
 ): void {
   const wsUrl = buildWsUrl(config);
-  console.log(`[AgentLink] Connecting to ${config.server}...`);
+  console.log(`[AgentLink] Connecting to ${config.server}...${state.sessionId ? ` (session: ${state.sessionId})` : ''}`);
 
   const ws = new WebSocket(wsUrl);
   state.ws = ws;
@@ -102,8 +102,9 @@ function doConnect(
       if (!settled) {
         settled = true;
         onRegistered(state.sessionId);
-      } else if (previousSessionId && previousSessionId !== newSessionId) {
-        // Session ID changed on reconnect — update runtime state so status/URL stay correct
+      }
+      // Always check for session ID changes and update runtime state
+      if (previousSessionId && previousSessionId !== newSessionId) {
         console.warn(`[AgentLink] Session ID changed: ${previousSessionId} → ${newSessionId}`);
         const prev = loadRuntimeState();
         if (prev) {
@@ -176,6 +177,8 @@ function buildWsUrl(config: AgentConfig): string {
   // On reconnect, send previous sessionId so the URL stays valid
   if (state.sessionId) {
     params.set('sessionId', state.sessionId);
+  } else {
+    console.warn('[AgentLink] No sessionId to send on reconnect — server will assign a new one');
   }
   // Send password if configured (server will hash it)
   if (config.password) {

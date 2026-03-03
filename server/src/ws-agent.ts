@@ -33,6 +33,9 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   // Reuse requested sessionId (agent reconnecting) or generate a new one
   const requestedSessionId = url.searchParams.get('sessionId');
   const sessionId = requestedSessionId || generateSessionId();
+  if (!requestedSessionId) {
+    console.log(`[Agent] No sessionId in query params for ${name} — generated new: ${sessionId}`);
+  }
   const sessionKey = generateSessionKey();
 
   const agent: AgentSession = {
