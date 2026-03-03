@@ -197,19 +197,7 @@ program
     const daemonAlive = wasRunning && isProcessAlive(wasRunning.pid);
     const port = wasRunning?.port;
 
-    // Stop daemon if running
-    if (daemonAlive) {
-      console.log(`Stopping server (PID ${wasRunning!.pid})...`);
-      killProcess(wasRunning!.pid);
-      for (let i = 0; i < 25; i++) {
-        await new Promise(r => setTimeout(r, 200));
-        if (!isProcessAlive(wasRunning!.pid)) break;
-      }
-      clearServerRuntimeState();
-      console.log('Server stopped.');
-    }
-
-    // Install latest version
+    // Install latest version FIRST (while old process is still running)
     console.log(`Installing @agent-link/server@${latestVersion}...`);
     try {
       execSync('npm install -g @agent-link/server@latest', { stdio: 'inherit' });
@@ -220,17 +208,24 @@ program
 
     console.log(`Upgraded: v${currentVersion} → v${latestVersion}`);
 
-    // Restart daemon if it was running — use the newly installed binary
+    // Stop daemon if running, then restart with new binary
     if (daemonAlive) {
+      console.log(`Stopping server (PID ${wasRunning!.pid})...`);
+      killProcess(wasRunning!.pid);
+      for (let i = 0; i < 25; i++) {
+        await new Promise(r => setTimeout(r, 200));
+        if (!isProcessAlive(wasRunning!.pid)) break;
+      }
+      clearServerRuntimeState();
+      console.log('Server stopped.');
+
       console.log('Restarting server...');
       const portArg = port ? ` --port ${port}` : '';
       try {
-        // Resolve the new binary path from npm global prefix to avoid stale shell cache
         const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
         const newBin = join(npmPrefix, 'bin', 'agentlink-server');
         execSync(`"${newBin}" start --daemon${portArg}`, { stdio: 'inherit' });
       } catch {
-        // Fallback to PATH-based command
         try {
           execSync(`agentlink-server start --daemon${portArg}`, { stdio: 'inherit' });
         } catch {

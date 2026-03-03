@@ -290,21 +290,7 @@ program
     const wasRunning = loadRuntimeState();
     const daemonAlive = wasRunning && isProcessAlive(wasRunning.pid);
 
-    // Stop daemon if running
-    if (daemonAlive) {
-      console.log(`Stopping agent (PID ${wasRunning!.pid})...`);
-      killProcess(wasRunning!.pid);
-      // Wait for exit
-      for (let i = 0; i < 25; i++) {
-        await new Promise(r => setTimeout(r, 200));
-        if (!isProcessAlive(wasRunning!.pid)) break;
-      }
-      // Don't clear runtime state — new process reads sessionId from agent.json
-      // to preserve the session URL across upgrades
-      console.log('Agent stopped.');
-    }
-
-    // Install latest version
+    // Install latest version FIRST (while old process is still running)
     console.log(`Installing @agent-link/agent@${latestVersion}...`);
     try {
       execSync(`npm install -g @agent-link/agent@${latestVersion}`, { stdio: 'inherit' });
@@ -315,18 +301,26 @@ program
 
     console.log(`Upgraded: v${currentVersion} → v${latestVersion}`);
 
-    // Restart daemon if it was running — use the newly installed binary
+    // Stop daemon if running, then restart with new binary
     if (daemonAlive) {
+      console.log(`Stopping agent (PID ${wasRunning!.pid})...`);
+      killProcess(wasRunning!.pid);
+      for (let i = 0; i < 25; i++) {
+        await new Promise(r => setTimeout(r, 200));
+        if (!isProcessAlive(wasRunning!.pid)) break;
+      }
+      // Don't clear runtime state — new process reads sessionId from agent.json
+      // to preserve the session URL across upgrades
+      console.log('Agent stopped.');
+
       console.log('Restarting agent...');
       try {
-        // Resolve the new binary path from npm global prefix to avoid stale shell cache
         const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
         const newBin = process.platform === 'win32'
           ? join(npmPrefix, 'agentlink-client.cmd')
           : join(npmPrefix, 'bin', 'agentlink-client');
         execSync(`"${newBin}" start --daemon`, { stdio: 'inherit' });
       } catch {
-        // Fallback to PATH-based command
         try {
           execSync('agentlink-client start --daemon', { stdio: 'inherit' });
         } catch {
