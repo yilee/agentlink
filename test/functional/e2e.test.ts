@@ -435,3 +435,316 @@ describe('Functional: Session Password Auth', () => {
     }
   });
 });
+
+// ── Chat Message Flow ──
+
+describe('Functional: Chat Message Flow', () => {
+  it('sends a chat message and receives streamed response with tool use', async () => {
+    const agent = await connectMockAgentEncrypted('ChatAgent', '/chat-test');
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume the list_sessions request
+      await agent.waitForMessage((m) => m.type === 'list_sessions');
+      agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/chat-test' });
+
+      // Type and send a user message
+      await page.fill('textarea', 'Hello, Claude!');
+      await page.click('.send-btn');
+
+      // Agent should receive the chat message
+      const chatMsg = await agent.waitForMessage((m) => m.type === 'chat');
+      expect(chatMsg.prompt).toBe('Hello, Claude!');
+
+      // User message should appear in the UI
+      await page.waitForSelector('.user-bubble', { timeout: 3000 });
+      const userText = await page.textContent('.user-bubble');
+      expect(userText).toContain('Hello, Claude!');
+
+      // Simulate Claude streaming text response
+      agent.sendEncrypted({
+        type: 'claude_output',
+        data: { type: 'content_block_delta', delta: 'Hello! How can I ' },
+      });
+      agent.sendEncrypted({
+        type: 'claude_output',
+        data: { type: 'content_block_delta', delta: 'help you today?' },
+      });
+
+      // Simulate a tool use
+      agent.sendEncrypted({
+        type: 'claude_output',
+        data: {
+          type: 'tool_use',
+          tools: [{ id: 'tool_1', name: 'Read', input: { file_path: '/test/file.txt' } }],
+        },
+      });
+
+      // Wait for tool block to appear
+      await page.waitForSelector('.tool-line', { timeout: 5000 });
+      const toolText = await page.textContent('.tool-name');
+      expect(toolText).toContain('Read');
+
+      // Simulate tool result
+      agent.sendEncrypted({
+        type: 'claude_output',
+        data: {
+          type: 'user',
+          tool_use_result: { tool_use_id: 'tool_1', content: 'file contents here' },
+        },
+      });
+
+      // Simulate more text after tool
+      agent.sendEncrypted({
+        type: 'claude_output',
+        data: { type: 'content_block_delta', delta: 'I read the file for you.' },
+      });
+
+      // Send turn_completed
+      agent.sendEncrypted({ type: 'turn_completed' });
+
+      // Wait for processing to end — stop button should disappear
+      await page.waitForFunction(() => {
+        const btn = document.querySelector('.stop-btn');
+        return !btn;
+      }, { timeout: 5000 });
+
+      // Verify the assistant text appeared (streaming reveal may take a moment)
+      await page.waitForFunction(() => {
+        const bubbles = document.querySelectorAll('.assistant-bubble');
+        for (const b of bubbles) {
+          if (b.textContent?.includes('help you today')) return true;
+        }
+        return false;
+      }, { timeout: 5000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('cancel execution sends cancel and shows system message', async () => {
+    const agent = await connectMockAgentEncrypted('CancelAgent', '/cancel-test');
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume list_sessions
+      await agent.waitForMessage((m) => m.type === 'list_sessions');
+      agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/cancel-test' });
+
+      // Send a chat message
+      await page.fill('textarea', 'Do something long');
+      await page.click('.send-btn');
+
+      const chatMsg = await agent.waitForMessage((m) => m.type === 'chat');
+      expect(chatMsg.prompt).toBe('Do something long');
+
+      // Start streaming so UI is in processing state
+      agent.sendEncrypted({
+        type: 'claude_output',
+        data: { type: 'content_block_delta', delta: 'Working on it...' },
+      });
+
+      // Click the stop button
+      await page.waitForSelector('.stop-btn', { timeout: 3000 });
+      await page.click('.stop-btn');
+
+      // Agent should receive cancel_execution
+      const cancelMsg = await agent.waitForMessage((m) => m.type === 'cancel_execution');
+      expect(cancelMsg.type).toBe('cancel_execution');
+
+      // Agent sends execution_cancelled
+      agent.sendEncrypted({ type: 'execution_cancelled' });
+
+      // UI should show "Generation stopped"
+      await page.waitForFunction(() => {
+        const msgs = document.querySelectorAll('.system-msg');
+        for (const m of msgs) {
+          if (m.textContent?.includes('Generation stopped')) return true;
+        }
+        return false;
+      }, { timeout: 5000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+});
+
+// ── Working Directory Change ──
+
+describe('Functional: Working Directory Change', () => {
+  it('folder picker opens and change_workdir updates UI', async () => {
+    const agent = await connectMockAgentEncrypted('WdAgent', '/original-dir');
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume list_sessions
+      await agent.waitForMessage((m) => m.type === 'list_sessions');
+      agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/original-dir' });
+
+      // Verify initial working directory is displayed
+      await page.waitForFunction((dir: string) => {
+        return document.body.textContent?.includes(dir) ?? false;
+      }, '/original-dir', { timeout: 3000 });
+
+      // Click the folder picker button (folder icon next to working directory)
+      await page.click('.sidebar-change-dir-btn');
+
+      // Folder picker modal should appear
+      await page.waitForSelector('.folder-picker-dialog', { timeout: 3000 });
+
+      // Agent should receive a list_directory request
+      const listDirMsg = await agent.waitForMessage((m) => m.type === 'list_directory');
+      expect(listDirMsg.type).toBe('list_directory');
+
+      // Respond with directory listing
+      agent.sendEncrypted({
+        type: 'directory_listing',
+        dirPath: '/original-dir',
+        entries: [
+          { name: 'subdir1', type: 'directory' },
+          { name: 'subdir2', type: 'directory' },
+          { name: 'file.txt', type: 'file' },
+        ],
+      });
+
+      // Wait for entries to render (only directories should show)
+      await page.waitForFunction(() => {
+        const items = document.querySelectorAll('.folder-picker-item');
+        return items.length === 2; // subdir1 and subdir2, file.txt filtered out
+      }, { timeout: 3000 });
+
+      // Click on subdir1 to select it
+      const firstItem = page.locator('.folder-picker-item').first();
+      await firstItem.click();
+
+      // Click confirm
+      await page.click('.folder-picker-confirm');
+
+      // Agent should receive change_workdir
+      const changeMsg = await agent.waitForMessage((m) => m.type === 'change_workdir');
+      expect(changeMsg.type).toBe('change_workdir');
+      expect((changeMsg.workDir as string)).toContain('subdir1');
+
+      // Agent sends workdir_changed
+      agent.sendEncrypted({
+        type: 'workdir_changed',
+        workDir: '/original-dir/subdir1',
+      });
+
+      // UI should show the new working directory
+      await page.waitForFunction(() => {
+        return document.body.textContent?.includes('/original-dir/subdir1') ?? false;
+      }, { timeout: 3000 });
+
+      // Chat should be cleared with a system message about the directory change
+      await page.waitForFunction(() => {
+        const msgs = document.querySelectorAll('.system-msg');
+        for (const m of msgs) {
+          if (m.textContent?.includes('Working directory changed')) return true;
+        }
+        return false;
+      }, { timeout: 3000 });
+
+      // Agent should also receive a new list_sessions request after workdir change
+      const newListReq = await agent.waitForMessage((m) =>
+        m.type === 'list_sessions'
+      );
+      expect(newListReq.type).toBe('list_sessions');
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+});
+
+// ── Session Resume ──
+
+describe('Functional: Session Resume', () => {
+  it('clicking a session in sidebar resumes it with history', async () => {
+    const agent = await connectMockAgentEncrypted('ResumeAgent', '/resume-test');
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume list_sessions and respond with sessions
+      await agent.waitForMessage((m) => m.type === 'list_sessions');
+      agent.sendEncrypted({
+        type: 'sessions_list',
+        sessions: [
+          {
+            sessionId: 'resume-session-abc',
+            title: 'Previous Conversation',
+            preview: 'We discussed testing',
+            lastModified: Date.now() - 3600000,
+          },
+        ],
+        workDir: '/resume-test',
+      });
+
+      // Wait for sessions to render in sidebar
+      await page.waitForSelector('.session-item', { timeout: 5000 });
+
+      // Click the session to resume it
+      await page.click('.session-item');
+
+      // Agent should receive resume_conversation
+      const resumeMsg = await agent.waitForMessage((m) => m.type === 'resume_conversation');
+      expect(resumeMsg.type).toBe('resume_conversation');
+      expect(resumeMsg.claudeSessionId).toBe('resume-session-abc');
+
+      // Agent sends conversation_resumed with history
+      agent.sendEncrypted({
+        type: 'conversation_resumed',
+        claudeSessionId: 'resume-session-abc',
+        history: [
+          { role: 'user', content: 'How do I write tests?' },
+          { role: 'assistant', content: 'You can use vitest for unit testing.' },
+          { role: 'tool', toolId: 'tool_1', toolName: 'Read', toolInput: '{"file_path": "/test.ts"}' },
+          { role: 'user', content: 'Thanks, what about E2E tests?' },
+          { role: 'assistant', content: 'For E2E tests, Playwright is a great choice.' },
+        ],
+      });
+
+      // Wait for history messages to render
+      await page.waitForFunction(() => {
+        const userBubbles = document.querySelectorAll('.user-bubble');
+        return userBubbles.length >= 2;
+      }, { timeout: 5000 });
+
+      // Verify user messages
+      const userBubbles = await page.locator('.user-bubble').allTextContents();
+      expect(userBubbles.some(t => t.includes('How do I write tests?'))).toBe(true);
+      expect(userBubbles.some(t => t.includes('what about E2E tests?'))).toBe(true);
+
+      // Verify assistant messages
+      const assistantBubbles = await page.locator('.assistant-bubble').allTextContents();
+      expect(assistantBubbles.some(t => t.includes('vitest'))).toBe(true);
+      expect(assistantBubbles.some(t => t.includes('Playwright'))).toBe(true);
+
+      // Verify tool block
+      const toolNames = await page.locator('.tool-name').allTextContents();
+      expect(toolNames.some(t => t.includes('Read'))).toBe(true);
+
+      // Verify system message about session restore
+      await page.waitForFunction(() => {
+        const msgs = document.querySelectorAll('.system-msg');
+        for (const m of msgs) {
+          if (m.textContent?.includes('Session restored')) return true;
+        }
+        return false;
+      }, { timeout: 3000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+});
