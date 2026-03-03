@@ -1,6 +1,6 @@
 {
   "name": "@agent-link/agent",
-  "version": "0.1.61",
+  "version": "0.1.62",
   "description": "AgentLink local agent CLI",
   "license": "MIT",
   "repository": {
@@ -12,7 +12,14 @@
   "bugs": {
     "url": "https://github.com/yilee/agentlink/issues"
   },
-  "keywords": ["agentlink", "claude", "claude-code", "cli", "ai-agent", "remote-development"],
+  "keywords": [
+    "agentlink",
+    "claude",
+    "claude-code",
+    "cli",
+    "ai-agent",
+    "remote-development"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
