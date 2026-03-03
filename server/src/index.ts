@@ -1,13 +1,14 @@
 import express from 'express';
 import { createServer } from 'http';
 import { createRequire } from 'module';
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { agents, webClients } from './context.js';
+import { agents, webClients, cleanupDeadConnections } from './context.js';
 import { handleAgentConnection } from './ws-agent.js';
 import { handleWebConnection } from './ws-client.js';
 import { saveServerRuntimeState, clearServerRuntimeState } from './config.js';
+import { encryptAndSend } from './encryption.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -106,25 +107,11 @@ wss.on('connection', (ws, req) => {
 
 // Heartbeat every 30s to detect dead connections
 setInterval(() => {
-  for (const [agentId, agent] of agents) {
-    if (!agent.isAlive) {
-      console.log(`[Heartbeat] Agent ${agent.name} timed out`);
-      agent.ws.terminate();
-      continue;
+  cleanupDeadConnections((client, msg) => {
+    if (client.ws.readyState === WebSocket.OPEN) {
+      encryptAndSend(client.ws, msg, client.sessionKey);
     }
-    agent.isAlive = false;
-    agent.ws.ping();
-  }
-
-  for (const [clientId, client] of webClients) {
-    if (!client.isAlive) {
-      client.ws.terminate();
-      webClients.delete(clientId);
-      continue;
-    }
-    client.isAlive = false;
-    client.ws.ping();
-  }
+  });
 }, 30_000);
 
 server.listen(PORT, () => {

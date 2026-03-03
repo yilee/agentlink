@@ -261,6 +261,7 @@ export function createConnection(deps) {
         finalizeStreamingMsg(scheduleHighlight);
         isProcessing.value = false;
         isCompacting.value = false;
+        toolMsgMap.clear();
         if (msg.type === 'execution_cancelled') {
           messages.value.push({
             id: streaming.nextId(), role: 'system',

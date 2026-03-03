@@ -53,3 +53,48 @@ export const serverSecret = randomBytes(32);
 export function generateSessionId(): string {
   return randomBytes(12).toString('base64url');
 }
+
+/**
+ * Clean up dead WebSocket connections detected by heartbeat.
+ * Terminates dead sockets, removes them from maps, pings alive ones,
+ * and notifies web clients when their agent disconnects.
+ */
+export function cleanupDeadConnections(
+  notifyFn: (client: WebClient, msg: { type: string }) => void
+): { removedAgents: string[]; removedClients: string[] } {
+  const removedAgents: string[] = [];
+  const removedClients: string[] = [];
+
+  for (const [agentId, agent] of agents) {
+    if (!agent.isAlive) {
+      console.log(`[Heartbeat] Agent ${agent.name} timed out`);
+      agent.ws.terminate();
+      sessionToAgent.delete(agent.sessionId);
+      agents.delete(agentId);
+      removedAgents.push(agentId);
+
+      // Notify connected web clients that agent is gone
+      for (const [, client] of webClients) {
+        if (client.sessionId === agent.sessionId) {
+          notifyFn(client, { type: 'agent_disconnected' });
+        }
+      }
+      continue;
+    }
+    agent.isAlive = false;
+    agent.ws.ping();
+  }
+
+  for (const [clientId, client] of webClients) {
+    if (!client.isAlive) {
+      client.ws.terminate();
+      webClients.delete(clientId);
+      removedClients.push(clientId);
+      continue;
+    }
+    client.isAlive = false;
+    client.ws.ping();
+  }
+
+  return { removedAgents, removedClients };
+}
