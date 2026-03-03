@@ -123,7 +123,7 @@ function doConnect(
       if (msg) {
         handleServerMessage(msg as { type: string; [key: string]: unknown });
       } else {
-        console.error('[AgentLink] Failed to decrypt message');
+        console.error(`[AgentLink] Failed to decrypt message (key=${state.sessionKey ? 'set' : 'null'}, raw=${raw.slice(0, 120)})`);
       }
     }
   });
@@ -158,6 +158,8 @@ export function disconnect(): void {
 export function send(msg: Record<string, unknown>): void {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
     encryptAndSend(state.ws, msg, state.sessionKey);
+  } else {
+    console.warn(`[AgentLink] Cannot send ${msg.type}: WebSocket not open (readyState=${state.ws?.readyState})`);
   }
 }
 
@@ -209,6 +211,7 @@ function scheduleReconnect(config: AgentConfig): void {
 }
 
 function handleServerMessage(msg: { type: string; [key: string]: unknown }): void {
+  console.log(`[AgentLink] ← ${msg.type}`);
   switch (msg.type) {
     case 'chat':
       claudeHandleChat(
@@ -238,6 +241,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         abortClaude();
       }
       const history = readSessionMessages(state.workDir, m.claudeSessionId);
+      console.log(`[AgentLink] → conversation_resumed (${history.length} messages, session ${m.claudeSessionId.slice(0, 8)})`);
       // Include live status so the web client can restore compacting/processing state
       const currentConv = getConversation();
       const isSameSession = currentConv?.claudeSessionId === m.claudeSessionId;
@@ -266,8 +270,14 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
 }
 
 function handleListSessions(): void {
-  const sessions = listSessions(state.workDir);
-  send({ type: 'sessions_list', sessions, workDir: state.workDir });
+  try {
+    const sessions = listSessions(state.workDir);
+    console.log(`[AgentLink] → sessions_list (${sessions.length} sessions for ${state.workDir})`);
+    send({ type: 'sessions_list', sessions, workDir: state.workDir });
+  } catch (err) {
+    console.error(`[AgentLink] listSessions failed:`, err);
+    send({ type: 'sessions_list', sessions: [], workDir: state.workDir });
+  }
 }
 
 function handleDeleteSession(sessionId: string): void {

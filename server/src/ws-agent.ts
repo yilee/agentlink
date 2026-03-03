@@ -113,8 +113,13 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
 
   const msg = await parseMessage(raw, agent.sessionKey);
   if (!msg) {
-    console.error(`[Agent] Failed to parse/decrypt message from ${agentId}`);
+    console.error(`[Agent] Failed to parse/decrypt message from ${agentId} (key=${agent.sessionKey ? 'set' : 'null'})`);
     return;
+  }
+
+  // Log non-streaming messages for debugging
+  if (msg.type !== 'claude_output') {
+    console.log(`[Agent] ${agent.name} → ${msg.type}`);
   }
 
   // Intercept workdir_changed to keep server state in sync
@@ -125,9 +130,14 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
 
   // Forward agent messages to all web clients connected to this session
   // Re-encrypt with each client's own session key
+  let relayCount = 0;
   for (const [, client] of webClients) {
     if (client.sessionId === agent.sessionId && client.ws.readyState === WebSocket.OPEN) {
       encryptAndSend(client.ws, msg, client.sessionKey);
+      relayCount++;
     }
+  }
+  if (relayCount === 0 && msg.type !== 'claude_output') {
+    console.warn(`[Agent] No web clients to relay ${msg.type} for session ${agent.sessionId}`);
   }
 }

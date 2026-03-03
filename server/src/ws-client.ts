@@ -215,9 +215,11 @@ async function handleWebMessage(clientId: string, raw: string): Promise<void> {
 
   const msg = await parseMessage(raw, client.sessionKey);
   if (!msg) {
-    console.error(`[Web] Failed to parse/decrypt message from ${clientId.slice(0, 8)}`);
+    console.error(`[Web] Failed to parse/decrypt message from ${clientId.slice(0, 8)} (key=${client.sessionKey ? 'set' : 'null'})`);
     return;
   }
+
+  console.log(`[Web] ${clientId.slice(0, 8)} → ${msg.type}`);
 
   // Find the agent for this session and forward
   const agentId = sessionToAgent.get(client.sessionId);
