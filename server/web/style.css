@@ -50,21 +50,17 @@
   --code-header-bg: #e9ecef;
 }
 
-html {
-  overscroll-behavior: none;
-}
-
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
   overscroll-behavior: none;
 }
 
 #app {
-  height: 100%;
-  overflow: hidden;
+  position: fixed;
+  inset: 0;
 }
 
 /* ── Layout ── */
