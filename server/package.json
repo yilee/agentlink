@@ -1,6 +1,6 @@
 {
   "name": "@agent-link/server",
-  "version": "0.1.98",
+  "version": "0.1.99",
   "description": "AgentLink relay server",
   "license": "MIT",
   "repository": {
