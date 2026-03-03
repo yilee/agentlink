@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AgentLink</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/style.css">
@@ -22,15 +22,18 @@
     // iPad: track visualViewport to handle keyboard accessory bar
     (function() {
       if (!window.visualViewport) return;
-      function onResize() {
+      function onViewportChange() {
         var vv = window.visualViewport;
         var app = document.getElementById('app');
         if (!app) return;
-        app.style.setProperty('--vv-offset-top', vv.offsetTop + 'px');
-        app.style.setProperty('--vv-height', vv.height + 'px');
+        // When keyboard accessory bar appears, visual viewport shrinks
+        // and may scroll. Adjust #app to stay within visible area.
+        app.style.top = vv.offsetTop + 'px';
+        app.style.height = vv.height + 'px';
+        app.style.bottom = 'auto';
       }
-      window.visualViewport.addEventListener('resize', onResize);
-      window.visualViewport.addEventListener('scroll', onResize);
+      window.visualViewport.addEventListener('resize', onViewportChange);
+      window.visualViewport.addEventListener('scroll', onViewportChange);
     })();
   </script>
   <script src="/vendor/vue.global.prod.js"></script>
