@@ -18,6 +18,21 @@
         : '/vendor/github-dark.min.css';
     })();
   </script>
+  <script>
+    // iPad: track visualViewport to handle keyboard accessory bar
+    (function() {
+      if (!window.visualViewport) return;
+      function onResize() {
+        var vv = window.visualViewport;
+        var app = document.getElementById('app');
+        if (!app) return;
+        app.style.setProperty('--vv-offset-top', vv.offsetTop + 'px');
+        app.style.setProperty('--vv-height', vv.height + 'px');
+      }
+      window.visualViewport.addEventListener('resize', onResize);
+      window.visualViewport.addEventListener('scroll', onResize);
+    })();
+  </script>
   <script src="/vendor/vue.global.prod.js"></script>
   <script src="/vendor/marked.min.js"></script>
   <script src="/vendor/highlight.min.js"></script>
