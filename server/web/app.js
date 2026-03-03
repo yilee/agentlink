@@ -69,6 +69,10 @@ const App = {
     const deleteConfirmOpen = ref(false);
     const deleteConfirmTitle = ref('');
 
+    // Rename session state
+    const renamingSessionId = ref(null);
+    const renameText = ref('');
+
     // Working directory history
     const workdirHistory = ref([]);
 
@@ -152,6 +156,7 @@ const App = {
       folderPickerOpen, folderPickerPath, folderPickerEntries,
       folderPickerLoading, folderPickerSelected, streaming,
       deleteConfirmOpen, deleteConfirmTitle,
+      renamingSessionId, renameText,
       hostname, workdirHistory,
     });
 
@@ -319,6 +324,11 @@ const App = {
       deleteSession: sidebar.deleteSession,
       confirmDeleteSession: sidebar.confirmDeleteSession,
       cancelDeleteSession: sidebar.cancelDeleteSession,
+      // Rename session
+      renamingSessionId, renameText,
+      startRename: sidebar.startRename,
+      confirmRename: sidebar.confirmRename,
+      cancelRename: sidebar.cancelRename,
       // Working directory history
       filteredWorkdirHistory: sidebar.filteredWorkdirHistory,
       switchToWorkdir: sidebar.switchToWorkdir,
@@ -432,20 +442,41 @@ const App = {
                 <div
                   v-for="s in group.sessions" :key="s.sessionId"
                   :class="['session-item', { active: currentClaudeSessionId === s.sessionId }]"
-                  @click="resumeSession(s)"
+                  @click="renamingSessionId !== s.sessionId && resumeSession(s)"
                   :title="s.preview"
                 >
-                  <div class="session-title">{{ s.title }}</div>
+                  <div v-if="renamingSessionId === s.sessionId" class="session-rename-row">
+                    <input
+                      class="session-rename-input"
+                      v-model="renameText"
+                      @click.stop
+                      @keydown.enter.stop="confirmRename"
+                      @keydown.escape.stop="cancelRename"
+                      @vue:mounted="$event.el.focus()"
+                    />
+                    <button class="session-rename-ok" @click.stop="confirmRename" title="Confirm">&#10003;</button>
+                    <button class="session-rename-cancel" @click.stop="cancelRename" title="Cancel">&times;</button>
+                  </div>
+                  <div v-else class="session-title">{{ s.title }}</div>
                   <div class="session-meta">
                     <span>{{ formatRelativeTime(s.lastModified) }}</span>
-                    <button
-                      v-if="currentClaudeSessionId !== s.sessionId"
-                      class="session-delete-btn"
-                      @click.stop="deleteSession(s)"
-                      title="Delete session"
-                    >
-                      <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                    </button>
+                    <span v-if="renamingSessionId !== s.sessionId && !isProcessing" class="session-actions">
+                      <button
+                        class="session-rename-btn"
+                        @click.stop="startRename(s)"
+                        title="Rename session"
+                      >
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                      </button>
+                      <button
+                        v-if="currentClaudeSessionId !== s.sessionId"
+                        class="session-delete-btn"
+                        @click.stop="deleteSession(s)"
+                        title="Delete session"
+                      >
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                      </button>
+                    </span>
                   </div>
                 </div>
               </div>

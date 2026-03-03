@@ -510,8 +510,18 @@ body {
   justify-content: space-between;
 }
 
-.session-delete-btn {
+.session-actions {
   display: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.session-item:hover .session-actions {
+  display: flex;
+}
+
+.session-delete-btn {
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 20px;
@@ -525,14 +535,65 @@ body {
   transition: color 0.15s, background 0.15s;
 }
 
-.session-item:hover .session-delete-btn {
-  display: flex;
-}
-
 .session-delete-btn:hover {
   color: var(--error);
   background: rgba(239, 68, 68, 0.1);
 }
+
+/* ── Rename session (pencil icon + inline edit) ── */
+.session-rename-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.session-rename-btn:hover {
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.session-rename-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.session-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  padding: 2px 6px;
+  outline: none;
+}
+
+.session-rename-ok,
+.session-rename-cancel {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.session-rename-ok:hover { color: var(--accent); }
+.session-rename-cancel:hover { color: var(--error); }
 
 /* ── Delete confirmation dialog ── */
 .delete-confirm-dialog {

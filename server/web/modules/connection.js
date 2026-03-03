@@ -312,6 +312,9 @@ export function createConnection(deps) {
         loadingSessions.value = false;
       } else if (msg.type === 'session_deleted') {
         historySessions.value = historySessions.value.filter(s => s.sessionId !== msg.sessionId);
+      } else if (msg.type === 'session_renamed') {
+        const session = historySessions.value.find(s => s.sessionId === msg.sessionId);
+        if (session) session.title = msg.newTitle;
       } else if (msg.type === 'conversation_resumed') {
         currentClaudeSessionId.value = msg.claudeSessionId;
         if (msg.history && Array.isArray(msg.history)) {

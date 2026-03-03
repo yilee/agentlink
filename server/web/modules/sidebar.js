@@ -109,6 +109,34 @@ export function createSidebar(deps) {
     pendingDeleteSession = null;
   }
 
+  // ── Rename session ──
+
+  const renamingSessionId = deps.renamingSessionId;
+  const renameText = deps.renameText;
+
+  function startRename(session) {
+    if (isProcessing.value) return;
+    renamingSessionId.value = session.sessionId;
+    renameText.value = session.title || '';
+  }
+
+  function confirmRename() {
+    const sid = renamingSessionId.value;
+    const title = renameText.value.trim();
+    if (!sid || !title) {
+      cancelRename();
+      return;
+    }
+    wsSend({ type: 'rename_session', sessionId: sid, newTitle: title });
+    renamingSessionId.value = null;
+    renameText.value = '';
+  }
+
+  function cancelRename() {
+    renamingSessionId.value = null;
+    renameText.value = '';
+  }
+
   // ── Folder picker ──
 
   function openFolderPicker() {
@@ -253,6 +281,7 @@ export function createSidebar(deps) {
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
     deleteSession, confirmDeleteSession, cancelDeleteSession,
+    startRename, confirmRename, cancelRename,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
     groupedSessions,

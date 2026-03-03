@@ -6,7 +6,7 @@
  */
 
 import { homedir } from 'os';
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, appendFileSync } from 'fs';
 import { join } from 'path';
 
 export interface SessionInfo {
@@ -234,6 +234,28 @@ export function deleteSession(workDir: string, sessionId: string): boolean {
 
   try {
     unlinkSync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Rename a session by appending a custom-title entry to its JSONL file.
+ * This matches what Claude CLI's /rename command does.
+ */
+export function renameSession(workDir: string, sessionId: string, newTitle: string): boolean {
+  const projectsDir = getClaudeProjectsDir();
+  const projectFolder = pathToProjectFolder(workDir);
+  const filePath = join(projectsDir, projectFolder, `${sessionId}.jsonl`);
+
+  if (!existsSync(filePath)) {
+    return false;
+  }
+
+  try {
+    const entry = JSON.stringify({ type: 'custom-title', customTitle: newTitle });
+    appendFileSync(filePath, '\n' + entry + '\n', 'utf-8');
     return true;
   } catch {
     return false;
