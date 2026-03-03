@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'server-v*'
+      - 'agent-v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ "$TAG" == server-v* ]]; then
+            WORKSPACE="server"
+            VERSION="${TAG#server-v}"
+            PKG_NAME="@agent-link/server"
+          elif [[ "$TAG" == agent-v* ]]; then
+            WORKSPACE="agent"
+            VERSION="${TAG#agent-v}"
+            PKG_NAME="@agent-link/agent"
+          else
+            echo "Unknown tag format: $TAG"
+            exit 1
+          fi
+          echo "workspace=$WORKSPACE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "pkg_name=$PKG_NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Verify version matches tag
+        run: |
+          PKG_VERSION=$(node -p "require('./${{ steps.parse.outputs.workspace }}/package.json').version")
+          if [ "$PKG_VERSION" != "${{ steps.parse.outputs.version }}" ]; then
+            echo "Version mismatch: package.json=$PKG_VERSION, tag=${{ steps.parse.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Publish to npm
+        run: npm publish --workspace ${{ steps.parse.outputs.workspace }} --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ steps.parse.outputs.pkg_name }} ${{ steps.parse.outputs.version }}"
+          generate_release_notes: true
