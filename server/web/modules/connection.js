@@ -22,6 +22,10 @@ export function createConnection(deps) {
     scrollToBottom,
   } = deps;
 
+  // Dequeue callback — set after creation to resolve circular dependency
+  let _dequeueNext = () => {};
+  function setDequeueNext(fn) { _dequeueNext = fn; }
+
   let ws = null;
   let sessionKey = null;
   let reconnectAttempts = 0;
@@ -226,6 +230,7 @@ export function createConnection(deps) {
         scrollToBottom();
         isProcessing.value = false;
         isCompacting.value = false;
+        _dequeueNext();
       } else if (msg.type === 'claude_output') {
         handleClaudeOutput(msg, scheduleHighlight);
       } else if (msg.type === 'command_output') {
@@ -269,6 +274,7 @@ export function createConnection(deps) {
           });
           scrollToBottom();
         }
+        _dequeueNext();
       } else if (msg.type === 'ask_user_question') {
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
@@ -446,5 +452,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext };
 }

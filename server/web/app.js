@@ -154,7 +154,7 @@ const App = {
       hostname, workdirHistory,
     });
 
-    const { connect, wsSend, closeWs, submitPassword } = createConnection({
+    const { connect, wsSend, closeWs, submitPassword, setDequeueNext } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion,
       messages, isProcessing, isCompacting, visibleLimit,
@@ -166,10 +166,12 @@ const App = {
 
     // Now wire up the forwarding function
     _wsSend = wsSend;
+    setDequeueNext(dequeueNext);
 
     // ── Computed ──
+    const hasInput = computed(() => !!(inputText.value.trim() || attachments.value.length > 0));
     const canSend = computed(() =>
-      status.value === 'Connected' && (inputText.value.trim() || attachments.value.length > 0) && !isProcessing.value && !isCompacting.value
+      status.value === 'Connected' && hasInput.value && !isCompacting.value
       && !messages.value.some(m => m.role === 'ask-question' && !m.answered)
     );
 
@@ -195,15 +197,6 @@ const App = {
         name: f.name, size: f.size, isImage: f.isImage, thumbUrl: f.thumbUrl,
       }));
 
-      messages.value.push({
-        id: streaming.nextId(), role: 'user',
-        content: text || (files.length > 0 ? `[${files.length} file${files.length > 1 ? 's' : ''} attached]` : ''),
-        attachments: msgAttachments.length > 0 ? msgAttachments : undefined,
-        timestamp: new Date(),
-      });
-      isProcessing.value = true;
-      scrollToBottom(true);
-
       const payload = { type: 'chat', prompt: text || '(see attached files)' };
       if (needsResume.value && currentClaudeSessionId.value) {
         payload.resumeSessionId = currentClaudeSessionId.value;
@@ -214,13 +207,47 @@ const App = {
           name: f.name, mimeType: f.mimeType, data: f.data,
         }));
       }
-      wsSend(payload);
+
+      const userMsg = {
+        id: streaming.nextId(), role: 'user',
+        content: text || (files.length > 0 ? `[${files.length} file${files.length > 1 ? 's' : ''} attached]` : ''),
+        attachments: msgAttachments.length > 0 ? msgAttachments : undefined,
+        timestamp: new Date(),
+      };
+
+      if (isProcessing.value) {
+        userMsg.status = 'queued';
+        userMsg._queuedPayload = payload;
+        messages.value.push(userMsg);
+      } else {
+        userMsg.status = 'sent';
+        messages.value.push(userMsg);
+        isProcessing.value = true;
+        wsSend(payload);
+      }
+      scrollToBottom(true);
       attachments.value = [];
     }
 
     function cancelExecution() {
       if (!isProcessing.value) return;
       wsSend({ type: 'cancel_execution' });
+    }
+
+    function dequeueNext() {
+      const idx = messages.value.findIndex(m => m.status === 'queued');
+      if (idx === -1) return;
+      const msg = messages.value[idx];
+      msg.status = 'sent';
+      isProcessing.value = true;
+      wsSend(msg._queuedPayload);
+      delete msg._queuedPayload;
+      scrollToBottom(true);
+    }
+
+    function removeQueuedMessage(msgId) {
+      const idx = messages.value.findIndex(m => m.id === msgId);
+      if (idx !== -1) messages.value.splice(idx, 1);
     }
 
     function handleKeydown(e) {
@@ -256,8 +283,8 @@ const App = {
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
-      inputText, isProcessing, isCompacting, canSend, inputRef,
-      sendMessage, handleKeydown, cancelExecution, onMessageListScroll,
+      inputText, isProcessing, isCompacting, canSend, hasInput, inputRef,
+      sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       getRenderedContent, copyMessage, toggleTool,
       isPrevAssistant: _isPrevAssistant,
       toggleContextSummary, formatTimestamp,
@@ -457,7 +484,8 @@ const App = {
                 <!-- User message -->
                 <template v-if="msg.role === 'user'">
                   <div class="message-role-label user-label">You</div>
-                  <div class="message-bubble user-bubble" :title="formatTimestamp(msg.timestamp)">
+                  <div :class="['message-bubble', 'user-bubble', { queued: msg.status === 'queued' }]" :title="formatTimestamp(msg.timestamp)">
+                    <button v-if="msg.status === 'queued'" class="queue-remove-btn" @click="removeQueuedMessage(msg.id)" title="Remove from queue">&times;</button>
                     <div class="message-content">{{ msg.content }}</div>
                     <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
                       <div v-for="(att, ai) in msg.attachments" :key="ai" class="message-attachment-chip">
@@ -468,6 +496,7 @@ const App = {
                         <span>{{ att.name }}</span>
                       </div>
                     </div>
+                    <div v-if="msg.status === 'queued'" class="queue-badge">queued</div>
                   </div>
                 </template>
 
@@ -620,7 +649,7 @@ const App = {
                 <button class="attach-btn" @click="triggerFileInput" :disabled="status !== 'Connected' || isCompacting || attachments.length >= 5" title="Attach files">
                   <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
                 </button>
-                <button v-if="isProcessing" @click="cancelExecution" class="send-btn stop-btn" title="Stop generation">
+                <button v-if="isProcessing && !hasInput" @click="cancelExecution" class="send-btn stop-btn" title="Stop generation">
                   <svg viewBox="0 0 24 24" width="14" height="14"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
                 </button>
                 <button v-else @click="sendMessage" :disabled="!canSend" class="send-btn" title="Send">

@@ -787,6 +787,46 @@ body {
   color: var(--text-primary);
 }
 
+/* ── Queued message (pending send) ── */
+.user-bubble.queued {
+  background: transparent;
+  border: 1px dashed var(--border);
+  opacity: 0.7;
+}
+
+.queue-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  text-align: right;
+  margin-top: 0.2rem;
+}
+
+.queue-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0;
+  transition: color 0.15s, opacity 0.15s;
+}
+
+.user-bubble.queued:hover .queue-remove-btn {
+  opacity: 1;
+}
+
+.queue-remove-btn:hover {
+  color: var(--error);
+}
+
 .assistant-bubble {
   background: transparent;
   padding: 0.2rem 0;
