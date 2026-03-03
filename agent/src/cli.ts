@@ -7,7 +7,8 @@ import {
 } from './config.js';
 import { serviceInstall, serviceUninstall } from './service.js';
 import { spawn, execSync } from 'child_process';
-import { openSync } from 'fs';
+import { openSync, existsSync, readFileSync, statSync, createReadStream } from 'fs';
+import { watchFile, unwatchFile } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -260,6 +261,75 @@ serviceCmd
 serviceCmd.action(() => {
   serviceCmd.help();
 });
+
+// ── Log ──
+
+program
+  .command('log')
+  .description('Show daemon log output')
+  .option('-f, --follow', 'Follow log output in real-time (like tail -f)')
+  .option('-n, --lines <count>', 'Number of lines to show', '100')
+  .option('--err', 'Show only stderr log')
+  .action((options) => {
+    const logDir = getLogDir();
+    const logFile = join(logDir, 'agent.log');
+    const errFile = join(logDir, 'agent.err');
+    const lines = parseInt(options.lines, 10) || 100;
+
+    function tailLines(filePath: string, n: number): string {
+      if (!existsSync(filePath)) return '';
+      const content = readFileSync(filePath, 'utf-8');
+      const allLines = content.split('\n');
+      // Remove trailing empty line from final newline
+      if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
+      return allLines.slice(-n).join('\n');
+    }
+
+    if (!options.err) {
+      const out = tailLines(logFile, lines);
+      if (out) process.stdout.write(out + '\n');
+    }
+
+    const errOut = tailLines(errFile, lines);
+    if (errOut) {
+      if (!options.err) process.stderr.write('\n--- stderr ---\n');
+      process.stderr.write(errOut + '\n');
+    }
+
+    if (!options.follow) {
+      if (!options.err && !existsSync(logFile) && !existsSync(errFile)) {
+        console.log('No log files found. Is the agent running in daemon mode?');
+      }
+      return;
+    }
+
+    // Follow mode: watch files for changes and print new content
+    const watchers: string[] = [];
+    function followFile(filePath: string, output: NodeJS.WritableStream): void {
+      if (!existsSync(filePath)) return;
+      let pos = statSync(filePath).size;
+      watchers.push(filePath);
+      watchFile(filePath, { interval: 300 }, (curr) => {
+        if (curr.size > pos) {
+          const stream = createReadStream(filePath, { start: pos, end: curr.size - 1, encoding: 'utf-8' });
+          stream.pipe(output, { end: false });
+          pos = curr.size;
+        } else if (curr.size < pos) {
+          // File was truncated (log rotation)
+          pos = 0;
+        }
+      });
+    }
+
+    if (!options.err) followFile(logFile, process.stdout);
+    followFile(errFile, process.stderr);
+
+    // Keep process alive, clean up on exit
+    process.on('SIGINT', () => {
+      for (const f of watchers) unwatchFile(f);
+      process.exit(0);
+    });
+  });
 
 // ── Upgrade ──
 
