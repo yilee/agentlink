@@ -2,7 +2,7 @@
 
 Access your local Claude Code agent from anywhere — through a shareable web URL.
 
-AgentLink runs a lightweight agent on your dev machine, connects it to a cloud relay, and gives you a clean chat interface at `https://msclaude.ai/xxxx`. All code execution happens locally. The relay just forwards messages.
+AgentLink runs a lightweight agent on your dev machine, connects it to a cloud relay, and gives you a clean chat interface at `https://msclaude.ai/xxxx`. All code execution happens locally. The relay just forwards encrypted messages.
 
 ```
 Browser (any device)  ←→  Cloud Relay  ←→  Local Agent  ←→  Your Codebase
@@ -31,14 +31,19 @@ agentlink-client start --daemon
 
 ## Features
 
-- Dark/light theme
-- File upload (drag-drop, paste, paperclip)
+- Dark/light theme with localStorage persistence
+- File upload (drag-drop, paste, paperclip button)
 - Interactive `AskUserQuestion` cards from Claude
 - Session history grouped by time (Today / Yesterday / This week / Earlier)
-- Change working directory from the browser
-- Mobile responsive
-- Auto-update in daemon mode
-- Auto-start on boot (`service install`)
+- Working directory history (quick switch between recent directories)
+- Change working directory from the browser (folder picker)
+- Context compaction status display
+- Command output rendering (`/cost`, `/help`, etc.)
+- Password protection (`--password` flag)
+- Mobile responsive (optimized for phones and tablets)
+- Auto-update in daemon mode (`--no-auto-update` to disable)
+- Auto-start on boot (`service install` — systemd/launchd/Windows Startup)
+- In-place upgrade (`agentlink-client upgrade`)
 
 ## How It Works
 
@@ -53,7 +58,7 @@ agentlink-client start --daemon
 
 ```bash
 # Agent
-agentlink-client start [--daemon] [--server URL] [--name NAME] [--dir PATH]
+agentlink-client start [--daemon] [--server URL] [--name NAME] [--dir PATH] [--password PWD]
 agentlink-client stop
 agentlink-client status
 agentlink-client config list|get|set
@@ -91,6 +96,12 @@ agentlink-client start --daemon --server ws://your-server:3456
 | Server | Express, `ws`, static file serving |
 | Web UI | Vue 3 (browser ES modules), marked.js, highlight.js |
 | Encryption | TweetNaCl (XSalsa20-Poly1305 secretbox) |
+
+## Links
+
+- [npm: @agent-link/agent](https://www.npmjs.com/package/@agent-link/agent)
+- [npm: @agent-link/server](https://www.npmjs.com/package/@agent-link/server)
+- [GitHub](https://github.com/yilee/agentlink)
 
 ## License
 
