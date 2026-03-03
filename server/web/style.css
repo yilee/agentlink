@@ -787,27 +787,56 @@ body {
   color: var(--text-primary);
 }
 
-/* ── Queued message (pending send) ── */
-.user-bubble.queued {
-  background: transparent;
+/* ── Queue bar (pending messages above input) ── */
+.queue-bar {
+  max-width: 768px;
+  margin: 0 auto 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-secondary);
   border: 1px dashed var(--border);
-  opacity: 0.7;
-}
-
-.queue-badge {
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  line-height: 1.3;
   color: var(--text-secondary);
-  text-align: right;
-  margin-top: 0.2rem;
+  opacity: 0.85;
 }
 
-.queue-remove-btn {
-  position: absolute;
-  top: 4px;
-  right: 6px;
+.queue-item-num {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.queue-item-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-item-attach {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.queue-item-remove {
+  flex-shrink: 0;
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -815,15 +844,12 @@ body {
   line-height: 1;
   cursor: pointer;
   padding: 0 2px;
-  opacity: 0;
+  opacity: 0.5;
   transition: color 0.15s, opacity 0.15s;
 }
 
-.user-bubble.queued:hover .queue-remove-btn {
+.queue-item-remove:hover {
   opacity: 1;
-}
-
-.queue-remove-btn:hover {
   color: var(--error);
 }
 

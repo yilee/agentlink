@@ -14,7 +14,7 @@ export function createConnection(deps) {
   const {
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion,
-    messages, isProcessing, isCompacting, visibleLimit,
+    messages, isProcessing, isCompacting, visibleLimit, queuedMessages,
     historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
     authRequired, authPassword, authError, authAttempts, authLocked,
@@ -207,6 +207,7 @@ export function createConnection(deps) {
         error.value = 'Agent disconnected. Waiting for reconnect...';
         isProcessing.value = false;
         isCompacting.value = false;
+        queuedMessages.value = [];
       } else if (msg.type === 'agent_reconnected') {
         status.value = 'Connected';
         error.value = '';
@@ -393,6 +394,7 @@ export function createConnection(deps) {
         localStorage.setItem(`agentlink-workdir-${sessionId.value}`, msg.workDir);
         sidebar.addToWorkdirHistory(msg.workDir);
         messages.value = [];
+        queuedMessages.value = [];
         toolMsgMap.clear();
         visibleLimit.value = 50;
         streaming.setMessageIdCounter(0);
@@ -414,6 +416,7 @@ export function createConnection(deps) {
       const wasConnected = status.value === 'Connected' || status.value === 'Connecting...';
       isProcessing.value = false;
       isCompacting.value = false;
+      queuedMessages.value = [];
 
       // Don't auto-reconnect if auth-locked or still in auth prompt
       if (authLocked.value || authRequired.value) return;

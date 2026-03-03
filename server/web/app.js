@@ -47,6 +47,7 @@ const App = {
     const inputText = ref('');
     const isProcessing = ref(false);
     const isCompacting = ref(false);
+    const queuedMessages = ref([]);
     const inputRef = ref(null);
 
     // Sidebar state
@@ -157,7 +158,7 @@ const App = {
     const { connect, wsSend, closeWs, submitPassword, setDequeueNext } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion,
-      messages, isProcessing, isCompacting, visibleLimit,
+      messages, isProcessing, isCompacting, visibleLimit, queuedMessages,
       historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
       folderPickerLoading, folderPickerEntries, folderPickerPath,
       authRequired, authPassword, authError, authAttempts, authLocked,
@@ -216,9 +217,7 @@ const App = {
       };
 
       if (isProcessing.value) {
-        userMsg.status = 'queued';
-        userMsg._queuedPayload = payload;
-        messages.value.push(userMsg);
+        queuedMessages.value.push({ id: streaming.nextId(), content: userMsg.content, attachments: userMsg.attachments, payload });
       } else {
         userMsg.status = 'sent';
         messages.value.push(userMsg);
@@ -235,19 +234,22 @@ const App = {
     }
 
     function dequeueNext() {
-      const idx = messages.value.findIndex(m => m.status === 'queued');
-      if (idx === -1) return;
-      const msg = messages.value[idx];
-      msg.status = 'sent';
+      if (queuedMessages.value.length === 0) return;
+      const queued = queuedMessages.value.shift();
+      const userMsg = {
+        id: queued.id, role: 'user', status: 'sent',
+        content: queued.content, attachments: queued.attachments,
+        timestamp: new Date(),
+      };
+      messages.value.push(userMsg);
       isProcessing.value = true;
-      wsSend(msg._queuedPayload);
-      delete msg._queuedPayload;
+      wsSend(queued.payload);
       scrollToBottom(true);
     }
 
     function removeQueuedMessage(msgId) {
-      const idx = messages.value.findIndex(m => m.id === msgId);
-      if (idx !== -1) messages.value.splice(idx, 1);
+      const idx = queuedMessages.value.findIndex(m => m.id === msgId);
+      if (idx !== -1) queuedMessages.value.splice(idx, 1);
     }
 
     function handleKeydown(e) {
@@ -283,7 +285,7 @@ const App = {
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
-      inputText, isProcessing, isCompacting, canSend, hasInput, inputRef,
+      inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       getRenderedContent, copyMessage, toggleTool,
       isPrevAssistant: _isPrevAssistant,
@@ -484,8 +486,7 @@ const App = {
                 <!-- User message -->
                 <template v-if="msg.role === 'user'">
                   <div class="message-role-label user-label">You</div>
-                  <div :class="['message-bubble', 'user-bubble', { queued: msg.status === 'queued' }]" :title="formatTimestamp(msg.timestamp)">
-                    <button v-if="msg.status === 'queued'" class="queue-remove-btn" @click="removeQueuedMessage(msg.id)" title="Remove from queue">&times;</button>
+                  <div class="message-bubble user-bubble" :title="formatTimestamp(msg.timestamp)">
                     <div class="message-content">{{ msg.content }}</div>
                     <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
                       <div v-for="(att, ai) in msg.attachments" :key="ai" class="message-attachment-chip">
@@ -496,7 +497,6 @@ const App = {
                         <span>{{ att.name }}</span>
                       </div>
                     </div>
-                    <div v-if="msg.status === 'queued'" class="queue-badge">queued</div>
                   </div>
                 </template>
 
@@ -616,6 +616,17 @@ const App = {
               @change="handleFileSelect"
               accept="image/*,text/*,.pdf,.json,.md,.py,.js,.ts,.tsx,.jsx,.css,.html,.xml,.yaml,.yml,.toml,.sh,.sql,.csv"
             />
+            <div v-if="queuedMessages.length > 0" class="queue-bar">
+              <div v-for="(qm, qi) in queuedMessages" :key="qm.id" class="queue-item">
+                <span class="queue-item-num">{{ qi + 1 }}.</span>
+                <span class="queue-item-text">{{ qm.content }}</span>
+                <span v-if="qm.attachments && qm.attachments.length" class="queue-item-attach" :title="qm.attachments.map(a => a.name).join(', ')">
+                  <svg viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                  {{ qm.attachments.length }}
+                </span>
+                <button class="queue-item-remove" @click="removeQueuedMessage(qm.id)" title="Remove from queue">&times;</button>
+              </div>
+            </div>
             <div
               :class="['input-card', { 'drag-over': dragOver }]"
               @dragover="handleDragOver"
