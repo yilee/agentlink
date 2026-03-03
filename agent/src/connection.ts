@@ -272,6 +272,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       handleRenameSession(m.sessionId, m.newTitle);
       break;
     }
+    case 'ping':
+      send({ type: 'pong', ts: (msg as unknown as { ts: number }).ts });
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
   }

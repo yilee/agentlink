@@ -121,6 +121,15 @@ body {
   font-size: 0.85rem;
 }
 
+.latency {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+.latency.good { color: var(--success); }
+.latency.ok { color: var(--warning); }
+.latency.bad { color: var(--error); }
+
 .theme-toggle {
   display: flex;
   align-items: center;

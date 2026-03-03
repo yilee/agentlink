@@ -121,7 +121,7 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
   }
 
   // Log non-streaming messages for debugging
-  if (msg.type !== 'claude_output') {
+  if (msg.type !== 'claude_output' && msg.type !== 'pong') {
     console.log(`[Agent] ${agent.name} → ${msg.type}`);
   }
 
@@ -140,7 +140,7 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
       relayCount++;
     }
   }
-  if (relayCount === 0 && msg.type !== 'claude_output') {
+  if (relayCount === 0 && msg.type !== 'claude_output' && msg.type !== 'pong') {
     console.warn(`[Agent] No web clients to relay ${msg.type} for session ${agent.sessionId}`);
   }
 }

@@ -13,7 +13,7 @@ const RECONNECT_MAX_DELAY = 15000;
 export function createConnection(deps) {
   const {
     status, agentName, hostname, workDir, sessionId, error,
-    serverVersion, agentVersion,
+    serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages,
     historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
@@ -30,6 +30,7 @@ export function createConnection(deps) {
   let sessionKey = null;
   let reconnectAttempts = 0;
   let reconnectTimer = null;
+  let pingTimer = null;
   const toolMsgMap = new Map(); // toolId -> message (for fast tool_result lookup)
 
   function wsSend(msg) {
@@ -40,6 +41,20 @@ export function createConnection(deps) {
     } else {
       ws.send(JSON.stringify(msg));
     }
+  }
+
+  function startPing() {
+    stopPing();
+    // Send first ping immediately, then every 10s
+    wsSend({ type: 'ping', ts: Date.now() });
+    pingTimer = setInterval(() => {
+      wsSend({ type: 'ping', ts: Date.now() });
+    }, 10000);
+  }
+
+  function stopPing() {
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+    latency.value = null;
   }
 
   function getSessionId() {
@@ -196,11 +211,17 @@ export function createConnection(deps) {
             wsSend({ type: 'change_workdir', workDir: savedDir });
           }
           sidebar.requestSessionList();
+          startPing();
         } else {
           status.value = 'Waiting';
           error.value = 'Agent is not connected yet.';
         }
+      } else if (msg.type === 'pong') {
+        if (typeof msg.ts === 'number') {
+          latency.value = Date.now() - msg.ts;
+        }
       } else if (msg.type === 'agent_disconnected') {
+        stopPing();
         status.value = 'Waiting';
         agentName.value = '';
         hostname.value = '';
@@ -221,6 +242,7 @@ export function createConnection(deps) {
           sidebar.addToWorkdirHistory(msg.agent.workDir);
         }
         sidebar.requestSessionList();
+        startPing();
       } else if (msg.type === 'error') {
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
@@ -418,6 +440,7 @@ export function createConnection(deps) {
 
     ws.onclose = () => {
       sessionKey = null;
+      stopPing();
       const wasConnected = status.value === 'Connected' || status.value === 'Connecting...';
       isProcessing.value = false;
       isCompacting.value = false;

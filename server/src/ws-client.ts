@@ -219,7 +219,9 @@ async function handleWebMessage(clientId: string, raw: string): Promise<void> {
     return;
   }
 
-  console.log(`[Web] ${clientId.slice(0, 8)} → ${msg.type}`);
+  if (msg.type !== 'ping') {
+    console.log(`[Web] ${clientId.slice(0, 8)} → ${msg.type}`);
+  }
 
   // Find the agent for this session and forward
   const agentId = sessionToAgent.get(client.sessionId);
