@@ -39,6 +39,7 @@ program
   .option('-D, --daemon', 'Run agent in the background as a daemon')
   .option('-p, --password <password>', 'Session password (clients must authenticate)')
   .option('--auto-update', 'Enable automatic update checks (disabled by default)')
+  .option('--ephemeral', 'Skip writing runtime state (for running alongside a daemon)')
   .action(async (options) => {
     // Persist password and autoUpdate to config file so restarts preserve them
     const configUpdates: Record<string, unknown> = {};
@@ -116,6 +117,7 @@ program
     }
 
     // Foreground mode (default)
+    if (options.ephemeral) process.env.AGENTLINK_NO_STATE = '1';
     const { start } = await import('./index.js');
     await start(config);
   });

@@ -27,6 +27,7 @@ program
   .description('Start the relay server')
   .option('-p, --port <port>', 'Server port', '3456')
   .option('-D, --daemon', 'Run server in the background as a daemon')
+  .option('--ephemeral', 'Skip writing runtime state (for running alongside a daemon)')
   .action(async (options) => {
     const existing = loadServerRuntimeState();
     if (existing && isProcessAlive(existing.pid)) {
@@ -38,6 +39,7 @@ program
 
     if (!options.daemon) {
       // Foreground mode: run server directly
+      if (options.ephemeral) process.env.AGENTLINK_NO_STATE = '1';
       process.env.PORT = options.port;
       await import('./index.js');
       return;

@@ -82,6 +82,7 @@ export interface RuntimeState {
 }
 
 export function saveRuntimeState(state: RuntimeState): void {
+  if (process.env.AGENTLINK_NO_STATE) return;
   ensureConfigDir();
   writeFileSync(RUNTIME_FILE, JSON.stringify(state, null, 2) + '\n', 'utf-8');
 }
@@ -96,6 +97,7 @@ export function loadRuntimeState(): RuntimeState | null {
 }
 
 export function clearRuntimeState(): void {
+  if (process.env.AGENTLINK_NO_STATE) return;
   try {
     unlinkSync(RUNTIME_FILE);
   } catch {

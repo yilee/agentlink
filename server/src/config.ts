@@ -22,6 +22,7 @@ export interface ServerRuntimeState {
 }
 
 export function saveServerRuntimeState(state: ServerRuntimeState): void {
+  if (process.env.AGENTLINK_NO_STATE) return;
   ensureConfigDir();
   writeFileSync(SERVER_RUNTIME_FILE, JSON.stringify(state, null, 2) + '\n', 'utf-8');
 }
@@ -36,6 +37,7 @@ export function loadServerRuntimeState(): ServerRuntimeState | null {
 }
 
 export function clearServerRuntimeState(): void {
+  if (process.env.AGENTLINK_NO_STATE) return;
   try {
     unlinkSync(SERVER_RUNTIME_FILE);
   } catch {
