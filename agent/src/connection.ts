@@ -9,7 +9,7 @@ import { loadRuntimeState, saveRuntimeState } from './config.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
@@ -256,6 +256,10 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         if (!conv || conv.claudeSessionId !== m.claudeSessionId) {
           abortClaude();
         }
+      } else {
+        // Multi-session: rebind running conversation to new conversationId
+        // (handles page refresh where web client generates a new UUID)
+        rebindConversation(m.claudeSessionId, convId);
       }
 
       const history = readSessionMessages(state.workDir, m.claudeSessionId);
