@@ -313,6 +313,27 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
+### Test 19: Delete Session After Switching Conversations
+
+**Steps:**
+1. Create at least 3 conversations (e.g., send simple math questions in each).
+2. Switch between them several times by clicking different sessions in the sidebar.
+3. Hover over a session that is **not** the current foreground conversation and **not** currently processing.
+4. Click the delete (trash) button.
+
+**Expected:**
+- A confirmation dialog appears: "Are you sure you want to delete this session?"
+- Click "Delete" → the session is removed from the sidebar.
+- Click "Cancel" → the dialog closes and the session remains.
+- Repeat for another session to confirm delete continues to work after multiple switches.
+
+**Key knowledge:**
+- `deleteSession()` in `sidebar.js` guards against deleting sessions that are actively processing in the background (`cached.isProcessing === true`).
+- The guard must NOT block deletion of idle cached sessions — only sessions with `isProcessing === true` should be protected.
+- `conversationCache` accumulates entries as the user switches conversations; the delete guard must tolerate cached-but-idle entries.
+
+---
+
 ## Architecture Reference
 
 ### Agent Side (claude.ts)
