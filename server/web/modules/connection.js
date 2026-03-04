@@ -207,6 +207,18 @@ export function createConnection(deps) {
         });
       }
       sidebar.requestSessionList();
+      // Dequeue next message for this background conversation
+      if (cache.queuedMessages && cache.queuedMessages.length > 0) {
+        const queued = cache.queuedMessages.shift();
+        cache.messages.push({
+          id: ++cache.messageIdCounter, role: 'user', status: 'sent',
+          content: queued.content, attachments: queued.attachments,
+          timestamp: new Date(),
+        });
+        cache.isProcessing = true;
+        processingConversations.value[convId] = true;
+        wsSend(queued.payload);
+      }
     } else if (msg.type === 'context_compaction') {
       if (msg.status === 'started') {
         cache.isCompacting = true;
