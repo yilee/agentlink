@@ -7,8 +7,8 @@ This document defines the full manual E2E test suite for the multi-session paral
 1. Build the project: `npm run build`
 2. Start ephemeral server and agent:
    ```bash
-   node Q:/src/agentlink/server/dist/cli.js start --ephemeral
-   node Q:/src/agentlink/agent/dist/cli.js start --server ws://localhost:3456 --ephemeral
+   node server/dist/cli.js start --ephemeral
+   node agent/dist/cli.js start --server ws://localhost:3456 --ephemeral
    ```
 3. Open the session URL in a browser (shown in agent startup output).
 4. Verify status bar shows "Connected" and the agent name.
