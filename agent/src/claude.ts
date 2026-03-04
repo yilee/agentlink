@@ -125,6 +125,9 @@ export function evictByClaudeSessionId(claudeSessionId: string): boolean {
  * Used when the web client reconnects (page refresh) with a new conversationId.
  */
 export function rebindConversation(claudeSessionId: string, newConvId: string): boolean {
+  if (conversations.has(newConvId)) {
+    return false;
+  }
   for (const [oldConvId, conv] of conversations) {
     if ((conv.claudeSessionId === claudeSessionId || conv.lastClaudeSessionId === claudeSessionId)
         && oldConvId !== newConvId) {
