@@ -119,6 +119,31 @@ export function evictByClaudeSessionId(claudeSessionId: string): boolean {
   return false;
 }
 
+/**
+ * Rebind a running conversation to a new conversationId.
+ * Finds the conversation by claudeSessionId and remaps its key in the Map.
+ * Used when the web client reconnects (page refresh) with a new conversationId.
+ */
+export function rebindConversation(claudeSessionId: string, newConvId: string): boolean {
+  for (const [oldConvId, conv] of conversations) {
+    if ((conv.claudeSessionId === claudeSessionId || conv.lastClaudeSessionId === claudeSessionId)
+        && oldConvId !== newConvId) {
+      conversations.delete(oldConvId);
+      conv.conversationId = newConvId;
+      conversations.set(newConvId, conv);
+      // Update pending control requests that reference the old conversationId
+      for (const pending of pendingControlRequests.values()) {
+        if (pending.conversationId === oldConvId) {
+          pending.conversationId = newConvId;
+        }
+      }
+      console.log(`[Claude] Rebound conversation ${oldConvId.slice(0, 8)} → ${newConvId.slice(0, 8)} (session ${claudeSessionId.slice(0, 8)})`);
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Whether context compaction is currently in progress for a conversation. */
 export function getIsCompacting(conversationId?: string): boolean {
   const conv = conversations.get(conversationId || DEFAULT_CONVERSATION_ID);
@@ -440,7 +465,6 @@ async function processOutput(
   state: ConversationState,
   stderr: { buf: string },
 ): Promise<void> {
-  const convId = state.conversationId;
   const rl = createInterface({ input: child.stdout! });
   const messageStream = new Stream<ClaudeMessage>();
 
@@ -456,14 +480,14 @@ async function processOutput(
           if (msg.type === 'system' && msg.session_id) {
             state.claudeSessionId = msg.session_id as string;
             state.lastClaudeSessionId = state.claudeSessionId;
-            console.log(`[Claude:${convId.slice(0, 8)}] Session ID: ${state.claudeSessionId}`);
+            console.log(`[Claude:${state.conversationId.slice(0, 8)}] Session ID: ${state.claudeSessionId}`);
             // Notify web client so sidebar can refresh session list
             sendWithConvId({ type: 'session_started', claudeSessionId: state.claudeSessionId });
           }
 
           // Handle control_request (tool permission checks)
           if (msg.type === 'control_request') {
-            handleControlRequest(msg as unknown as ControlRequest, child, convId);
+            handleControlRequest(msg as unknown as ControlRequest, child, state.conversationId);
             continue;
           }
 
@@ -471,7 +495,7 @@ async function processOutput(
           if (msg.type === 'control_cancel_request') {
             const reqId = (msg as unknown as { request_id: string }).request_id;
             if (pendingControlRequests.has(reqId)) {
-              console.log(`[Claude:${convId.slice(0, 8)}] Control request cancelled: ${reqId}`);
+              console.log(`[Claude:${state.conversationId.slice(0, 8)}] Control request cancelled: ${reqId}`);
               pendingControlRequests.delete(reqId);
             }
             continue;
@@ -497,7 +521,7 @@ async function processOutput(
 
   // Helper: send message with conversationId
   function sendWithConvId(msg: Record<string, unknown>): void {
-    sendFn({ ...msg, conversationId: convId });
+    sendFn({ ...msg, conversationId: state.conversationId });
   }
 
   // Consumer: iterate messages and forward to web client
@@ -604,7 +628,7 @@ async function processOutput(
       // ── system messages (init, compact, etc.) ──
       if (msg.type === 'system') {
         const sub = (msg.subtype || '') as string;
-        console.log(`[Claude:${convId.slice(0, 8)}] system/${sub}`);
+        console.log(`[Claude:${state.conversationId.slice(0, 8)}] system/${sub}`);
 
         // Forward context compaction events to web client
         // New format: subtype='status', status='compacting'
@@ -631,12 +655,12 @@ async function processOutput(
   } catch (err) {
     const error = err as Error;
     if (error.name === 'AbortError') {
-      console.log(`[Claude:${convId.slice(0, 8)}] Query aborted`);
+      console.log(`[Claude:${state.conversationId.slice(0, 8)}] Query aborted`);
     } else if (resultHandled) {
       // Ignore post-turn errors
-      console.warn(`[Claude:${convId.slice(0, 8)}] Ignoring post-result error: ${error.message}`);
+      console.warn(`[Claude:${state.conversationId.slice(0, 8)}] Ignoring post-result error: ${error.message}`);
     } else {
-      console.error(`[Claude:${convId.slice(0, 8)}] Error: ${error.message}`);
+      console.error(`[Claude:${state.conversationId.slice(0, 8)}] Error: ${error.message}`);
       sendWithConvId({
         type: 'error',
         message: `Claude error: ${error.message}`,
@@ -653,7 +677,7 @@ async function processOutput(
     state.turnActive = false;
 
     // Only clean up if this conversation is still in the map with the same state
-    if (conversations.get(convId) === state) {
+    if (conversations.get(state.conversationId) === state) {
       state.child = null;
       state.inputStream = null;
     }
