@@ -117,6 +117,7 @@ const App = {
           streamingState: streamState,
           toolMsgMap: _getToolMsgMap(),
           messageIdCounter: streaming.getMessageIdCounter(),
+          queuedMessages: queuedMessages.value,
         };
       }
 
@@ -134,7 +135,7 @@ const App = {
         // streamingState recorded at save time — use the authoritative value.
         streaming.setMessageIdCounter(cached.messageIdCounter || 0);
         _restoreToolMsgMap(cached.toolMsgMap || new Map());
-        queuedMessages.value = [];
+        queuedMessages.value = cached.queuedMessages || [];
       } else {
         // New blank conversation
         messages.value = [];
