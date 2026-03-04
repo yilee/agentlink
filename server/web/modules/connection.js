@@ -502,6 +502,17 @@ export function createConnection(deps) {
         isCompacting.value = false;
         queuedMessages.value = [];
         loadingSessions.value = false;
+        // Clear processing state for all background conversations
+        if (conversationCache) {
+          for (const [convId, cached] of Object.entries(conversationCache.value)) {
+            cached.isProcessing = false;
+            cached.isCompacting = false;
+            processingConversations.value[convId] = false;
+          }
+        }
+        if (currentConversationId && currentConversationId.value) {
+          processingConversations.value[currentConversationId.value] = false;
+        }
       } else if (msg.type === 'agent_reconnected') {
         status.value = 'Connected';
         error.value = '';
