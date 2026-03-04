@@ -91,7 +91,7 @@ const App = {
 
     // Multi-session parallel state
     const conversationCache = ref({});          // conversationId → saved state snapshot
-    const currentConversationId = ref(null);    // currently visible conversation
+    const currentConversationId = ref(crypto.randomUUID());    // currently visible conversation
     const processingConversations = ref({});    // conversationId → boolean
 
     // ── switchConversation: save current → load target ──
