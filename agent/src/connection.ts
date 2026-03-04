@@ -250,19 +250,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const m = msg as unknown as { claudeSessionId: string; conversationId?: string };
       const convId = m.conversationId;
 
-      if (convId) {
-        // Multi-session mode: check if any existing conversation already has this claudeSessionId
-        let alreadyActive = false;
-        for (const [, conv] of getConversations()) {
-          if (conv.claudeSessionId === m.claudeSessionId && conv.child) {
-            alreadyActive = true;
-            break;
-          }
-        }
-        if (!alreadyActive) {
-          // No active process for this session — will be started on next chat message
-        }
-      } else {
+      if (!convId) {
         // Backward compat: single-session mode
         const conv = getConversation();
         if (!conv || conv.claudeSessionId !== m.claudeSessionId) {
