@@ -155,7 +155,13 @@ export function createSidebar(deps) {
   const deleteConfirmTitle = deps.deleteConfirmTitle;
 
   function deleteSession(session) {
-    if (currentClaudeSessionId.value === session.sessionId) return; // guard
+    if (currentClaudeSessionId.value === session.sessionId) return; // guard: foreground
+    // Guard: check background conversations in cache
+    if (conversationCache) {
+      for (const [, cached] of Object.entries(conversationCache.value)) {
+        if (cached.claudeSessionId === session.sessionId) return;
+      }
+    }
     pendingDeleteSession = session;
     deleteConfirmTitle.value = session.title || session.sessionId.slice(0, 8);
     deleteConfirmOpen.value = true;
