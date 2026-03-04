@@ -259,6 +259,7 @@ body {
 
 .sidebar-workdir {
   overflow: hidden;
+  position: relative;
 }
 
 .sidebar-hostname {
@@ -1864,34 +1865,69 @@ body {
   justify-content: space-between;
 }
 
-.sidebar-workdir-actions {
+/* ── Workdir path row (clickable) ── */
+.sidebar-workdir-path-row {
   display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.sidebar-change-dir-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-secondary);
+  align-items: flex-start;
+  gap: 4px;
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  border-radius: 4px;
+  transition: background 0.15s;
 }
 
-.sidebar-change-dir-btn:hover {
-  color: var(--text-primary);
+.sidebar-workdir-path-row:hover {
   background: var(--bg-tertiary);
 }
 
-.sidebar-change-dir-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.sidebar-workdir-path-row .sidebar-workdir-path {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-workdir-chevron {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.sidebar-workdir-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* ── Workdir dropdown menu ── */
+.workdir-menu {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  z-index: 50;
+  margin-top: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.workdir-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.workdir-menu-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.workdir-menu-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
 }
 
 /* ── Folder Picker Modal ── */
@@ -2253,6 +2289,25 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+}
+
+.file-panel-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.file-panel-resize-handle:hover,
+.file-panel-resize-handle:active {
+  background: var(--accent);
+  opacity: 0.4;
 }
 
 .file-panel-header {
@@ -2312,6 +2367,7 @@ body {
 .file-tree {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.25rem 0;
 }
 
@@ -2326,6 +2382,7 @@ body {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  overflow: hidden;
 }
 
 .file-tree-item:hover {
@@ -2357,6 +2414,8 @@ body {
 }
 
 .file-tree-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -2446,26 +2505,6 @@ body {
   opacity: 0;
 }
 
-/* ── File browse button in sidebar ── */
-.sidebar-browse-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  background: none;
-  border: none;
-  border-radius: 4px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-}
-
-.sidebar-browse-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
 /* ── Mobile file browser in sidebar ── */
 .file-panel-mobile {
   display: flex;
@@ -2504,7 +2543,7 @@ body {
    ══════════════════════════════════════════ */
 @media (max-width: 1200px) and (min-width: 769px) {
   .file-panel {
-    width: clamp(200px, 20vw, 280px);
+    max-width: clamp(200px, 20vw, 280px);
   }
 }
 

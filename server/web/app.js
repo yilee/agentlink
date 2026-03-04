@@ -96,12 +96,14 @@ const App = {
     const processingConversations = ref({});    // conversationId → boolean
 
     // File browser state
-    const filePanelOpen = ref(localStorage.getItem('agentlink-file-panel-open') === 'true');
+    const filePanelOpen = ref(false);
+    const filePanelWidth = ref(parseInt(localStorage.getItem('agentlink-file-panel-width'), 10) || 280);
     const fileTreeRoot = ref(null);
     const fileTreeLoading = ref(false);
     const fileContextMenu = ref(null);
     const sidebarView = ref('sessions');       // 'sessions' | 'files' (mobile only)
     const isMobile = ref(window.innerWidth <= 768);
+    const workdirMenuOpen = ref(false);
 
     // ── switchConversation: save current → load target ──
     // Defined here and used by sidebar.newConversation, sidebar.resumeSession, workdir_changed
@@ -266,17 +268,28 @@ const App = {
     // File browser module
     const fileBrowser = createFileBrowser({
       wsSend, workDir, inputText, inputRef, sendMessage,
-      filePanelOpen, fileTreeRoot, fileTreeLoading, fileContextMenu,
+      filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
       sidebarOpen, sidebarView,
     });
     setFileBrowser(fileBrowser);
 
-    // Persist file panel open state
-    watch(filePanelOpen, (v) => localStorage.setItem('agentlink-file-panel-open', String(v)));
-
     // Track mobile state on resize
     let _resizeHandler = () => { isMobile.value = window.innerWidth <= 768; };
     window.addEventListener('resize', _resizeHandler);
+
+    // Close workdir menu on outside click or Escape
+    let _workdirMenuClickHandler = (e) => {
+      if (!workdirMenuOpen.value) return;
+      const row = document.querySelector('.sidebar-workdir-path-row');
+      const menu = document.querySelector('.workdir-menu');
+      if ((row && row.contains(e.target)) || (menu && menu.contains(e.target))) return;
+      workdirMenuOpen.value = false;
+    };
+    let _workdirMenuKeyHandler = (e) => {
+      if (e.key === 'Escape' && workdirMenuOpen.value) workdirMenuOpen.value = false;
+    };
+    document.addEventListener('click', _workdirMenuClickHandler);
+    document.addEventListener('keydown', _workdirMenuKeyHandler);
 
     // ── Computed ──
     const hasInput = computed(() => !!(inputText.value.trim() || attachments.value.length > 0));
@@ -401,7 +414,7 @@ const App = {
 
     // ── Lifecycle ──
     onMounted(() => { connect(scheduleHighlight); });
-    onUnmounted(() => { closeWs(); streaming.cleanup(); window.removeEventListener('resize', _resizeHandler); });
+    onUnmounted(() => { closeWs(); streaming.cleanup(); window.removeEventListener('resize', _resizeHandler); document.removeEventListener('click', _workdirMenuClickHandler); document.removeEventListener('keydown', _workdirMenuKeyHandler); });
 
     return {
       status, agentName, hostname, workDir, sessionId, error,
@@ -466,9 +479,24 @@ const App = {
       handleDrop: fileAttach.handleDrop,
       handlePaste: fileAttach.handlePaste,
       // File browser
-      filePanelOpen, fileTreeRoot, fileTreeLoading, fileContextMenu,
+      filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
       sidebarView, isMobile, fileBrowser,
       flattenedTree: fileBrowser.flattenedTree,
+      workdirMenuOpen,
+      toggleWorkdirMenu() { workdirMenuOpen.value = !workdirMenuOpen.value; },
+      workdirMenuBrowse() {
+        workdirMenuOpen.value = false;
+        if (isMobile.value) { sidebarView.value = 'files'; fileBrowser.openPanel(); }
+        else { fileBrowser.togglePanel(); }
+      },
+      workdirMenuChangeDir() {
+        workdirMenuOpen.value = false;
+        sidebar.openFolderPicker();
+      },
+      workdirMenuCopyPath() {
+        workdirMenuOpen.value = false;
+        navigator.clipboard.writeText(workDir.value);
+      },
     };
   },
   template: `
@@ -556,16 +584,25 @@ const App = {
               </div>
               <div class="sidebar-workdir-header">
                 <div class="sidebar-workdir-label">Working Directory</div>
-                <div class="sidebar-workdir-actions">
-                  <button class="sidebar-browse-btn" @click="isMobile ? (sidebarView = 'files', fileBrowser.openPanel()) : fileBrowser.togglePanel()" title="Browse files">
-                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M3 6h8l2 2h6c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2H3c-1.1 0-2-.9-2-2V8c0-1.1.9-2 2-2zm0 2v10h18V10H12.83l-2-2H3zm5 3h8v2H8v-2z"/></svg>
-                  </button>
-                  <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory">
-                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                  </button>
+              </div>
+              <div class="sidebar-workdir-path-row" @click.stop="toggleWorkdirMenu()">
+                <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
+                <svg class="sidebar-workdir-chevron" :class="{ open: workdirMenuOpen }" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+              </div>
+              <div v-if="workdirMenuOpen" class="workdir-menu">
+                <div class="workdir-menu-item" @click.stop="workdirMenuBrowse()">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13h8v2H8v-2z"/></svg>
+                  <span>Browse files</span>
+                </div>
+                <div class="workdir-menu-item" @click.stop="workdirMenuChangeDir()">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                  <span>Change directory</span>
+                </div>
+                <div class="workdir-menu-item" @click.stop="workdirMenuCopyPath()">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                  <span>Copy path</span>
                 </div>
               </div>
-              <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
               <div v-if="filteredWorkdirHistory.length > 0" class="workdir-history">
                 <div class="workdir-history-label">Recent Directories</div>
                 <div class="workdir-history-list">
@@ -662,12 +699,16 @@ const App = {
 
         <!-- File browser panel (desktop) -->
         <Transition name="file-panel">
-        <div v-if="filePanelOpen && !isMobile" class="file-panel">
+        <div v-if="filePanelOpen && !isMobile" class="file-panel" :style="{ width: filePanelWidth + 'px' }">
+          <div class="file-panel-resize-handle" @mousedown="fileBrowser.onResizeStart($event)" @touchstart="fileBrowser.onResizeStart($event)"></div>
           <div class="file-panel-header">
             <span class="file-panel-title">Files</span>
             <div class="file-panel-actions">
               <button class="file-panel-btn" @click="fileBrowser.refreshTree()" title="Refresh">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              </button>
+              <button class="file-panel-btn" @click="filePanelOpen = false" title="Close">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
               </button>
             </div>
           </div>

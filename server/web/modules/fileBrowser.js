@@ -9,7 +9,7 @@ export function createFileBrowser(deps) {
   const {
     wsSend, workDir, inputText, inputRef, sendMessage,
     filePanelOpen, fileTreeRoot, fileTreeLoading, fileContextMenu,
-    sidebarOpen, sidebarView,
+    sidebarOpen, sidebarView, filePanelWidth,
   } = deps;
 
   // Map of dirPath → TreeNode awaiting directory_listing response
@@ -252,7 +252,7 @@ export function createFileBrowser(deps) {
       sidebarView.value = 'sessions';
     }
     nextTick(() => {
-      sendMessage();
+      if (inputRef.value) inputRef.value.focus();
     });
   }
 
@@ -312,6 +312,51 @@ export function createFileBrowser(deps) {
     });
   }
 
+  // ── Resize handle (mouse + touch) ──
+
+  let _resizing = false;
+  let _startX = 0;
+  let _startWidth = 0;
+  const MIN_WIDTH = 160;
+  const MAX_WIDTH = 600;
+
+  function onResizeStart(e) {
+    e.preventDefault();
+    _resizing = true;
+    _startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    _startWidth = filePanelWidth.value;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    if (e.type === 'touchstart') {
+      document.addEventListener('touchmove', onResizeMove, { passive: false });
+      document.addEventListener('touchend', onResizeEnd);
+    } else {
+      document.addEventListener('mousemove', onResizeMove);
+      document.addEventListener('mouseup', onResizeEnd);
+    }
+  }
+
+  function onResizeMove(e) {
+    if (!_resizing) return;
+    if (e.type === 'touchmove') e.preventDefault();
+    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    const delta = clientX - _startX;
+    const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, _startWidth + delta));
+    filePanelWidth.value = newWidth;
+  }
+
+  function onResizeEnd() {
+    if (!_resizing) return;
+    _resizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', onResizeMove);
+    document.removeEventListener('mouseup', onResizeEnd);
+    document.removeEventListener('touchmove', onResizeMove);
+    document.removeEventListener('touchend', onResizeEnd);
+    localStorage.setItem('agentlink-file-panel-width', String(filePanelWidth.value));
+  }
+
   // Set up listeners immediately
   setupGlobalListeners();
 
@@ -329,5 +374,6 @@ export function createFileBrowser(deps) {
     handleDirectoryListing,
     onWorkdirChanged,
     flattenedTree,
+    onResizeStart,
   };
 }
