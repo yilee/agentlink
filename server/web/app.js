@@ -111,6 +111,7 @@ const App = {
           messages: messages.value,
           isProcessing: isProcessing.value,
           isCompacting: isCompacting.value,
+          loadingHistory: loadingHistory.value,
           claudeSessionId: currentClaudeSessionId.value,
           visibleLimit: visibleLimit.value,
           needsResume: needsResume.value,
@@ -127,6 +128,7 @@ const App = {
         messages.value = cached.messages;
         isProcessing.value = cached.isProcessing;
         isCompacting.value = cached.isCompacting;
+        loadingHistory.value = cached.loadingHistory || false;
         currentClaudeSessionId.value = cached.claudeSessionId;
         visibleLimit.value = cached.visibleLimit;
         needsResume.value = cached.needsResume;
@@ -141,6 +143,7 @@ const App = {
         messages.value = [];
         isProcessing.value = false;
         isCompacting.value = false;
+        loadingHistory.value = false;
         currentClaudeSessionId.value = null;
         visibleLimit.value = 50;
         needsResume.value = false;
