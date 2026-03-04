@@ -243,7 +243,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'new_conversation':
       // Backward compat: old web client sends this to reset the single conversation
       abortClaude();
-      clearSessionId();
+      clearSessionId('default');
       console.log('[AgentLink] New conversation — session cleared');
       break;
     case 'resume_conversation': {
