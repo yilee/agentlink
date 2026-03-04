@@ -527,6 +527,9 @@ export function createConnection(deps) {
         isProcessing.value = false;
         isCompacting.value = false;
         loadingSessions.value = false;
+        if (currentConversationId && currentConversationId.value) {
+          processingConversations.value[currentConversationId.value] = false;
+        }
         _dequeueNext();
       } else if (msg.type === 'claude_output') {
         handleClaudeOutput(msg, scheduleHighlight);
