@@ -26,7 +26,6 @@ import {
   getIsCompacting,
   clearSessionId,
   setSendFn,
-  handleUserAnswer,
   MAX_CONVERSATIONS,
 } from '../../agent/src/claude.js';
 
