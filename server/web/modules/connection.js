@@ -55,6 +55,83 @@ export function createConnection(deps) {
       return;
     }
 
+    if (msg.type === 'conversation_resumed') {
+      cache.claudeSessionId = msg.claudeSessionId;
+      if (msg.history && Array.isArray(msg.history)) {
+        const batch = [];
+        for (const h of msg.history) {
+          if (h.role === 'user') {
+            if (isContextSummary(h.content)) {
+              batch.push({
+                id: cache.messageIdCounter++, role: 'context-summary',
+                content: h.content, contextExpanded: false,
+                timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+              });
+            } else if (h.isCommandOutput) {
+              batch.push({
+                id: cache.messageIdCounter++, role: 'system',
+                content: h.content, isCommandOutput: true,
+                timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+              });
+            } else {
+              batch.push({
+                id: cache.messageIdCounter++, role: 'user',
+                content: h.content,
+                timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+              });
+            }
+          } else if (h.role === 'assistant') {
+            const last = batch[batch.length - 1];
+            if (last && last.role === 'assistant' && !last.isStreaming) {
+              last.content += '\n\n' + h.content;
+            } else {
+              batch.push({
+                id: cache.messageIdCounter++, role: 'assistant',
+                content: h.content, isStreaming: false,
+                timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+              });
+            }
+          } else if (h.role === 'tool') {
+            batch.push({
+              id: cache.messageIdCounter++, role: 'tool',
+              toolId: h.toolId || '', toolName: h.toolName || 'unknown',
+              toolInput: h.toolInput || '', hasResult: true,
+              expanded: (h.toolName === 'Edit' || h.toolName === 'TodoWrite'),
+              timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+            });
+          }
+        }
+        cache.messages = batch;
+        if (cache.toolMsgMap) cache.toolMsgMap.clear();
+      }
+      cache.loadingHistory = false;
+      if (msg.isCompacting) {
+        cache.isCompacting = true;
+        cache.isProcessing = true;
+        processingConversations.value[convId] = true;
+        cache.messages.push({
+          id: cache.messageIdCounter++, role: 'system',
+          content: 'Context compacting...', isCompactStart: true,
+          timestamp: new Date(),
+        });
+      } else if (msg.isProcessing) {
+        cache.isProcessing = true;
+        processingConversations.value[convId] = true;
+        cache.messages.push({
+          id: cache.messageIdCounter++, role: 'system',
+          content: 'Agent is processing...',
+          timestamp: new Date(),
+        });
+      } else {
+        cache.messages.push({
+          id: cache.messageIdCounter++, role: 'system',
+          content: 'Session restored. You can continue the conversation.',
+          timestamp: new Date(),
+        });
+      }
+      return;
+    }
+
     if (msg.type === 'claude_output') {
       const data = msg.data;
       if (!data) return;
