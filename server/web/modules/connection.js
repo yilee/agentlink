@@ -63,19 +63,19 @@ export function createConnection(deps) {
           if (h.role === 'user') {
             if (isContextSummary(h.content)) {
               batch.push({
-                id: cache.messageIdCounter++, role: 'context-summary',
+                id: ++cache.messageIdCounter, role: 'context-summary',
                 content: h.content, contextExpanded: false,
                 timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
               });
             } else if (h.isCommandOutput) {
               batch.push({
-                id: cache.messageIdCounter++, role: 'system',
+                id: ++cache.messageIdCounter, role: 'system',
                 content: h.content, isCommandOutput: true,
                 timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
               });
             } else {
               batch.push({
-                id: cache.messageIdCounter++, role: 'user',
+                id: ++cache.messageIdCounter, role: 'user',
                 content: h.content,
                 timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
               });
@@ -86,14 +86,14 @@ export function createConnection(deps) {
               last.content += '\n\n' + h.content;
             } else {
               batch.push({
-                id: cache.messageIdCounter++, role: 'assistant',
+                id: ++cache.messageIdCounter, role: 'assistant',
                 content: h.content, isStreaming: false,
                 timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
               });
             }
           } else if (h.role === 'tool') {
             batch.push({
-              id: cache.messageIdCounter++, role: 'tool',
+              id: ++cache.messageIdCounter, role: 'tool',
               toolId: h.toolId || '', toolName: h.toolName || 'unknown',
               toolInput: h.toolInput || '', hasResult: true,
               expanded: (h.toolName === 'Edit' || h.toolName === 'TodoWrite'),
@@ -110,7 +110,7 @@ export function createConnection(deps) {
         cache.isProcessing = true;
         processingConversations.value[convId] = true;
         cache.messages.push({
-          id: cache.messageIdCounter++, role: 'system',
+          id: ++cache.messageIdCounter, role: 'system',
           content: 'Context compacting...', isCompactStart: true,
           timestamp: new Date(),
         });
@@ -118,13 +118,13 @@ export function createConnection(deps) {
         cache.isProcessing = true;
         processingConversations.value[convId] = true;
         cache.messages.push({
-          id: cache.messageIdCounter++, role: 'system',
+          id: ++cache.messageIdCounter, role: 'system',
           content: 'Agent is processing...',
           timestamp: new Date(),
         });
       } else {
         cache.messages.push({
-          id: cache.messageIdCounter++, role: 'system',
+          id: ++cache.messageIdCounter, role: 'system',
           content: 'Session restored. You can continue the conversation.',
           timestamp: new Date(),
         });
@@ -143,7 +143,7 @@ export function createConnection(deps) {
           last.content += data.delta;
         } else {
           msgs.push({
-            id: cache.messageIdCounter++, role: 'assistant',
+            id: ++cache.messageIdCounter, role: 'assistant',
             content: data.delta, isStreaming: true, timestamp: new Date(),
           });
         }
@@ -160,7 +160,7 @@ export function createConnection(deps) {
         }
         for (const tool of data.tools) {
           const toolMsg = {
-            id: cache.messageIdCounter++, role: 'tool',
+            id: ++cache.messageIdCounter, role: 'tool',
             toolId: tool.id, toolName: tool.name || 'unknown',
             toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
             hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite'),
@@ -202,7 +202,7 @@ export function createConnection(deps) {
       processingConversations.value[convId] = false;
       if (msg.type === 'execution_cancelled') {
         cache.messages.push({
-          id: cache.messageIdCounter++, role: 'system',
+          id: ++cache.messageIdCounter, role: 'system',
           content: 'Generation stopped.', timestamp: new Date(),
         });
       }
@@ -211,7 +211,7 @@ export function createConnection(deps) {
       if (msg.status === 'started') {
         cache.isCompacting = true;
         cache.messages.push({
-          id: cache.messageIdCounter++, role: 'system',
+          id: ++cache.messageIdCounter, role: 'system',
           content: 'Context compacting...', isCompactStart: true,
           timestamp: new Date(),
         });
@@ -231,7 +231,7 @@ export function createConnection(deps) {
         last.isStreaming = false;
       }
       cache.messages.push({
-        id: cache.messageIdCounter++, role: 'system',
+        id: ++cache.messageIdCounter, role: 'system',
         content: msg.message, isError: true, timestamp: new Date(),
       });
       cache.isProcessing = false;
@@ -244,7 +244,7 @@ export function createConnection(deps) {
         last.isStreaming = false;
       }
       cache.messages.push({
-        id: cache.messageIdCounter++, role: 'system',
+        id: ++cache.messageIdCounter, role: 'system',
         content: msg.content, isCommandOutput: true, timestamp: new Date(),
       });
     } else if (msg.type === 'ask_user_question') {
@@ -271,7 +271,7 @@ export function createConnection(deps) {
         customTexts[i] = '';
       }
       msgs.push({
-        id: cache.messageIdCounter++,
+        id: ++cache.messageIdCounter,
         role: 'ask-question',
         requestId: msg.requestId,
         questions,
