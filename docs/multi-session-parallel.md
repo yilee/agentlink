@@ -68,7 +68,7 @@ interface ConversationState {
 |----------|--------|
 | `handleChat(prompt, workDir, resumeSessionId?, files?)` | `handleChat(conversationId, prompt, workDir, resumeSessionId?, files?)` |
 | `cancelExecution()` | `cancelExecution(conversationId)` |
-| `abort()` | `abort(conversationId?)` — 无参数 = abort all |
+| `abort()` | `abort(conversationId?)` — 无参数 = abort default conversation |
 | `getConversation()` | `getConversation(conversationId)` |
 | `getIsCompacting()` | `getIsCompacting(conversationId)` |
 | `clearSessionId()` | `clearSessionId(conversationId?)` — 无参数 = 全部清除 |
