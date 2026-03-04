@@ -236,6 +236,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'change_workdir':
       handleChangeWorkDir(msg as unknown as { workDir: string });
       break;
+    case 'new_conversation':
+      abortClaude();
+      clearSessionId();
+      console.log('[AgentLink] New conversation — session cleared');
+      break;
     case 'resume_conversation': {
       const m = msg as unknown as { claudeSessionId: string };
       const conv = getConversation();

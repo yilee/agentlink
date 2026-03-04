@@ -71,6 +71,10 @@ export function createSidebar(deps) {
     currentClaudeSessionId.value = null;
     needsResume.value = false;
 
+    // Tell the agent to clear its lastClaudeSessionId so the next message
+    // starts a fresh session instead of auto-resuming the previous one.
+    wsSend({ type: 'new_conversation' });
+
     messages.value.push({
       id: streaming.nextId(), role: 'system',
       content: 'New conversation started.',
