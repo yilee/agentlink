@@ -235,7 +235,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       handleListSessions();
       break;
     case 'list_directory':
-      handleListDirectory(msg as unknown as { dirPath: string });
+      handleListDirectory(msg as unknown as { dirPath: string; source?: string });
       break;
     case 'change_workdir':
       handleChangeWorkDir(msg as unknown as { workDir: string });
@@ -336,8 +336,9 @@ function handleRenameSession(sessionId: string, newTitle: string): void {
   }
 }
 
-async function handleListDirectory(msg: { dirPath: string }): Promise<void> {
+async function handleListDirectory(msg: { dirPath: string; source?: string }): Promise<void> {
   const dirPath = msg.dirPath || '';
+  const source = msg.source;
 
   try {
     // Empty path: list drives (Windows) or root (Unix)
@@ -350,21 +351,21 @@ async function handleListDirectory(msg: { dirPath: string }): Promise<void> {
             drives.push({ name: letter + ':', type: 'directory' });
           }
         }
-        send({ type: 'directory_listing', dirPath: '', entries: drives });
+        send({ type: 'directory_listing', dirPath: '', entries: drives, source });
         return;
       }
       // Unix: list root
       const entries = await listDirectoryEntries('/');
-      send({ type: 'directory_listing', dirPath: '/', entries });
+      send({ type: 'directory_listing', dirPath: '/', entries, source });
       return;
     }
 
     const resolved = isAbsolute(dirPath) ? resolve(dirPath) : resolve(state.workDir, dirPath);
     const entries = await listDirectoryEntries(resolved);
-    send({ type: 'directory_listing', dirPath: resolved, entries });
+    send({ type: 'directory_listing', dirPath: resolved, entries, source });
   } catch (err) {
     const error = err as Error;
-    send({ type: 'directory_listing', dirPath, entries: [], error: error.message });
+    send({ type: 'directory_listing', dirPath, entries: [], error: error.message, source });
   }
 }
 

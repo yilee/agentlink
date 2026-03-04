@@ -594,8 +594,10 @@ describe('Functional: Working Directory Change', () => {
         return document.body.textContent?.includes(dir) ?? false;
       }, '/original-dir', { timeout: 3000 });
 
-      // Click the folder picker button (folder icon next to working directory)
-      await page.click('.sidebar-change-dir-btn');
+      // Open the workdir dropdown menu and click "Change directory"
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+      await page.click('.workdir-menu-item >> text=Change directory');
 
       // Folder picker modal should appear
       await page.waitForSelector('.folder-picker-dialog', { timeout: 3000 });
@@ -742,6 +744,365 @@ describe('Functional: Session Resume', () => {
         }
         return false;
       }, { timeout: 3000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+});
+
+// ── File Browser Panel ──
+
+/** Helper: connect agent, open page, consume list_sessions */
+async function setupFileBrowserTest(agentName: string, workDir: string) {
+  const agent = await connectMockAgentEncrypted(agentName, workDir);
+  const page = await browser.newPage();
+  await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+  await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+  // Consume list_sessions
+  await agent.waitForMessage((m) => m.type === 'list_sessions');
+  agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir });
+
+  return { agent, page };
+}
+
+/** Helper: respond to list_directory requests with sample entries */
+function respondWithDirectoryListing(
+  agent: Awaited<ReturnType<typeof connectMockAgentEncrypted>>,
+  dirPath: string,
+  entries: Array<{ name: string; type: string }>,
+) {
+  agent.sendEncrypted({
+    type: 'directory_listing',
+    dirPath,
+    entries,
+    source: 'file_browser',
+  });
+}
+
+describe('Functional: File Browser Panel', () => {
+  it('opens file panel via workdir dropdown "Browse files" and shows tree', async () => {
+    const { agent, page } = await setupFileBrowserTest('FileBrowseAgent', '/browse-test');
+    try {
+      // File panel should not be visible initially
+      const panelCount = await page.locator('.file-panel').count();
+      expect(panelCount).toBe(0);
+
+      // Open workdir dropdown and click "Browse files"
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+      await page.click('.workdir-menu-item >> text=Browse files');
+
+      // File panel should appear
+      await page.waitForSelector('.file-panel', { timeout: 3000 });
+
+      // Agent should receive list_directory for the root
+      const listDirMsg = await agent.waitForMessage((m) => m.type === 'list_directory');
+      expect(listDirMsg.type).toBe('list_directory');
+
+      // Respond with directory listing
+      respondWithDirectoryListing(agent, '/browse-test', [
+        { name: 'src', type: 'directory' },
+        { name: 'docs', type: 'directory' },
+        { name: 'README.md', type: 'file' },
+        { name: 'package.json', type: 'file' },
+      ]);
+
+      // Wait for tree items to render
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('.file-tree-item').length === 4;
+      }, { timeout: 5000 });
+
+      // Verify file names rendered
+      const names = await page.locator('.file-tree-name').allTextContents();
+      expect(names).toContain('src');
+      expect(names).toContain('README.md');
+      expect(names).toContain('package.json');
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('closes file panel via close button', async () => {
+    const { agent, page } = await setupFileBrowserTest('CloseAgent', '/close-test');
+    try {
+      // Open panel
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+      await page.click('.workdir-menu-item >> text=Browse files');
+      await page.waitForSelector('.file-panel', { timeout: 3000 });
+
+      // Consume list_directory
+      await agent.waitForMessage((m) => m.type === 'list_directory');
+      respondWithDirectoryListing(agent, '/close-test', [
+        { name: 'file.txt', type: 'file' },
+      ]);
+
+      // Click close button (the X icon in the header)
+      const closeBtn = page.locator('.file-panel-btn[title="Close"]');
+      await closeBtn.click();
+
+      // Panel should disappear
+      await page.waitForSelector('.file-panel', { state: 'detached', timeout: 3000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('expands and collapses directories in file tree', async () => {
+    const { agent, page } = await setupFileBrowserTest('ExpandAgent', '/expand-test');
+    try {
+      // Open panel
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+      await page.click('.workdir-menu-item >> text=Browse files');
+      await page.waitForSelector('.file-panel', { timeout: 3000 });
+
+      // Root listing
+      await agent.waitForMessage((m) => m.type === 'list_directory');
+      respondWithDirectoryListing(agent, '/expand-test', [
+        { name: 'src', type: 'directory' },
+        { name: 'config.json', type: 'file' },
+      ]);
+
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('.file-tree-item').length === 2;
+      }, { timeout: 5000 });
+
+      // Click on the "src" directory to expand it
+      await page.click('.file-tree-item.folder');
+
+      // Agent should receive list_directory for the subdirectory
+      const subDirMsg = await agent.waitForMessage((m) =>
+        m.type === 'list_directory' && (m.dirPath as string).includes('src'),
+      );
+      expect(subDirMsg.type).toBe('list_directory');
+
+      // Respond with subdirectory contents
+      respondWithDirectoryListing(agent, subDirMsg.dirPath as string, [
+        { name: 'index.ts', type: 'file' },
+        { name: 'utils.ts', type: 'file' },
+      ]);
+
+      // Wait for subdirectory items to render (2 root + 2 sub = 4)
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('.file-tree-item').length === 4;
+      }, { timeout: 5000 });
+
+      // Verify expanded arrow
+      const expandedArrow = await page.locator('.file-tree-arrow.expanded').count();
+      expect(expandedArrow).toBe(1);
+
+      // Click the folder again to collapse
+      await page.click('.file-tree-item.folder');
+
+      // Should go back to 2 items
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('.file-tree-item').length === 2;
+      }, { timeout: 3000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('shows context menu on file click with actions', async () => {
+    const { agent, page } = await setupFileBrowserTest('ContextAgent', '/ctx-test');
+    try {
+      // Open panel
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+      await page.click('.workdir-menu-item >> text=Browse files');
+      await page.waitForSelector('.file-panel', { timeout: 3000 });
+
+      await agent.waitForMessage((m) => m.type === 'list_directory');
+      respondWithDirectoryListing(agent, '/ctx-test', [
+        { name: 'app.js', type: 'file' },
+        { name: 'style.css', type: 'file' },
+      ]);
+
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('.file-tree-item').length === 2;
+      }, { timeout: 5000 });
+
+      // Click on a file (not a folder) to open context menu
+      const firstFile = page.locator('.file-tree-item').first();
+      await firstFile.click();
+
+      // Context menu should appear
+      await page.waitForSelector('.file-context-menu', { timeout: 3000 });
+
+      // Verify menu items
+      const menuItems = await page.locator('.file-context-item').allTextContents();
+      const menuText = menuItems.map(t => t.trim());
+      expect(menuText.some(t => t.includes('Ask Claude to read'))).toBe(true);
+      expect(menuText.some(t => t.includes('Copy path'))).toBe(true);
+      expect(menuText.some(t => t.includes('Insert path to input'))).toBe(true);
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('"Ask Claude to read" populates input without sending', async () => {
+    const { agent, page } = await setupFileBrowserTest('ReadAgent', '/read-test');
+    try {
+      // Open panel
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+      await page.click('.workdir-menu-item >> text=Browse files');
+      await page.waitForSelector('.file-panel', { timeout: 3000 });
+
+      await agent.waitForMessage((m) => m.type === 'list_directory');
+      respondWithDirectoryListing(agent, '/read-test', [
+        { name: 'data.json', type: 'file' },
+      ]);
+
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('.file-tree-item').length === 1;
+      }, { timeout: 5000 });
+
+      // Click on file to open context menu
+      await page.click('.file-tree-item');
+      await page.waitForSelector('.file-context-menu', { timeout: 3000 });
+
+      // Click "Ask Claude to read"
+      await page.click('.file-context-item >> text=Ask Claude to read');
+
+      // Context menu should close
+      await page.waitForSelector('.file-context-menu', { state: 'detached', timeout: 3000 });
+
+      // Input textarea should contain the read command but NOT be sent
+      const inputValue = await page.locator('textarea').inputValue();
+      expect(inputValue).toContain('Read the file');
+      expect(inputValue).toContain('data.json');
+
+      // No chat message should have been sent (no user bubble)
+      const userBubbles = await page.locator('.user-bubble').count();
+      expect(userBubbles).toBe(0);
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('file panel shows correct breadcrumb matching workDir', async () => {
+    const { agent, page } = await setupFileBrowserTest('BreadcrumbAgent', '/my/project/path');
+    try {
+      // Open panel
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+      await page.click('.workdir-menu-item >> text=Browse files');
+      await page.waitForSelector('.file-panel', { timeout: 3000 });
+
+      await agent.waitForMessage((m) => m.type === 'list_directory');
+      respondWithDirectoryListing(agent, '/my/project/path', []);
+
+      // Breadcrumb should show the workDir
+      const breadcrumb = await page.textContent('.file-panel-breadcrumb');
+      expect(breadcrumb).toContain('/my/project/path');
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('refresh button reloads the file tree', async () => {
+    const { agent, page } = await setupFileBrowserTest('RefreshAgent', '/refresh-test');
+    try {
+      // Open panel
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+      await page.click('.workdir-menu-item >> text=Browse files');
+      await page.waitForSelector('.file-panel', { timeout: 3000 });
+
+      // First load
+      await agent.waitForMessage((m) => m.type === 'list_directory');
+      respondWithDirectoryListing(agent, '/refresh-test', [
+        { name: 'old-file.txt', type: 'file' },
+      ]);
+
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('.file-tree-item').length === 1;
+      }, { timeout: 5000 });
+
+      // Click refresh
+      await page.click('.file-panel-btn[title="Refresh"]');
+
+      // Agent should receive another list_directory
+      const refreshMsg = await agent.waitForMessage((m) => m.type === 'list_directory');
+      expect(refreshMsg.type).toBe('list_directory');
+
+      // Respond with updated listing
+      respondWithDirectoryListing(agent, '/refresh-test', [
+        { name: 'old-file.txt', type: 'file' },
+        { name: 'new-file.txt', type: 'file' },
+      ]);
+
+      // Wait for 2 items
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('.file-tree-item').length === 2;
+      }, { timeout: 5000 });
+
+      const names = await page.locator('.file-tree-name').allTextContents();
+      expect(names).toContain('new-file.txt');
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+});
+
+// ── Workdir Dropdown Menu ──
+
+describe('Functional: Workdir Dropdown Menu', () => {
+  it('toggles open/close on path row click', async () => {
+    const { agent, page } = await setupFileBrowserTest('MenuToggleAgent', '/toggle-test');
+    try {
+      // Menu should not be visible initially
+      let menuCount = await page.locator('.workdir-menu').count();
+      expect(menuCount).toBe(0);
+
+      // Click path row to open
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+
+      // Click path row again to close
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { state: 'detached', timeout: 3000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('closes on Escape key', async () => {
+    const { agent, page } = await setupFileBrowserTest('EscAgent', '/esc-test');
+    try {
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+
+      // Press Escape
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('.workdir-menu', { state: 'detached', timeout: 3000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('shows three menu items: Browse files, Change directory, Copy path', async () => {
+    const { agent, page } = await setupFileBrowserTest('MenuItemsAgent', '/items-test');
+    try {
+      await page.click('.sidebar-workdir-path-row');
+      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
+
+      const items = await page.locator('.workdir-menu-item').allTextContents();
+      const trimmed = items.map(t => t.trim());
+      expect(trimmed).toEqual(['Browse files', 'Change directory', 'Copy path']);
     } finally {
       await page.close();
       agent.ws.close();

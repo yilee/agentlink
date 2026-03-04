@@ -16,6 +16,7 @@ import {
 import { createStreaming } from './modules/streaming.js';
 import { createSidebar } from './modules/sidebar.js';
 import { createConnection } from './modules/connection.js';
+import { createFileBrowser } from './modules/fileBrowser.js';
 
 // ── App ─────────────────────────────────────────────────────────────────────
 const App = {
@@ -93,6 +94,16 @@ const App = {
     const conversationCache = ref({});          // conversationId → saved state snapshot
     const currentConversationId = ref(crypto.randomUUID());    // currently visible conversation
     const processingConversations = ref({});    // conversationId → boolean
+
+    // File browser state
+    const filePanelOpen = ref(false);
+    const filePanelWidth = ref(parseInt(localStorage.getItem('agentlink-file-panel-width'), 10) || 280);
+    const fileTreeRoot = ref(null);
+    const fileTreeLoading = ref(false);
+    const fileContextMenu = ref(null);
+    const sidebarView = ref('sessions');       // 'sessions' | 'files' (mobile only)
+    const isMobile = ref(window.innerWidth <= 768);
+    const workdirMenuOpen = ref(false);
 
     // ── switchConversation: save current → load target ──
     // Defined here and used by sidebar.newConversation, sidebar.resumeSession, workdir_changed
@@ -233,7 +244,7 @@ const App = {
       switchConversation,
     });
 
-    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, isProcessing, isCompacting, visibleLimit, queuedMessages,
@@ -253,6 +264,32 @@ const App = {
     _getToolMsgMap = getToolMsgMap;
     _restoreToolMsgMap = restoreToolMsgMap;
     _clearToolMsgMap = clearToolMsgMap;
+
+    // File browser module
+    const fileBrowser = createFileBrowser({
+      wsSend, workDir, inputText, inputRef, sendMessage,
+      filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
+      sidebarOpen, sidebarView,
+    });
+    setFileBrowser(fileBrowser);
+
+    // Track mobile state on resize
+    let _resizeHandler = () => { isMobile.value = window.innerWidth <= 768; };
+    window.addEventListener('resize', _resizeHandler);
+
+    // Close workdir menu on outside click or Escape
+    let _workdirMenuClickHandler = (e) => {
+      if (!workdirMenuOpen.value) return;
+      const row = document.querySelector('.sidebar-workdir-path-row');
+      const menu = document.querySelector('.workdir-menu');
+      if ((row && row.contains(e.target)) || (menu && menu.contains(e.target))) return;
+      workdirMenuOpen.value = false;
+    };
+    let _workdirMenuKeyHandler = (e) => {
+      if (e.key === 'Escape' && workdirMenuOpen.value) workdirMenuOpen.value = false;
+    };
+    document.addEventListener('click', _workdirMenuClickHandler);
+    document.addEventListener('keydown', _workdirMenuKeyHandler);
 
     // ── Computed ──
     const hasInput = computed(() => !!(inputText.value.trim() || attachments.value.length > 0));
@@ -377,7 +414,7 @@ const App = {
 
     // ── Lifecycle ──
     onMounted(() => { connect(scheduleHighlight); });
-    onUnmounted(() => { closeWs(); streaming.cleanup(); });
+    onUnmounted(() => { closeWs(); streaming.cleanup(); window.removeEventListener('resize', _resizeHandler); document.removeEventListener('click', _workdirMenuClickHandler); document.removeEventListener('keydown', _workdirMenuKeyHandler); });
 
     return {
       status, agentName, hostname, workDir, sessionId, error,
@@ -441,6 +478,25 @@ const App = {
       handleDragLeave: fileAttach.handleDragLeave,
       handleDrop: fileAttach.handleDrop,
       handlePaste: fileAttach.handlePaste,
+      // File browser
+      filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
+      sidebarView, isMobile, fileBrowser,
+      flattenedTree: fileBrowser.flattenedTree,
+      workdirMenuOpen,
+      toggleWorkdirMenu() { workdirMenuOpen.value = !workdirMenuOpen.value; },
+      workdirMenuBrowse() {
+        workdirMenuOpen.value = false;
+        if (isMobile.value) { sidebarView.value = 'files'; fileBrowser.openPanel(); }
+        else { fileBrowser.togglePanel(); }
+      },
+      workdirMenuChangeDir() {
+        workdirMenuOpen.value = false;
+        sidebar.openFolderPicker();
+      },
+      workdirMenuCopyPath() {
+        workdirMenuOpen.value = false;
+        navigator.clipboard.writeText(workDir.value);
+      },
     };
   },
   template: `
@@ -478,9 +534,48 @@ const App = {
 
       <div v-else class="main-body">
         <!-- Sidebar backdrop (mobile) -->
-        <div v-if="sidebarOpen" class="sidebar-backdrop" @click="toggleSidebar"></div>
+        <div v-if="sidebarOpen" class="sidebar-backdrop" @click="toggleSidebar(); sidebarView = 'sessions'"></div>
         <!-- Sidebar -->
         <aside v-if="sidebarOpen" class="sidebar">
+          <!-- Mobile: file browser view -->
+          <div v-if="isMobile && sidebarView === 'files'" class="file-panel-mobile">
+            <div class="file-panel-mobile-header">
+              <button class="file-panel-mobile-back" @click="sidebarView = 'sessions'">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                Sessions
+              </button>
+              <button class="file-panel-btn" @click="fileBrowser.refreshTree()" title="Refresh">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              </button>
+            </div>
+            <div class="file-panel-breadcrumb" :title="workDir">{{ workDir }}</div>
+            <div v-if="fileTreeLoading" class="file-panel-loading">Loading...</div>
+            <div v-else-if="!fileTreeRoot || !fileTreeRoot.children || fileTreeRoot.children.length === 0" class="file-panel-empty">
+              No files found.
+            </div>
+            <div v-else class="file-tree">
+              <template v-for="item in flattenedTree" :key="item.node.path">
+                <div
+                  class="file-tree-item"
+                  :class="{ folder: item.node.type === 'directory' }"
+                  :style="{ paddingLeft: (item.depth * 16 + 8) + 'px' }"
+                  @click="item.node.type === 'directory' ? fileBrowser.toggleFolder(item.node) : fileBrowser.onFileClick($event, item.node)"
+                >
+                  <span v-if="item.node.type === 'directory'" class="file-tree-arrow" :class="{ expanded: item.node.expanded }">&#9654;</span>
+                  <span v-else class="file-tree-file-icon">
+                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+                  </span>
+                  <span class="file-tree-name" :title="item.node.path">{{ item.node.name }}</span>
+                  <span v-if="item.node.loading" class="file-tree-spinner"></span>
+                </div>
+                <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">(empty)</div>
+                <div v-if="item.node.error" class="file-tree-error" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ item.node.error }}</div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Normal sidebar content (sessions view) -->
+          <template v-else>
           <div class="sidebar-section">
             <div class="sidebar-workdir">
               <div v-if="hostname" class="sidebar-hostname">
@@ -489,11 +584,25 @@ const App = {
               </div>
               <div class="sidebar-workdir-header">
                 <div class="sidebar-workdir-label">Working Directory</div>
-                <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory">
-                  <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                </button>
               </div>
-              <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
+              <div class="sidebar-workdir-path-row" @click.stop="toggleWorkdirMenu()">
+                <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
+                <svg class="sidebar-workdir-chevron" :class="{ open: workdirMenuOpen }" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+              </div>
+              <div v-if="workdirMenuOpen" class="workdir-menu">
+                <div class="workdir-menu-item" @click.stop="workdirMenuBrowse()">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13h8v2H8v-2z"/></svg>
+                  <span>Browse files</span>
+                </div>
+                <div class="workdir-menu-item" @click.stop="workdirMenuChangeDir()">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                  <span>Change directory</span>
+                </div>
+                <div class="workdir-menu-item" @click.stop="workdirMenuCopyPath()">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                  <span>Copy path</span>
+                </div>
+              </div>
               <div v-if="filteredWorkdirHistory.length > 0" class="workdir-history">
                 <div class="workdir-history-label">Recent Directories</div>
                 <div class="workdir-history-list">
@@ -585,7 +694,50 @@ const App = {
             <span v-if="serverVersion && agentVersion" class="sidebar-version-sep">/</span>
             <span v-if="agentVersion">agent {{ agentVersion }}</span>
           </div>
+          </template>
         </aside>
+
+        <!-- File browser panel (desktop) -->
+        <Transition name="file-panel">
+        <div v-if="filePanelOpen && !isMobile" class="file-panel" :style="{ width: filePanelWidth + 'px' }">
+          <div class="file-panel-resize-handle" @mousedown="fileBrowser.onResizeStart($event)" @touchstart="fileBrowser.onResizeStart($event)"></div>
+          <div class="file-panel-header">
+            <span class="file-panel-title">Files</span>
+            <div class="file-panel-actions">
+              <button class="file-panel-btn" @click="fileBrowser.refreshTree()" title="Refresh">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              </button>
+              <button class="file-panel-btn" @click="filePanelOpen = false" title="Close">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="file-panel-breadcrumb" :title="workDir">{{ workDir }}</div>
+          <div v-if="fileTreeLoading" class="file-panel-loading">Loading...</div>
+          <div v-else-if="!fileTreeRoot || !fileTreeRoot.children || fileTreeRoot.children.length === 0" class="file-panel-empty">
+            No files found.
+          </div>
+          <div v-else class="file-tree">
+            <template v-for="item in flattenedTree" :key="item.node.path">
+              <div
+                class="file-tree-item"
+                :class="{ folder: item.node.type === 'directory' }"
+                :style="{ paddingLeft: (item.depth * 16 + 8) + 'px' }"
+                @click="item.node.type === 'directory' ? fileBrowser.toggleFolder(item.node) : fileBrowser.onFileClick($event, item.node)"
+              >
+                <span v-if="item.node.type === 'directory'" class="file-tree-arrow" :class="{ expanded: item.node.expanded }">&#9654;</span>
+                <span v-else class="file-tree-file-icon">
+                  <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+                </span>
+                <span class="file-tree-name" :title="item.node.path">{{ item.node.name }}</span>
+                <span v-if="item.node.loading" class="file-tree-spinner"></span>
+              </div>
+              <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">(empty)</div>
+              <div v-if="item.node.error" class="file-tree-error" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ item.node.error }}</div>
+            </template>
+          </div>
+        </div>
+        </Transition>
 
         <!-- Chat area -->
         <div class="chat-area">
@@ -891,6 +1043,26 @@ const App = {
             <p>{{ authError }}</p>
             <p class="auth-locked-hint">Close this tab and try again later.</p>
           </div>
+        </div>
+      </div>
+
+      <!-- File context menu -->
+      <div
+        v-if="fileContextMenu"
+        class="file-context-menu"
+        :style="{ left: fileContextMenu.x + 'px', top: fileContextMenu.y + 'px' }"
+      >
+        <div class="file-context-item" @click="fileBrowser.askClaudeRead()">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM5 15h14v2H5zm0-4h14v2H5zm0-4h14v2H5z"/></svg>
+          Ask Claude to read
+        </div>
+        <div class="file-context-item" @click="fileBrowser.copyPath()">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          {{ fileContextMenu.copied ? 'Copied!' : 'Copy path' }}
+        </div>
+        <div class="file-context-item" @click="fileBrowser.insertPath()">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+          Insert path to input
         </div>
       </div>
     </div>
