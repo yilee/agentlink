@@ -32,18 +32,65 @@ export function createSidebar(deps) {
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
     hostname, workdirHistory,
+    // Multi-session parallel
+    currentConversationId, conversationCache, processingConversations,
+    switchConversation,
   } = deps;
 
   // ── Session management ──
 
+  let _sessionListTimer = null;
+
   function requestSessionList() {
+    // Debounce: coalesce rapid calls (e.g. session_started + turn_completed)
+    // into a single request. First call fires immediately, subsequent calls
+    // within 2s are deferred.
+    if (_sessionListTimer) {
+      clearTimeout(_sessionListTimer);
+      _sessionListTimer = setTimeout(() => {
+        _sessionListTimer = null;
+        loadingSessions.value = true;
+        wsSend({ type: 'list_sessions' });
+      }, 2000);
+      return;
+    }
     loadingSessions.value = true;
     wsSend({ type: 'list_sessions' });
+    _sessionListTimer = setTimeout(() => { _sessionListTimer = null; }, 2000);
   }
 
   function resumeSession(session) {
-    if (isProcessing.value) return;
     if (window.innerWidth <= 768) sidebarOpen.value = false;
+
+    // Multi-session: check if we already have a conversation loaded for this claudeSessionId
+    if (switchConversation && conversationCache) {
+      // Check cache for existing conversation with this claudeSessionId
+      for (const [convId, cached] of Object.entries(conversationCache.value)) {
+        if (cached.claudeSessionId === session.sessionId) {
+          switchConversation(convId);
+          return;
+        }
+      }
+      // Check if current foreground already shows this session
+      if (currentClaudeSessionId.value === session.sessionId) {
+        return;
+      }
+      // Create new conversationId, switch to it, then send resume
+      const newConvId = crypto.randomUUID();
+      switchConversation(newConvId);
+      currentClaudeSessionId.value = session.sessionId;
+      needsResume.value = true;
+      loadingHistory.value = true;
+      wsSend({
+        type: 'resume_conversation',
+        conversationId: newConvId,
+        claudeSessionId: session.sessionId,
+      });
+      return;
+    }
+
+    // Legacy fallback (no multi-session)
+    if (isProcessing.value) return;
     messages.value = [];
     visibleLimit.value = 50;
     streaming.setMessageIdCounter(0);
@@ -61,8 +108,22 @@ export function createSidebar(deps) {
   }
 
   function newConversation() {
-    if (isProcessing.value) return;
     if (window.innerWidth <= 768) sidebarOpen.value = false;
+
+    // Multi-session: just switch to a new blank conversation
+    if (switchConversation) {
+      const newConvId = crypto.randomUUID();
+      switchConversation(newConvId);
+      messages.value.push({
+        id: streaming.nextId(), role: 'system',
+        content: 'New conversation started.',
+        timestamp: new Date(),
+      });
+      return;
+    }
+
+    // Legacy fallback (no multi-session)
+    if (isProcessing.value) return;
     messages.value = [];
     visibleLimit.value = 50;
     streaming.setMessageIdCounter(0);
@@ -94,8 +155,13 @@ export function createSidebar(deps) {
   const deleteConfirmTitle = deps.deleteConfirmTitle;
 
   function deleteSession(session) {
-    if (isProcessing.value) return;
-    if (currentClaudeSessionId.value === session.sessionId) return; // guard
+    if (currentClaudeSessionId.value === session.sessionId) return; // guard: foreground
+    // Guard: check background conversations that are actively processing
+    if (conversationCache) {
+      for (const [, cached] of Object.entries(conversationCache.value)) {
+        if (cached.claudeSessionId === session.sessionId && cached.isProcessing) return;
+      }
+    }
     pendingDeleteSession = session;
     deleteConfirmTitle.value = session.title || session.sessionId.slice(0, 8);
     deleteConfirmOpen.value = true;
@@ -119,7 +185,6 @@ export function createSidebar(deps) {
   const renameText = deps.renameText;
 
   function startRename(session) {
-    if (isProcessing.value) return;
     renamingSessionId.value = session.sessionId;
     renameText.value = session.title || '';
   }
@@ -251,13 +316,29 @@ export function createSidebar(deps) {
   }
 
   function switchToWorkdir(path) {
-    if (isProcessing.value) return;
     wsSend({ type: 'change_workdir', workDir: path });
   }
 
   const filteredWorkdirHistory = computed(() => {
     return workdirHistory.value.filter(p => p !== workDir.value);
   });
+
+  // ── isSessionProcessing ──
+  // Used by sidebar template to show processing indicator on session items
+  function isSessionProcessing(claudeSessionId) {
+    if (!conversationCache || !processingConversations) return false;
+    // Check cached background conversations
+    for (const [convId, cached] of Object.entries(conversationCache.value)) {
+      if (cached.claudeSessionId === claudeSessionId && cached.isProcessing) {
+        return true;
+      }
+    }
+    // Check current foreground conversation
+    if (currentClaudeSessionId.value === claudeSessionId && isProcessing.value) {
+      return true;
+    }
+    return false;
+  }
 
   // ── Grouped sessions ──
 
@@ -288,7 +369,7 @@ export function createSidebar(deps) {
     startRename, confirmRename, cancelRename,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
-    groupedSessions,
+    groupedSessions, isSessionProcessing,
     loadWorkdirHistory, addToWorkdirHistory, removeFromWorkdirHistory,
     switchToWorkdir, filteredWorkdirHistory,
   };

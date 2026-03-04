@@ -518,6 +518,24 @@ body {
   line-height: 1.3;
 }
 
+/* Processing indicator: pulsing dot before session title */
+.session-item.processing .session-title::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 6px;
+  vertical-align: middle;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .session-meta {
   font-size: 0.7rem;
   color: var(--text-secondary);

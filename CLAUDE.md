@@ -190,6 +190,14 @@ git tag server-v0.1.86
 git push && git push origin server-v0.1.86
 ```
 
+### E2E Testing
+
+**Test plan:** [`docs/e2e-test-plan.md`](docs/e2e-test-plan.md) — 19 manual E2E tests covering multi-session parallel features. When asked to run a full E2E test, follow every test case in that document using Playwright against a live ephemeral server + agent.
+
+**Scope:** basic messaging, conversation switching, background routing, cancel/resume, simultaneous parallel processing, working directory changes, page refresh recovery, and session deletion.
+
+**Working directory:** Always start the ephemeral agent with `--dir test/e2e-workdir` so that test session history (`~/.claude/projects/`) is isolated from real project sessions. The `test/e2e-workdir/` directory is gitignored (except `.gitkeep`).
+
 ### Development Workflow
 
 - **Commit after each milestone** — every completed feature, bug fix, or logical unit of work should be committed immediately. Do not batch unrelated changes into a single commit.

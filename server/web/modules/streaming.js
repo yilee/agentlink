@@ -84,10 +84,27 @@ export function createStreaming({ messages, scrollToBottom }) {
     if (revealTimer !== null) { clearTimeout(revealTimer); revealTimer = null; }
   }
 
+  function saveState() {
+    flushReveal(); // flush pending text into the message before saving
+    return {
+      pendingText: '',
+      streamingMessageId,
+      messageIdCounter,
+    };
+  }
+
+  function restoreState(saved) {
+    flushReveal(); // clear any current pending
+    pendingText = saved.pendingText || '';
+    streamingMessageId = saved.streamingMessageId ?? null;
+    messageIdCounter = saved.messageIdCounter || 0;
+    if (pendingText) startReveal();
+  }
+
   return {
     startReveal, flushReveal, appendPending, reset, cleanup,
     getMessageIdCounter, setMessageIdCounter,
     getStreamingMessageId, setStreamingMessageId,
-    nextId,
+    nextId, saveState, restoreState,
   };
 }
