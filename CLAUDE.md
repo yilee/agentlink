@@ -166,7 +166,16 @@ node Q:/src/agentlink/server/dist/cli.js start [--daemon] [--ephemeral]
 node Q:/src/agentlink/agent/dist/cli.js start --server ws://localhost:3456 [--ephemeral]
 ```
 
-`--ephemeral` sets `AGENTLINK_NO_STATE=1` so local dev doesn't overwrite prod daemon's `~/.agentlink/*.json`. To stop ephemeral processes, use `wmic process where "commandline like '%%ephemeral%%'"` + `taskkill /pid <PID> /f /t` (not `agentlink-client stop` which targets prod).
+`--ephemeral` sets `AGENTLINK_NO_STATE=1` so local dev doesn't overwrite prod daemon's `~/.agentlink/*.json`. **Do NOT use `agentlink-server stop` / `agentlink-client stop` to kill ephemeral processes** — those commands target prod daemons via `~/.agentlink/*.json`. Instead, kill ephemeral processes by PID:
+```bash
+# macOS/Linux: find and kill ephemeral processes
+ps aux | grep ephemeral | grep -v grep
+kill <PID>
+
+# Windows:
+wmic process where "commandline like '%%ephemeral%%'" get processid
+taskkill /pid <PID> /f /t
+```
 
 ### Releasing (Automated)
 
