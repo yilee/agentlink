@@ -29,6 +29,10 @@ export function createConnection(deps) {
   let _dequeueNext = () => {};
   function setDequeueNext(fn) { _dequeueNext = fn; }
 
+  // File browser — set after creation to resolve circular dependency
+  let fileBrowser = null;
+  function setFileBrowser(fb) { fileBrowser = fb; }
+
   let ws = null;
   let sessionKey = null;
   let reconnectAttempts = 0;
@@ -705,15 +709,20 @@ export function createConnection(deps) {
         }
         scrollToBottom();
       } else if (msg.type === 'directory_listing') {
-        folderPickerLoading.value = false;
-        folderPickerEntries.value = (msg.entries || [])
-          .filter(e => e.type === 'directory')
-          .sort((a, b) => a.name.localeCompare(b.name));
-        if (msg.dirPath != null) folderPickerPath.value = msg.dirPath;
+        if (msg.source === 'file_browser' && fileBrowser) {
+          fileBrowser.handleDirectoryListing(msg);
+        } else {
+          folderPickerLoading.value = false;
+          folderPickerEntries.value = (msg.entries || [])
+            .filter(e => e.type === 'directory')
+            .sort((a, b) => a.name.localeCompare(b.name));
+          if (msg.dirPath != null) folderPickerPath.value = msg.dirPath;
+        }
       } else if (msg.type === 'workdir_changed') {
         workDir.value = msg.workDir;
         localStorage.setItem(`agentlink-workdir-${sessionId.value}`, msg.workDir);
         sidebar.addToWorkdirHistory(msg.workDir);
+        if (fileBrowser) fileBrowser.onWorkdirChanged();
 
         // Multi-session: switch to a new blank conversation for the new workdir.
         // Background conversations keep running and receiving output in their cache.
@@ -788,5 +797,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }

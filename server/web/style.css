@@ -1864,6 +1864,12 @@ body {
   justify-content: space-between;
 }
 
+.sidebar-workdir-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .sidebar-change-dir-btn {
   display: flex;
   align-items: center;
@@ -2237,6 +2243,272 @@ body {
 }
 
 /* ══════════════════════════════════════════
+   File Browser Panel
+   ══════════════════════════════════════════ */
+.file-panel {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.file-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.file-panel-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.file-panel-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.file-panel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.file-panel-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.file-panel-breadcrumb {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.file-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.file-tree-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.file-tree-arrow {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+  display: inline-block;
+}
+
+.file-tree-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.file-tree-file-icon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-tree-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.file-tree-empty {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.file-tree-error {
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: var(--error, #e74c3c);
+}
+
+.file-panel-loading {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.file-panel-empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* ── File Context Menu ── */
+.file-context-menu {
+  position: fixed;
+  z-index: 200;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: 4px 0;
+  min-width: 200px;
+}
+
+.file-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.file-context-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.file-context-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+/* ── File panel transition (Vue <Transition>) ── */
+.file-panel-enter-active,
+.file-panel-leave-active {
+  transition: width 0.2s ease, opacity 0.15s ease;
+  overflow: hidden;
+}
+.file-panel-enter-from,
+.file-panel-leave-to {
+  width: 0 !important;
+  opacity: 0;
+}
+
+/* ── File browse button in sidebar ── */
+.sidebar-browse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.sidebar-browse-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+/* ── Mobile file browser in sidebar ── */
+.file-panel-mobile {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.file-panel-mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.file-panel-mobile-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 0;
+}
+
+.file-panel-mobile-back:hover {
+  opacity: 0.8;
+}
+
+/* ══════════════════════════════════════════
+   Medium screens — file panel narrower
+   ══════════════════════════════════════════ */
+@media (max-width: 1200px) and (min-width: 769px) {
+  .file-panel {
+    width: clamp(200px, 20vw, 280px);
+  }
+}
+
+/* ══════════════════════════════════════════
    Mobile responsive — max-width: 768px
    ══════════════════════════════════════════ */
 @media (max-width: 768px) {
@@ -2248,6 +2520,11 @@ body {
   .layout, .main-body, .chat-area {
     overflow-x: hidden;
     max-width: 100vw;
+  }
+
+  /* File panel hidden on mobile — shown inside sidebar instead */
+  .file-panel {
+    display: none;
   }
 
   /* Sidebar as fixed overlay */
