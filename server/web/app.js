@@ -540,7 +540,7 @@ const App = {
                   :class="['session-item', { active: currentClaudeSessionId === s.sessionId, processing: isSessionProcessing(s.sessionId) }]"
                   @click="renamingSessionId !== s.sessionId && resumeSession(s)"
                   :title="s.preview"
-                  :aria-label="s.title + (isSessionProcessing(s.sessionId) ? ' (processing)' : '')"
+                  :aria-label="(s.title || s.sessionId.slice(0, 8)) + (isSessionProcessing(s.sessionId) ? ' (processing)' : '')"
                 >
                   <div v-if="renamingSessionId === s.sessionId" class="session-rename-row">
                     <input
