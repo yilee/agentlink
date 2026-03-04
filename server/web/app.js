@@ -130,6 +130,9 @@ const App = {
         visibleLimit.value = cached.visibleLimit;
         needsResume.value = cached.needsResume;
         streaming.restoreState(cached.streamingState || { pendingText: '', streamingMessageId: null, messageIdCounter: cached.messageIdCounter || 0 });
+        // Background routing may have incremented messageIdCounter beyond what
+        // streamingState recorded at save time — use the authoritative value.
+        streaming.setMessageIdCounter(cached.messageIdCounter || 0);
         _restoreToolMsgMap(cached.toolMsgMap || new Map());
         queuedMessages.value = [];
       } else {
