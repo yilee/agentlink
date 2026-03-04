@@ -5,11 +5,12 @@ This document defines the full manual E2E test suite for the multi-session paral
 ## Prerequisites
 
 1. Build the project: `npm run build`
-2. Start ephemeral server and agent:
+2. Start ephemeral server and agent, using `test/e2e-workdir` as working directory to isolate test sessions from real history:
    ```bash
-   node server/dist/cli.js start --ephemeral
-   node agent/dist/cli.js start --server ws://localhost:3456 --ephemeral
+   node server/dist/cli.js start --ephemeral --port <PORT>
+   node agent/dist/cli.js start --server ws://localhost:<PORT> --ephemeral --dir test/e2e-workdir
    ```
+   > **Important:** Always use `test/e2e-workdir` as `--dir` so test session history (stored under `~/.claude/projects/`) is kept separate from real project sessions. Do NOT use the project root as the working directory for E2E tests.
 3. Open the session URL in a browser (shown in agent startup output).
 4. Verify status bar shows "Connected" and the agent name.
 
