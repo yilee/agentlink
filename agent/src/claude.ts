@@ -105,6 +105,20 @@ export function getConversations(): Map<string, ConversationState> {
   return conversations;
 }
 
+/**
+ * Evict any idle conversation that holds the given claudeSessionId.
+ * Returns true if a busy (turnActive) conversation blocked the eviction.
+ */
+export function evictByClaudeSessionId(claudeSessionId: string): boolean {
+  for (const [convId, conv] of conversations) {
+    if (conv.claudeSessionId === claudeSessionId || conv.lastClaudeSessionId === claudeSessionId) {
+      if (conv.turnActive) return true; // busy — caller should block
+      cleanupConversation(convId);
+    }
+  }
+  return false;
+}
+
 /** Whether context compaction is currently in progress for a conversation. */
 export function getIsCompacting(conversationId?: string): boolean {
   const conv = conversations.get(conversationId || DEFAULT_CONVERSATION_ID);

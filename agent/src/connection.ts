@@ -9,7 +9,7 @@ import { loadRuntimeState, saveRuntimeState } from './config.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
@@ -310,12 +310,10 @@ function handleListSessions(): void {
 }
 
 function handleDeleteSession(sessionId: string): void {
-  // Check if any active conversation is using this session
-  for (const [, conv] of getConversations()) {
-    if (conv.claudeSessionId === sessionId) {
-      send({ type: 'error', message: 'Cannot delete the active session.' });
-      return;
-    }
+  // Evict any idle conversation holding this session; block if busy
+  if (evictByClaudeSessionId(sessionId)) {
+    send({ type: 'error', message: 'Cannot delete a session while it is processing.' });
+    return;
   }
   const deleted = deleteSession(state.workDir, sessionId);
   if (deleted) {
