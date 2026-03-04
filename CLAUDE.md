@@ -1,0 +1,186 @@
+# CLAUDE.md - AgentLink Project Reference
+
+## Project Overview
+
+AgentLink is a local CLI agent that proxies a local working directory to a cloud web interface (`https://msclaude.ai/xxxx`).
+
+## AgentLink Project
+
+```
+agentlink/
+├── server/src/          # Express + ws server: cli.ts, index.ts, context.ts, ws-agent.ts, ws-client.ts, encryption.ts, config.ts
+│   └── web/             # Vue 3 SPA: index.html, style.css, app.js, encryption.js
+│       └── modules/     # ES modules: markdown, messageHelpers, fileAttachments, askQuestion, streaming, sidebar, connection
+├── agent/src/           # Agent: cli.ts, connection.ts, claude.ts, sdk.ts, stream.ts, history.ts, daemon.ts, encryption.ts, auto-update.ts, service.ts, config.ts, index.ts
+└── test/                # Vitest: server/ (encryption, context), agent/ (encryption, stream, history, config), functional/ (e2e)
+```
+
+### Claude CLI Integration (agent/claude.ts)
+
+**Lifecycle:**
+1. First user message → `startQuery()` spawns `claude` subprocess
+2. Claude runs with `--output-format stream-json --input-format stream-json --verbose --permission-mode bypassPermissions --permission-prompt-tool stdio`
+3. User messages enqueued into `Stream<ClaudeMessage>` → piped to stdin
+4. Stdout parsed as JSON lines by `readline` → forwarded to web client
+5. On `result` message → turn complete, process stays alive for next turn
+6. On `--resume <sessionId>` → resumes previous Claude session
+
+**Session persistence:**
+- `lastClaudeSessionId` (module-level) tracks the most recent session ID across process restarts
+- When `handleChat()` needs to spawn a new process (e.g. after turn completion or cancel), it auto-resumes: `resumeSessionId || conversation?.claudeSessionId || lastClaudeSessionId`
+- `cleanup()` saves `claudeSessionId` to `lastClaudeSessionId` before nulling the conversation
+- `clearSessionId()` resets `lastClaudeSessionId` (called on workdir change)
+
+**Permission & control_request protocol:**
+- `--permission-mode bypassPermissions` auto-approves all regular tool calls
+- `--permission-prompt-tool stdio` routes interactive tool permission checks (like `AskUserQuestion`) through stdout/stdin instead of auto-denying them
+- Claude emits `control_request` with `subtype: 'can_use_tool'` on stdout
+- Agent's `handleControlRequest()` intercepts these:
+  - `AskUserQuestion`: stored in `pendingControlRequests` Map, forwarded to web UI as `ask_user_question` message
+  - All other tools: auto-approved by sending `control_response` with `{ behavior: 'allow' }` back to stdin
+- When web UI submits an answer, agent receives `ask_user_answer`, resolves the pending request by writing `control_response` to Claude's stdin with `updatedInput` containing the user's answers
+- `AskUserQuestion` tool_use blocks are filtered out of regular `claude_output` forwarding (they're handled via the control_request path)
+
+**Output processing:**
+- `assistant` messages: extracts text deltas (incremental) + tool_use blocks (excluding `AskUserQuestion`)
+- `control_request` messages: intercepted for permission handling
+- `control_cancel_request`: cleans up pending requests
+- `user` messages: tool_result forwarding
+- `system` messages: session ID capture, logged only
+- `result` message: turn complete signal
+
+**State:**
+```typescript
+interface ConversationState {
+  child: ChildProcess | null;
+  inputStream: Stream<ClaudeMessage> | null;
+  abortController: AbortController | null;
+  claudeSessionId: string | null;
+  workDir: string;
+  turnActive: boolean;
+  turnResultReceived: boolean;
+}
+```
+
+### Session History (agent/history.ts)
+
+**JSONL file location:** `~/.claude/projects/<folder>/<sessionId>.jsonl`
+
+**Path conversion:** `Q:\src\agentlink` → `Q--src-agentlink` (colons → `-`, slashes → `-`, spaces → `-`)
+
+**`listSessions(workDir)`** — Scans JSONL files, extracts metadata:
+- Title: `custom-title` > `summary` > first user message (truncated to 100 chars)
+- Skips internal command messages (`/compact`, etc.) via `isInternalCommand()` tag detection
+- Returns `SessionInfo[]` sorted by lastModified descending
+
+**`readSessionMessages(workDir, sessionId)`** — Parses full message history:
+- User messages: extracts text from `message.content` (handles string + array formats)
+- Filters out internal CLI commands (messages containing `<local-command-caveat>`, `<command-name>`, `<local-command-stdout>` tags)
+- Assistant messages: iterates content blocks → separate entries for text + tool_use
+- Returns `HistoryMessage[]` (flat list of user/assistant/tool entries)
+
+### WebSocket Message Protocol (AgentLink)
+
+**Server acts as a transparent relay** — all messages from web clients are forwarded to the bound agent, and vice versa. Server intercepts `workdir_changed` to keep its agent state in sync.
+
+**Registration:** Agent connects with `?type=agent&id=NAME&name=NAME&workDir=PATH`, gets `{ type: 'registered', sessionId, sessionKey }`. Web client connects with `?type=web&sessionId=SID`, gets `{ type: 'connected', sessionKey, agent }`. All subsequent messages encrypted (XSalsa20-Poly1305, envelope: `{ n, c, z? }`).
+
+**Message types (Web → Agent):**
+
+| Type | Purpose | Key fields |
+|------|---------|------------|
+| `chat` | Send user prompt | `prompt`, `resumeSessionId?`, `files?: ChatFile[]` |
+| `cancel_execution` | Stop current Claude turn | — |
+| `list_sessions` | Request session history list | — |
+| `resume_conversation` | Resume a historical session | `claudeSessionId` |
+| `list_directory` | Browse host filesystem | `dirPath` |
+| `change_workdir` | Switch working directory | `workDir` |
+| `ask_user_answer` | User's answer to AskUserQuestion | `requestId`, `answers: { questionText: selectedLabel }` |
+
+**Message types (Agent → Web):**
+
+| Type | Purpose | Key fields |
+|------|---------|------------|
+| `claude_output` | Streaming output | `data: { type, delta?, tools? }` |
+| `turn_completed` | Claude turn finished | — |
+| `execution_cancelled` | Execution was stopped | — |
+| `command_output` | CLI command output (/cost, /help, etc.) | `content` |
+| `context_compaction` | Context compaction status | `status: 'started' \| 'completed'` |
+| `error` | Error message | `message` |
+| `sessions_list` | Historical sessions | `sessions[], workDir` |
+| `conversation_resumed` | Session resumed with history | `claudeSessionId, history[]` |
+| `directory_listing` | Filesystem directory contents | `dirPath, entries[], error?` |
+| `workdir_changed` | Working directory updated | `workDir` |
+| `ask_user_question` | Interactive question from Claude | `requestId`, `questions[]` (with header, question, options, multiSelect) |
+
+**claude_output subtypes:**
+
+| data.type | Purpose |
+|-----------|---------|
+| `content_block_delta` | Incremental text (`data.delta`) |
+| `tool_use` | Tool invocations (`data.tools[]`) |
+| `user` / `tool_use_result` | Tool results (forwarded from Claude stdout) |
+| `result` | Turn complete (triggers `turn_completed`) |
+
+### Web UI Architecture
+
+**Web UI modules** (`server/web/modules/`): Stateful modules use factory pattern `createFoo(deps)` → methods; stateless modules export pure functions. Circular dependency between sidebar↔connection resolved via forwarding function in `app.js`.
+
+### Config System
+
+Config file: `~/.agentlink/config.json`
+
+Priority: **CLI flags > config file > defaults**
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `server` | `wss://msclaude.ai` | Relay server WebSocket URL |
+| `dir` | `process.cwd()` | Working directory |
+| `name` | `Agent-{platform}-{pid}` | Agent display name |
+| `autoUpdate` | `true` | Auto-install npm updates in daemon mode (`--no-auto-update` to disable) |
+
+**Runtime & data files (`~/.agentlink/`):**
+
+| File / Dir | Written by | Contains |
+|------------|-----------|----------|
+| `agent.json` | Agent process | PID, sessionId, sessionUrl, server, name, dir, startedAt |
+| `server.json` | Server process | PID, port, startedAt |
+| `logs/` | Agent / Server | stdout/stderr log files for daemon processes |
+| `tmp-attachments/` | Agent (claude.ts) | Uploaded files saved to disk for Claude (timestamped names) |
+
+Used by `agentlink stop`, `agentlink server stop`, and `agentlink status` to find and manage running processes. On Windows, `taskkill /pid /f /t` is used for reliable termination; on Unix, `SIGTERM`.
+
+### Build & Run Commands
+
+```bash
+npm install && npm run build     # install + build all
+npm run dev                      # dev mode (both server + agent, hot reload)
+npm test                         # vitest, also: test:e2e, test:watch, test:coverage
+```
+
+**CLI commands:** `agentlink-server start [--daemon] [--port 8080] | stop | status` and `agentlink-client start [--daemon] [--server ws://...] | stop | status | config list/set/get | service install/uninstall`
+
+**Local dev build** (run from source):
+```bash
+node Q:/src/agentlink/server/dist/cli.js start [--daemon] [--ephemeral]
+node Q:/src/agentlink/agent/dist/cli.js start --server ws://localhost:3456 [--ephemeral]
+```
+
+`--ephemeral` sets `AGENTLINK_NO_STATE=1` so local dev doesn't overwrite prod daemon's `~/.agentlink/*.json`. To stop ephemeral processes, use `wmic process where "commandline like '%%ephemeral%%'"` + `taskkill /pid <PID> /f /t` (not `agentlink-client stop` which targets prod).
+
+### Releasing (Automated)
+
+Pushing a git tag (`server-v<VERSION>` or `agent-v<VERSION>`) triggers GitHub Actions to build, test, publish to npm (`@agent-link/server` or `@agent-link/agent`), and create a GitHub Release. Requires `NPM_TOKEN` repo secret.
+
+```bash
+# Example: release server
+npm version patch --workspace server --no-git-tag-version
+git add server/package.json package-lock.json
+git commit -m "Bump server 0.1.86"
+git tag server-v0.1.86
+git push && git push origin server-v0.1.86
+```
+
+### Development Workflow
+
+- **Commit after each milestone** — every completed feature, bug fix, or logical unit of work should be committed immediately. Do not batch unrelated changes into a single commit.

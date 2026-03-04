@@ -36,5 +36,3 @@ chat-ui-test.png
 .playwright-mcp/
 nul
 
-# Project instructions (local only)
-CLAUDE.md
