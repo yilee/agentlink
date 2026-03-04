@@ -20,6 +20,9 @@ export function createConnection(deps) {
     authRequired, authPassword, authError, authAttempts, authLocked,
     streaming, sidebar,
     scrollToBottom,
+    // Multi-session parallel
+    currentConversationId, processingConversations, conversationCache,
+    switchConversation,
   } = deps;
 
   // Dequeue callback — set after creation to resolve circular dependency
@@ -32,6 +35,176 @@ export function createConnection(deps) {
   let reconnectTimer = null;
   let pingTimer = null;
   const toolMsgMap = new Map(); // toolId -> message (for fast tool_result lookup)
+
+  // ── toolMsgMap save/restore for conversation switching ──
+  function getToolMsgMap() { return new Map(toolMsgMap); }
+  function restoreToolMsgMap(map) { toolMsgMap.clear(); for (const [k, v] of map) toolMsgMap.set(k, v); }
+  function clearToolMsgMap() { toolMsgMap.clear(); }
+
+  // ── Background conversation routing ──
+  // When a message arrives for a conversation that is not the current foreground,
+  // update its cached state directly (no streaming animation).
+  function routeToBackgroundConversation(convId, msg) {
+    const cache = conversationCache.value[convId];
+    if (!cache) return; // no cache entry — discard
+
+    if (msg.type === 'session_started') {
+      // Claude session ID captured for background conversation
+      cache.claudeSessionId = msg.claudeSessionId;
+      sidebar.requestSessionList();
+      return;
+    }
+
+    if (msg.type === 'claude_output') {
+      const data = msg.data;
+      if (!data) return;
+      if (data.type === 'content_block_delta' && data.delta) {
+        // Append text to last assistant message (or create new one)
+        const msgs = cache.messages;
+        const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+        if (last && last.role === 'assistant' && last.isStreaming) {
+          last.content += data.delta;
+        } else {
+          msgs.push({
+            id: cache.messageIdCounter++, role: 'assistant',
+            content: data.delta, isStreaming: true, timestamp: new Date(),
+          });
+        }
+      } else if (data.type === 'tool_use' && data.tools) {
+        // Finalize streaming message
+        const msgs = cache.messages;
+        const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+        if (last && last.role === 'assistant' && last.isStreaming) {
+          last.isStreaming = false;
+          if (isContextSummary(last.content)) {
+            last.role = 'context-summary';
+            last.contextExpanded = false;
+          }
+        }
+        for (const tool of data.tools) {
+          const toolMsg = {
+            id: cache.messageIdCounter++, role: 'tool',
+            toolId: tool.id, toolName: tool.name || 'unknown',
+            toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
+            hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite'),
+            timestamp: new Date(),
+          };
+          msgs.push(toolMsg);
+          if (tool.id) {
+            if (!cache.toolMsgMap) cache.toolMsgMap = new Map();
+            cache.toolMsgMap.set(tool.id, toolMsg);
+          }
+        }
+      } else if (data.type === 'user' && data.tool_use_result) {
+        const result = data.tool_use_result;
+        const results = Array.isArray(result) ? result : [result];
+        const tMap = cache.toolMsgMap || new Map();
+        for (const r of results) {
+          const toolMsg = tMap.get(r.tool_use_id);
+          if (toolMsg) {
+            toolMsg.toolOutput = typeof r.content === 'string'
+              ? r.content : JSON.stringify(r.content, null, 2);
+            toolMsg.hasResult = true;
+          }
+        }
+      }
+    } else if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
+      // Finalize streaming message
+      const msgs = cache.messages;
+      const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      if (last && last.role === 'assistant' && last.isStreaming) {
+        last.isStreaming = false;
+        if (isContextSummary(last.content)) {
+          last.role = 'context-summary';
+          last.contextExpanded = false;
+        }
+      }
+      cache.isProcessing = false;
+      cache.isCompacting = false;
+      if (cache.toolMsgMap) cache.toolMsgMap.clear();
+      processingConversations.value[convId] = false;
+      if (msg.type === 'execution_cancelled') {
+        cache.messages.push({
+          id: cache.messageIdCounter++, role: 'system',
+          content: 'Generation stopped.', timestamp: new Date(),
+        });
+      }
+      sidebar.requestSessionList();
+    } else if (msg.type === 'context_compaction') {
+      if (msg.status === 'started') {
+        cache.isCompacting = true;
+        cache.messages.push({
+          id: cache.messageIdCounter++, role: 'system',
+          content: 'Context compacting...', isCompactStart: true,
+          timestamp: new Date(),
+        });
+      } else if (msg.status === 'completed') {
+        cache.isCompacting = false;
+        const startMsg = [...cache.messages].reverse().find(m => m.isCompactStart && !m.compactDone);
+        if (startMsg) {
+          startMsg.content = 'Context compacted';
+          startMsg.compactDone = true;
+        }
+      }
+    } else if (msg.type === 'error') {
+      // Finalize streaming
+      const msgs = cache.messages;
+      const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      if (last && last.role === 'assistant' && last.isStreaming) {
+        last.isStreaming = false;
+      }
+      cache.messages.push({
+        id: cache.messageIdCounter++, role: 'system',
+        content: msg.message, isError: true, timestamp: new Date(),
+      });
+      cache.isProcessing = false;
+      cache.isCompacting = false;
+      processingConversations.value[convId] = false;
+    } else if (msg.type === 'command_output') {
+      const msgs = cache.messages;
+      const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      if (last && last.role === 'assistant' && last.isStreaming) {
+        last.isStreaming = false;
+      }
+      cache.messages.push({
+        id: cache.messageIdCounter++, role: 'system',
+        content: msg.content, isCommandOutput: true, timestamp: new Date(),
+      });
+    } else if (msg.type === 'ask_user_question') {
+      // Finalize streaming
+      const msgs = cache.messages;
+      const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      if (last && last.role === 'assistant' && last.isStreaming) {
+        last.isStreaming = false;
+      }
+      // Remove AskUserQuestion tool msg
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const m = msgs[i];
+        if (m.role === 'tool' && m.toolName === 'AskUserQuestion') {
+          msgs.splice(i, 1);
+          break;
+        }
+        if (m.role === 'user') break;
+      }
+      const questions = msg.questions || [];
+      const selectedAnswers = {};
+      const customTexts = {};
+      for (let i = 0; i < questions.length; i++) {
+        selectedAnswers[i] = questions[i].multiSelect ? [] : null;
+        customTexts[i] = '';
+      }
+      msgs.push({
+        id: cache.messageIdCounter++,
+        role: 'ask-question',
+        requestId: msg.requestId,
+        questions,
+        answered: false,
+        selectedAnswers,
+        customTexts,
+        timestamp: new Date(),
+      });
+    }
+  }
 
   function wsSend(msg) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -186,6 +359,16 @@ export function createConnection(deps) {
         msg = parsed;
       }
 
+      // ── Multi-session: route messages to background conversations ──
+      // Messages with a conversationId that doesn't match the current foreground
+      // conversation are routed to their cached background state.
+      if (msg.conversationId && currentConversationId
+          && currentConversationId.value
+          && msg.conversationId !== currentConversationId.value) {
+        routeToBackgroundConversation(msg.conversationId, msg);
+        return;
+      }
+
       if (msg.type === 'connected') {
         // Reset auth state
         authRequired.value = false;
@@ -258,6 +441,10 @@ export function createConnection(deps) {
         _dequeueNext();
       } else if (msg.type === 'claude_output') {
         handleClaudeOutput(msg, scheduleHighlight);
+      } else if (msg.type === 'session_started') {
+        // Claude session ID captured — update and refresh sidebar
+        currentClaudeSessionId.value = msg.claudeSessionId;
+        sidebar.requestSessionList();
       } else if (msg.type === 'command_output') {
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
@@ -292,6 +479,9 @@ export function createConnection(deps) {
         isProcessing.value = false;
         isCompacting.value = false;
         toolMsgMap.clear();
+        if (currentConversationId && currentConversationId.value) {
+          processingConversations.value[currentConversationId.value] = false;
+        }
         if (msg.type === 'execution_cancelled') {
           messages.value.push({
             id: streaming.nextId(), role: 'system',
@@ -299,6 +489,7 @@ export function createConnection(deps) {
           });
           scrollToBottom();
         }
+        sidebar.requestSessionList();
         _dequeueNext();
       } else if (msg.type === 'ask_user_question') {
         streaming.flushReveal();
@@ -420,15 +611,24 @@ export function createConnection(deps) {
         workDir.value = msg.workDir;
         localStorage.setItem(`agentlink-workdir-${sessionId.value}`, msg.workDir);
         sidebar.addToWorkdirHistory(msg.workDir);
-        messages.value = [];
-        queuedMessages.value = [];
-        toolMsgMap.clear();
-        visibleLimit.value = 50;
-        streaming.setMessageIdCounter(0);
-        streaming.setStreamingMessageId(null);
-        streaming.reset();
-        currentClaudeSessionId.value = null;
-        isProcessing.value = false;
+
+        // Multi-session: switch to a new blank conversation for the new workdir.
+        // Background conversations keep running and receiving output in their cache.
+        if (switchConversation) {
+          const newConvId = crypto.randomUUID();
+          switchConversation(newConvId);
+        } else {
+          // Fallback for old code path (no switchConversation)
+          messages.value = [];
+          queuedMessages.value = [];
+          toolMsgMap.clear();
+          visibleLimit.value = 50;
+          streaming.setMessageIdCounter(0);
+          streaming.setStreamingMessageId(null);
+          streaming.reset();
+          currentClaudeSessionId.value = null;
+          isProcessing.value = false;
+        }
         messages.value.push({
           id: streaming.nextId(), role: 'system',
           content: 'Working directory changed to: ' + msg.workDir,
@@ -485,5 +685,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }

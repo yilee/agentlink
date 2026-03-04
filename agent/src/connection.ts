@@ -9,7 +9,7 @@ import { loadRuntimeState, saveRuntimeState } from './config.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getIsCompacting, clearSessionId, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 
@@ -149,7 +149,7 @@ function doConnect(
 
 export function disconnect(): void {
   state.shouldReconnect = false;
-  abortClaude();
+  abortAllClaude();
   if (state.ws) {
     state.ws.close();
     state.ws = null;
@@ -216,16 +216,20 @@ function scheduleReconnect(config: AgentConfig): void {
 function handleServerMessage(msg: { type: string; [key: string]: unknown }): void {
   console.log(`[AgentLink] ← ${msg.type}`);
   switch (msg.type) {
-    case 'chat':
+    case 'chat': {
+      const chatConvId = (msg as unknown as { conversationId?: string }).conversationId;
+      const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
       claudeHandleChat(
+        chatConvId,
         (msg as unknown as { prompt: string }).prompt,
-        state.workDir,
+        existingConv?.workDir || state.workDir,
         (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
         (msg as unknown as { files?: ChatFile[] }).files,
       );
       break;
+    }
     case 'cancel_execution':
-      claudeCancelExecution();
+      claudeCancelExecution((msg as unknown as { conversationId?: string }).conversationId);
       break;
     case 'list_sessions':
       handleListSessions();
@@ -237,27 +241,48 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       handleChangeWorkDir(msg as unknown as { workDir: string });
       break;
     case 'new_conversation':
+      // Backward compat: old web client sends this to reset the single conversation
       abortClaude();
       clearSessionId();
       console.log('[AgentLink] New conversation — session cleared');
       break;
     case 'resume_conversation': {
-      const m = msg as unknown as { claudeSessionId: string };
-      const conv = getConversation();
-      // Only kill Claude if switching to a different session
-      if (!conv || conv.claudeSessionId !== m.claudeSessionId) {
-        abortClaude();
+      const m = msg as unknown as { claudeSessionId: string; conversationId?: string };
+      const convId = m.conversationId;
+
+      if (convId) {
+        // Multi-session mode: check if any existing conversation already has this claudeSessionId
+        let alreadyActive = false;
+        for (const [, conv] of getConversations()) {
+          if (conv.claudeSessionId === m.claudeSessionId && conv.child) {
+            alreadyActive = true;
+            break;
+          }
+        }
+        if (!alreadyActive) {
+          // No active process for this session — will be started on next chat message
+        }
+      } else {
+        // Backward compat: single-session mode
+        const conv = getConversation();
+        if (!conv || conv.claudeSessionId !== m.claudeSessionId) {
+          abortClaude();
+        }
       }
+
       const history = readSessionMessages(state.workDir, m.claudeSessionId);
       console.log(`[AgentLink] → conversation_resumed (${history.length} messages, session ${m.claudeSessionId.slice(0, 8)})`);
+
       // Include live status so the web client can restore compacting/processing state
-      const currentConv = getConversation();
+      // In multi-session mode, look up by conversationId; in single-session mode, use default
+      const currentConv = convId ? getConversation(convId) : getConversation();
       const isSameSession = currentConv?.claudeSessionId === m.claudeSessionId;
       send({
         type: 'conversation_resumed',
+        conversationId: convId,
         claudeSessionId: m.claudeSessionId,
         history,
-        isCompacting: isSameSession && getIsCompacting(),
+        isCompacting: isSameSession && (convId ? getIsCompacting(convId) : getIsCompacting()),
         isProcessing: isSameSession && currentConv?.turnActive === true,
       });
       break;
@@ -297,10 +322,12 @@ function handleListSessions(): void {
 }
 
 function handleDeleteSession(sessionId: string): void {
-  const conv = getConversation();
-  if (conv && conv.claudeSessionId === sessionId) {
-    send({ type: 'error', message: 'Cannot delete the active session.' });
-    return;
+  // Check if any active conversation is using this session
+  for (const [, conv] of getConversations()) {
+    if (conv.claudeSessionId === sessionId) {
+      send({ type: 'error', message: 'Cannot delete the active session.' });
+      return;
+    }
   }
   const deleted = deleteSession(state.workDir, sessionId);
   if (deleted) {
@@ -380,11 +407,7 @@ function handleChangeWorkDir(msg: { workDir: string }): void {
     return;
   }
 
-  // Kill any existing Claude process and clear session
-  abortClaude();
-  clearSessionId();
-
-  // Update agent-side workDir
+  // Only update agent-side workDir — existing conversations keep running in their own workDir
   state.workDir = newDir;
   console.log(`[AgentLink] Working directory changed to: ${newDir}`);
 

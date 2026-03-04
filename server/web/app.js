@@ -89,6 +89,68 @@ const App = {
     const fileInputRef = ref(null);
     const dragOver = ref(false);
 
+    // Multi-session parallel state
+    const conversationCache = ref({});          // conversationId → saved state snapshot
+    const currentConversationId = ref(null);    // currently visible conversation
+    const processingConversations = ref({});    // conversationId → boolean
+
+    // ── switchConversation: save current → load target ──
+    // Defined here and used by sidebar.newConversation, sidebar.resumeSession, workdir_changed
+    // Needs access to streaming / connection which are created later, so we use late-binding refs.
+    let _getToolMsgMap = () => new Map();
+    let _restoreToolMsgMap = () => {};
+    let _clearToolMsgMap = () => {};
+
+    function switchConversation(newConvId) {
+      const oldConvId = currentConversationId.value;
+
+      // Save current state (if there is one)
+      if (oldConvId) {
+        const streamState = streaming.saveState();
+        conversationCache.value[oldConvId] = {
+          messages: messages.value,
+          isProcessing: isProcessing.value,
+          isCompacting: isCompacting.value,
+          claudeSessionId: currentClaudeSessionId.value,
+          visibleLimit: visibleLimit.value,
+          needsResume: needsResume.value,
+          streamingState: streamState,
+          toolMsgMap: _getToolMsgMap(),
+          messageIdCounter: streaming.getMessageIdCounter(),
+        };
+      }
+
+      // Load target state
+      const cached = conversationCache.value[newConvId];
+      if (cached) {
+        messages.value = cached.messages;
+        isProcessing.value = cached.isProcessing;
+        isCompacting.value = cached.isCompacting;
+        currentClaudeSessionId.value = cached.claudeSessionId;
+        visibleLimit.value = cached.visibleLimit;
+        needsResume.value = cached.needsResume;
+        streaming.restoreState(cached.streamingState || { pendingText: '', streamingMessageId: null, messageIdCounter: cached.messageIdCounter || 0 });
+        _restoreToolMsgMap(cached.toolMsgMap || new Map());
+        queuedMessages.value = [];
+      } else {
+        // New blank conversation
+        messages.value = [];
+        isProcessing.value = false;
+        isCompacting.value = false;
+        currentClaudeSessionId.value = null;
+        visibleLimit.value = 50;
+        needsResume.value = false;
+        streaming.setMessageIdCounter(0);
+        streaming.setStreamingMessageId(null);
+        streaming.reset();
+        _clearToolMsgMap();
+        queuedMessages.value = [];
+      }
+
+      currentConversationId.value = newConvId;
+      scrollToBottom(true);
+    }
+
     // Theme
     const theme = ref(localStorage.getItem('agentlink-theme') || 'light');
     function applyTheme() {
@@ -159,9 +221,12 @@ const App = {
       deleteConfirmOpen, deleteConfirmTitle,
       renamingSessionId, renameText,
       hostname, workdirHistory,
+      // Multi-session parallel
+      currentConversationId, conversationCache, processingConversations,
+      switchConversation,
     });
 
-    const { connect, wsSend, closeWs, submitPassword, setDequeueNext } = createConnection({
+    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, isProcessing, isCompacting, visibleLimit, queuedMessages,
@@ -169,11 +234,18 @@ const App = {
       folderPickerLoading, folderPickerEntries, folderPickerPath,
       authRequired, authPassword, authError, authAttempts, authLocked,
       streaming, sidebar, scrollToBottom,
+      // Multi-session parallel
+      currentConversationId, processingConversations, conversationCache,
+      switchConversation,
     });
 
     // Now wire up the forwarding function
     _wsSend = wsSend;
     setDequeueNext(dequeueNext);
+    // Wire up late-binding toolMsgMap functions for switchConversation
+    _getToolMsgMap = getToolMsgMap;
+    _restoreToolMsgMap = restoreToolMsgMap;
+    _clearToolMsgMap = clearToolMsgMap;
 
     // ── Computed ──
     const hasInput = computed(() => !!(inputText.value.trim() || attachments.value.length > 0));
@@ -205,6 +277,9 @@ const App = {
       }));
 
       const payload = { type: 'chat', prompt: text || '(see attached files)' };
+      if (currentConversationId.value) {
+        payload.conversationId = currentConversationId.value;
+      }
       if (needsResume.value && currentClaudeSessionId.value) {
         payload.resumeSessionId = currentClaudeSessionId.value;
         needsResume.value = false;
@@ -228,6 +303,9 @@ const App = {
         userMsg.status = 'sent';
         messages.value.push(userMsg);
         isProcessing.value = true;
+        if (currentConversationId.value) {
+          processingConversations.value[currentConversationId.value] = true;
+        }
         wsSend(payload);
       }
       scrollToBottom(true);
@@ -236,7 +314,11 @@ const App = {
 
     function cancelExecution() {
       if (!isProcessing.value) return;
-      wsSend({ type: 'cancel_execution' });
+      const cancelPayload = { type: 'cancel_execution' };
+      if (currentConversationId.value) {
+        cancelPayload.conversationId = currentConversationId.value;
+      }
+      wsSend(cancelPayload);
     }
 
     function dequeueNext() {
@@ -249,6 +331,9 @@ const App = {
       };
       messages.value.push(userMsg);
       isProcessing.value = true;
+      if (currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
       wsSend(queued.payload);
       scrollToBottom(true);
     }
@@ -311,6 +396,8 @@ const App = {
       requestSessionList: sidebar.requestSessionList,
       formatRelativeTime,
       groupedSessions: sidebar.groupedSessions,
+      isSessionProcessing: sidebar.isSessionProcessing,
+      processingConversations,
       // Folder picker
       folderPickerOpen, folderPickerPath, folderPickerEntries,
       folderPickerLoading, folderPickerSelected,
@@ -395,7 +482,7 @@ const App = {
               </div>
               <div class="sidebar-workdir-header">
                 <div class="sidebar-workdir-label">Working Directory</div>
-                <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory" :disabled="isProcessing">
+                <button class="sidebar-change-dir-btn" @click="openFolderPicker" title="Change working directory">
                   <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
                 </button>
               </div>
@@ -427,7 +514,7 @@ const App = {
               </button>
             </div>
 
-            <button class="new-conversation-btn" @click="newConversation" :disabled="isProcessing">
+            <button class="new-conversation-btn" @click="newConversation">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               New conversation
             </button>
@@ -443,7 +530,7 @@ const App = {
                 <div class="session-group-label">{{ group.label }}</div>
                 <div
                   v-for="s in group.sessions" :key="s.sessionId"
-                  :class="['session-item', { active: currentClaudeSessionId === s.sessionId }]"
+                  :class="['session-item', { active: currentClaudeSessionId === s.sessionId, processing: isSessionProcessing(s.sessionId) }]"
                   @click="renamingSessionId !== s.sessionId && resumeSession(s)"
                   :title="s.preview"
                 >
@@ -462,7 +549,7 @@ const App = {
                   <div v-else class="session-title">{{ s.title }}</div>
                   <div class="session-meta">
                     <span>{{ formatRelativeTime(s.lastModified) }}</span>
-                    <span v-if="renamingSessionId !== s.sessionId && !isProcessing" class="session-actions">
+                    <span v-if="renamingSessionId !== s.sessionId" class="session-actions">
                       <button
                         class="session-rename-btn"
                         @click.stop="startRename(s)"
