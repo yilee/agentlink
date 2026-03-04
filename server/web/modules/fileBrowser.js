@@ -1,5 +1,5 @@
 // ── File Browser: tree state, lazy loading, context menu, file actions ────────
-const { ref, computed, nextTick, watch } = Vue;
+const { computed, nextTick } = Vue;
 
 /**
  * Creates the file browser controller.
@@ -7,7 +7,7 @@ const { ref, computed, nextTick, watch } = Vue;
  */
 export function createFileBrowser(deps) {
   const {
-    wsSend, workDir, inputText, inputRef, sendMessage,
+    wsSend, workDir, inputText, inputRef,
     filePanelOpen, fileTreeRoot, fileTreeLoading, fileContextMenu,
     sidebarOpen, sidebarView, filePanelWidth,
   } = deps;

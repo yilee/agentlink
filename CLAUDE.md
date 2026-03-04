@@ -1,5 +1,9 @@
 # CLAUDE.md - AgentLink Project Reference
 
+## Development Rules
+
+- **Design before code** — For any significant feature or architectural change, write a design document first (in `docs/`) and get approval before writing any implementation code. Do not jump straight into coding.
+
 ## Project Overview
 
 AgentLink is a local CLI agent that proxies a local working directory to a cloud web interface (`https://msclaude.ai/xxxx`).
