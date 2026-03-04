@@ -206,7 +206,7 @@ Claude 产生的输出在 web 断开期间会：
 
 ```javascript
 const conversationCache = ref({});         // conversationId → 保存的状态快照
-const currentConversationId = ref(null);   // 当前前台的 conversationId
+const currentConversationId = ref(crypto.randomUUID());   // 当前前台的 conversationId
 const processingConversations = ref({});   // conversationId → boolean，sidebar 指示器用
 ```
 
