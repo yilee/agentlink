@@ -156,10 +156,10 @@ export function createSidebar(deps) {
 
   function deleteSession(session) {
     if (currentClaudeSessionId.value === session.sessionId) return; // guard: foreground
-    // Guard: check background conversations in cache
+    // Guard: check background conversations that are actively processing
     if (conversationCache) {
       for (const [, cached] of Object.entries(conversationCache.value)) {
-        if (cached.claudeSessionId === session.sessionId) return;
+        if (cached.claudeSessionId === session.sessionId && cached.isProcessing) return;
       }
     }
     pendingDeleteSession = session;
