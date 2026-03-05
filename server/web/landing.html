@@ -499,7 +499,6 @@
 
   .device {
     position: relative;
-    overflow: hidden;
     transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
@@ -507,17 +506,11 @@
     transform: translateY(-8px);
   }
 
-  .device img, .device picture { display: block; width: 100%; height: auto; border-radius: inherit; }
+  .device img, .device picture { display: block; width: 100%; height: auto; }
 
   .device-ipad {
     width: 100%;
-    border-radius: 4.2%;
     z-index: 1;
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.08),
-      0 40px 100px rgba(0,0,0,0.5),
-      0 15px 50px rgba(0,0,0,0.3),
-      0 0 80px rgba(59,130,246,0.08);
     transform: rotate(-1deg);
   }
 
@@ -525,22 +518,32 @@
     transform: rotate(-1deg) translateY(-8px);
   }
 
+  .device-ipad img {
+    border-radius: 4.2%;
+    box-shadow:
+      0 40px 100px rgba(0,0,0,0.5),
+      0 15px 50px rgba(0,0,0,0.3),
+      0 0 80px rgba(59,130,246,0.08);
+  }
+
   .device-iphone {
     width: 90%;
-    border-radius: 12%;
     z-index: 2;
     justify-self: center;
     align-self: center;
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.1),
-      0 45px 100px rgba(0,0,0,0.55),
-      0 15px 50px rgba(0,0,0,0.35),
-      0 0 80px rgba(245,158,11,0.08);
     transform: rotate(2deg);
   }
 
   .device-iphone:hover {
     transform: rotate(2deg) translateY(-8px);
+  }
+
+  .device-iphone img {
+    border-radius: 12%;
+    box-shadow:
+      0 45px 100px rgba(0,0,0,0.55),
+      0 15px 50px rgba(0,0,0,0.35),
+      0 0 80px rgba(245,158,11,0.08);
   }
 
   /* ── Divider ── */
