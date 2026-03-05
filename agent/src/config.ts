@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
 import { execSync } from 'child_process';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { homedir } from 'os';
 
 export interface AgentConfig {
@@ -60,9 +60,10 @@ export function getConfigPath(): string {
  */
 export function resolveConfig(cliOptions: Partial<AgentConfig>): AgentConfig {
   const fileConfig = loadConfig();
+  const dir = cliOptions.dir || fileConfig.dir || DEFAULTS.dir;
   return {
     server: cliOptions.server || fileConfig.server || DEFAULTS.server,
-    dir: cliOptions.dir || fileConfig.dir || DEFAULTS.dir,
+    dir: resolve(dir),
     name: cliOptions.name || fileConfig.name || DEFAULTS.name,
     autoUpdate: cliOptions.autoUpdate ?? fileConfig.autoUpdate ?? false,
     password: cliOptions.password || fileConfig.password || undefined,
