@@ -137,6 +137,11 @@ export function createConnection(deps) {
     }
 
     if (msg.type === 'claude_output') {
+      // Safety net: restore processing state if output arrives after reconnect
+      if (!cache.isProcessing) {
+        cache.isProcessing = true;
+        processingConversations.value[convId] = true;
+      }
       const data = msg.data;
       if (!data) return;
       if (data.type === 'content_block_delta' && data.delta) {
@@ -349,6 +354,15 @@ export function createConnection(deps) {
     const data = msg.data;
     if (!data) return;
 
+    // Safety net: if streaming output arrives but isProcessing is false
+    // (e.g. after reconnect before active_conversations response), self-correct
+    if (!isProcessing.value) {
+      isProcessing.value = true;
+      if (currentConversationId && currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
+    }
+
     if (data.type === 'content_block_delta' && data.delta) {
       streaming.appendPending(data.delta);
       streaming.startReveal();
@@ -490,6 +504,7 @@ export function createConnection(deps) {
           }
           sidebar.requestSessionList();
           startPing();
+          wsSend({ type: 'query_active_conversations' });
         } else {
           status.value = 'Waiting';
           error.value = 'Agent is not connected yet.';
@@ -532,6 +547,27 @@ export function createConnection(deps) {
         }
         sidebar.requestSessionList();
         startPing();
+        wsSend({ type: 'query_active_conversations' });
+      } else if (msg.type === 'active_conversations') {
+        // Restore processing state for all active conversations reported by the agent
+        const convs = msg.conversations || [];
+        for (const entry of convs) {
+          const convId = entry.conversationId;
+          if (!convId) continue;
+          if (currentConversationId && currentConversationId.value === convId) {
+            // Foreground conversation
+            isProcessing.value = true;
+            isCompacting.value = !!entry.isCompacting;
+          } else if (conversationCache && conversationCache.value[convId]) {
+            // Background conversation
+            const cached = conversationCache.value[convId];
+            cached.isProcessing = true;
+            cached.isCompacting = !!entry.isCompacting;
+          }
+          if (processingConversations) {
+            processingConversations.value[convId] = true;
+          }
+        }
       } else if (msg.type === 'error') {
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
