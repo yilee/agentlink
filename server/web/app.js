@@ -252,7 +252,7 @@ const App = {
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
-      historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
+      historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
       folderPickerLoading, folderPickerEntries, folderPickerPath,
       authRequired, authPassword, authError, authAttempts, authLocked,
       streaming, sidebar, scrollToBottom,

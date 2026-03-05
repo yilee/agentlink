@@ -15,7 +15,7 @@ export function createConnection(deps) {
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
-    historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
+    historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
     authRequired, authPassword, authError, authAttempts, authLocked,
     streaming, sidebar,
@@ -206,6 +206,7 @@ export function createConnection(deps) {
       if (cache.toolMsgMap) cache.toolMsgMap.clear();
       processingConversations.value[convId] = false;
       if (msg.type === 'execution_cancelled') {
+        cache.needsResume = true;
         cache.messages.push({
           id: ++cache.messageIdCounter, role: 'system',
           content: 'Generation stopped.', timestamp: new Date(),
@@ -592,6 +593,7 @@ export function createConnection(deps) {
           processingConversations.value[currentConversationId.value] = false;
         }
         if (msg.type === 'execution_cancelled') {
+          needsResume.value = true;
           messages.value.push({
             id: streaming.nextId(), role: 'system',
             content: 'Generation stopped.', timestamp: new Date(),
