@@ -50,6 +50,7 @@ const App = {
     const isCompacting = ref(false);
     const latency = ref(null);
     const queuedMessages = ref([]);
+    const usageStats = ref(null);
     const inputRef = ref(null);
 
     // Sidebar state
@@ -130,6 +131,7 @@ const App = {
           toolMsgMap: _getToolMsgMap(),
           messageIdCounter: streaming.getMessageIdCounter(),
           queuedMessages: queuedMessages.value,
+          usageStats: usageStats.value,
         };
       }
 
@@ -149,6 +151,7 @@ const App = {
         streaming.setMessageIdCounter(cached.messageIdCounter || 0);
         _restoreToolMsgMap(cached.toolMsgMap || new Map());
         queuedMessages.value = cached.queuedMessages || [];
+        usageStats.value = cached.usageStats || null;
       } else {
         // New blank conversation
         messages.value = [];
@@ -163,6 +166,7 @@ const App = {
         streaming.reset();
         _clearToolMsgMap();
         queuedMessages.value = [];
+        usageStats.value = null;
       }
 
       currentConversationId.value = newConvId;
@@ -247,7 +251,7 @@ const App = {
     const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
-      messages, isProcessing, isCompacting, visibleLimit, queuedMessages,
+      messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
       historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
       folderPickerLoading, folderPickerEntries, folderPickerPath,
       authRequired, authPassword, authError, authAttempts, authLocked,
@@ -412,6 +416,21 @@ const App = {
       document.title = name ? `${name} — AgentLink` : 'AgentLink';
     });
 
+    // ── Usage formatting ──
+    function formatTokens(n) {
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+      return String(n);
+    }
+    function formatUsage(u) {
+      if (!u) return '';
+      const pct = u.contextWindow ? Math.round(u.inputTokens / u.contextWindow * 100) : 0;
+      const ctx = formatTokens(u.inputTokens) + ' / ' + formatTokens(u.contextWindow) + ' (' + pct + '%)';
+      const cost = '$' + u.totalCost.toFixed(2);
+      const model = u.model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-1m$/, '');
+      const dur = (u.durationMs / 1000).toFixed(1) + 's';
+      return 'Context ' + ctx + '  \u00b7  Cost ' + cost + '  \u00b7  ' + model + '  \u00b7  ' + dur;
+    }
+
     // ── Lifecycle ──
     onMounted(() => { connect(scheduleHighlight); });
     onUnmounted(() => { closeWs(); streaming.cleanup(); window.removeEventListener('resize', _resizeHandler); document.removeEventListener('click', _workdirMenuClickHandler); document.removeEventListener('keydown', _workdirMenuKeyHandler); });
@@ -420,11 +439,11 @@ const App = {
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
-      inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages,
+      inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages, usageStats,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       getRenderedContent, copyMessage, toggleTool,
       isPrevAssistant: _isPrevAssistant,
-      toggleContextSummary, formatTimestamp,
+      toggleContextSummary, formatTimestamp, formatUsage,
       getToolIcon, getToolSummary, isEditTool, getEditDiffHtml, getFormattedToolInput, autoResize,
       // AskUserQuestion
       selectQuestionOption,
@@ -907,6 +926,7 @@ const App = {
                 <button class="queue-item-remove" @click="removeQueuedMessage(qm.id)" title="Remove from queue">&times;</button>
               </div>
             </div>
+            <div v-if="usageStats" class="usage-bar">{{ formatUsage(usageStats) }}</div>
             <div
               :class="['input-card', { 'drag-over': dragOver }]"
               @dragover="handleDragOver"

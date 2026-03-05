@@ -557,9 +557,22 @@ async function processOutput(
           }
         }
 
-        // Forward the result, then signal turn_completed
+        // Forward the result, then signal turn_completed with usage stats
         sendWithConvId({ type: 'claude_output', data: msg });
-        sendWithConvId({ type: 'turn_completed' });
+
+        const modelUsageValues = Object.values((msg.modelUsage as Record<string, Record<string, unknown>>) || {});
+        sendWithConvId({
+          type: 'turn_completed',
+          usage: {
+            inputTokens: (msg.usage as Record<string, unknown>)?.input_tokens ?? 0,
+            outputTokens: (msg.usage as Record<string, unknown>)?.output_tokens ?? 0,
+            cacheReadTokens: (msg.usage as Record<string, unknown>)?.cache_read_input_tokens ?? 0,
+            totalCost: msg.total_cost_usd ?? 0,
+            durationMs: msg.duration_ms ?? 0,
+            model: Object.keys((msg.modelUsage as Record<string, unknown>) || {})[0] || '',
+            contextWindow: (modelUsageValues[0] as Record<string, unknown>)?.contextWindow ?? 200000,
+          },
+        });
         continue;
       }
 
