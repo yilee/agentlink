@@ -157,9 +157,12 @@ export function disconnect(): void {
   }
 }
 
+let sendQueue = Promise.resolve();
+
 export function send(msg: Record<string, unknown>): void {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-    encryptAndSend(state.ws, msg, state.sessionKey);
+    sendQueue = sendQueue.then(() =>
+      encryptAndSend(state.ws!, msg, state.sessionKey));
   } else {
     console.warn(`[AgentLink] Cannot send ${msg.type}: WebSocket not open (readyState=${state.ws?.readyState})`);
   }

@@ -557,9 +557,10 @@ async function processOutput(
           }
         }
 
-        // Forward the result, then signal turn_completed with usage stats
-        sendWithConvId({ type: 'claude_output', data: msg });
-
+        // Signal turn_completed with usage stats
+        // Note: we intentionally do NOT forward the raw result as claude_output here.
+        // The web client has no handler for data.type === 'result', and the useful
+        // fields (usage, cost, duration) are already sent inside turn_completed.
         const modelUsageValues = Object.values((msg.modelUsage as Record<string, Record<string, unknown>>) || {});
         sendWithConvId({
           type: 'turn_completed',
