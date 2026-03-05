@@ -14,7 +14,7 @@ export function createConnection(deps) {
   const {
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
-    messages, isProcessing, isCompacting, visibleLimit, queuedMessages,
+    messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
     historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
     authRequired, authPassword, authError, authAttempts, authLocked,
@@ -202,6 +202,7 @@ export function createConnection(deps) {
       }
       cache.isProcessing = false;
       cache.isCompacting = false;
+      if (msg.usage) cache.usageStats = msg.usage;
       if (cache.toolMsgMap) cache.toolMsgMap.clear();
       processingConversations.value[convId] = false;
       if (msg.type === 'execution_cancelled') {
@@ -586,6 +587,7 @@ export function createConnection(deps) {
         isProcessing.value = false;
         isCompacting.value = false;
         toolMsgMap.clear();
+        if (msg.usage) usageStats.value = msg.usage;
         if (currentConversationId && currentConversationId.value) {
           processingConversations.value[currentConversationId.value] = false;
         }
