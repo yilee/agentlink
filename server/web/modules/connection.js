@@ -549,8 +549,40 @@ export function createConnection(deps) {
         startPing();
         wsSend({ type: 'query_active_conversations' });
       } else if (msg.type === 'active_conversations') {
-        // Restore processing state for all active conversations reported by the agent
+        // Agent's response is authoritative — first clear all processing state,
+        // then re-apply only for conversations the agent reports as active.
+        // This corrects any stale isProcessing=true left by the safety net or
+        // from turns that finished while the socket was down.
+        const activeSet = new Set();
         const convs = msg.conversations || [];
+        for (const entry of convs) {
+          if (entry.conversationId) activeSet.add(entry.conversationId);
+        }
+
+        // Clear foreground
+        if (!activeSet.has(currentConversationId && currentConversationId.value)) {
+          isProcessing.value = false;
+          isCompacting.value = false;
+        }
+        // Clear all cached background conversations
+        if (conversationCache) {
+          for (const [convId, cached] of Object.entries(conversationCache.value)) {
+            if (!activeSet.has(convId)) {
+              cached.isProcessing = false;
+              cached.isCompacting = false;
+            }
+          }
+        }
+        // Clear processingConversations map
+        if (processingConversations) {
+          for (const convId of Object.keys(processingConversations.value)) {
+            if (!activeSet.has(convId)) {
+              processingConversations.value[convId] = false;
+            }
+          }
+        }
+
+        // Now set state for actually active conversations
         for (const entry of convs) {
           const convId = entry.conversationId;
           if (!convId) continue;
