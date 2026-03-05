@@ -507,11 +507,11 @@
     transform: translateY(-8px);
   }
 
-  .device img, .device picture { display: block; width: 100%; height: auto; }
+  .device img, .device picture { display: block; width: 100%; height: auto; border-radius: inherit; }
 
   .device-ipad {
     width: 100%;
-    border-radius: 20px;
+    border-radius: 4.2%;
     z-index: 1;
     box-shadow:
       0 0 0 1px rgba(255,255,255,0.08),
@@ -527,7 +527,7 @@
 
   .device-iphone {
     width: 90%;
-    border-radius: 28px;
+    border-radius: 12%;
     z-index: 2;
     justify-self: center;
     align-self: center;
@@ -770,7 +770,7 @@
     top: 48px;
     bottom: 48px;
     width: 1px;
-    background: linear-gradient(180deg, var(--accent), var(--rose), var(--cyan), var(--green));
+    background: linear-gradient(180deg, var(--accent), var(--cyan), var(--green));
     opacity: 0.3;
   }
 
@@ -797,9 +797,8 @@
   }
 
   .workflow-step:nth-child(1) .step-marker { border-color: rgba(59,130,246,0.3); }
-  .workflow-step:nth-child(2) .step-marker { border-color: rgba(245,158,11,0.3); }
-  .workflow-step:nth-child(3) .step-marker { border-color: rgba(34,211,238,0.3); }
-  .workflow-step:nth-child(4) .step-marker { border-color: rgba(52,211,153,0.3); }
+  .workflow-step:nth-child(2) .step-marker { border-color: rgba(34,211,238,0.3); }
+  .workflow-step:nth-child(3) .step-marker { border-color: rgba(52,211,153,0.3); }
 
   .step-content h3 {
     font-size: 1rem;
@@ -874,7 +873,12 @@
     .cta-group { flex-direction: column; }
     .nav-links { gap: 1rem; }
     .nav-links a:not(.nav-gh) { display: none; }
-    .encrypt-visual { flex-wrap: wrap; justify-content: center; }
+    .encrypt-visual { flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+    .encrypt-visual .encrypt-arrow { display: none; }
+    .encrypt-block { font-size: 0.65rem; }
+    .device-flow { flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
+    .device-flow .flow-line { display: none; }
+    .device-pill { font-size: 0.7rem; }
   }
 
   @media (max-width: 640px) {
@@ -902,10 +906,17 @@
       align-self: auto;
     }
     .device-iphone:hover { transform: translateY(-3%); }
-    .terminal { margin: 0 1rem; }
+    .terminal { margin: 0 1rem; max-width: calc(100vw - 2rem); }
+    .terminal-body { padding: 1rem; font-size: 0.75rem; overflow-x: auto; }
+    .terminal-line { gap: 0.4rem; white-space: nowrap; }
+    .terminal-output { font-size: 0.7rem; padding-left: 0.9rem; }
     .section-divider { margin: 4rem auto; }
     .bento { padding: 0 1rem; margin: 4rem auto; }
-    .bento-card { padding: 1.5rem; border-radius: 16px; }
+    .bento-card { padding: 1.5rem; border-radius: 16px; overflow: visible; }
+    .encrypt-visual { gap: 0.4rem; }
+    .encrypt-block { padding: 0.3rem 0.5rem; font-size: 0.6rem; }
+    .device-flow { gap: 0.5rem; }
+    .device-pill { padding: 0.4rem 0.6rem; font-size: 0.65rem; }
     .workflow-step { gap: 1rem; }
     .step-marker { width: 40px; height: 40px; border-radius: 12px; font-size: 1rem; }
     .workflow-steps::before { left: 19px; }
@@ -973,13 +984,13 @@
     Open Source &middot; End-to-End Encrypted
   </div>
   <h1>
-    <span class="line">Your Code Follows You.</span>
-    <span class="line"><em>Everywhere.</em></span>
+    <span class="line">Control Claude Code.</span>
+    <span class="line"><em>From anywhere.</em></span>
   </h1>
   <p class="hero-sub">
     Start Claude Code on your machine. Walk away.
-    <strong>Pick it up from your phone, a tablet, or any browser</strong> &mdash;
-    fully encrypted, zero configuration.
+    <strong>Pick it up from your phone, tablet, or any browser</strong> &mdash;
+    end-to-end encrypted, zero configuration.
   </p>
   <div class="cta-group">
     <button class="cta-primary" onclick="copyInstall()">
@@ -1041,7 +1052,7 @@
   <p>
     AgentLink turns Claude Code into a truly portable experience.
     One command, one URL &mdash; your AI assistant is accessible from any device,
-    with military-grade encryption and zero accounts required.
+    with real encryption and zero accounts required.
   </p>
 </section>
 
@@ -1125,7 +1136,7 @@
       </div>
     </div>
     <h3>Self-Hostable</h3>
-    <p>Run your own relay. Full control over your infrastructure and data.</p>
+    <p>Run your own relay server. Your infrastructure, your rules, your data.</p>
   </div>
 
   <!-- Multi Session -->
@@ -1156,7 +1167,7 @@
 <!-- How It Works -->
 <section class="workflow reveal" id="how-it-works">
   <div class="workflow-label">How It Works</div>
-  <h2>Four steps. No complexity.</h2>
+  <h2>Three steps. That's it.</h2>
   <div class="workflow-steps">
     <div class="workflow-step">
       <div class="step-marker">01</div>
@@ -1168,22 +1179,15 @@
     <div class="workflow-step">
       <div class="step-marker">02</div>
       <div class="step-content">
-        <h3>Everything gets encrypted</h3>
-        <p>Your traffic is end-to-end encrypted with XSalsa20-Poly1305. The relay server is stateless &mdash; it forwards bytes it cannot read.</p>
+        <h3>Open the URL, anywhere</h3>
+        <p>Phone, tablet, a friend's laptop &mdash; any browser works. Traffic is end-to-end encrypted automatically; the relay never sees your data.</p>
       </div>
     </div>
     <div class="workflow-step">
       <div class="step-marker">03</div>
       <div class="step-content">
-        <h3>Open from anywhere</h3>
-        <p>Phone, tablet, a friend's laptop &mdash; open the URL in any browser. Start a task from your desk, check progress from bed.</p>
-      </div>
-    </div>
-    <div class="workflow-step">
-      <div class="step-marker">04</div>
-      <div class="step-content">
-        <h3>Resume any session</h3>
-        <p>Full history from Claude Code's own logs. Resume conversations, switch projects, change working directories &mdash; all from the browser.</p>
+        <h3>Run sessions in parallel, switch freely</h3>
+        <p>Multiple conversations, multiple projects &mdash; all running at once. Jump between them from any device, with full history preserved.</p>
       </div>
     </div>
   </div>
@@ -1196,7 +1200,7 @@
     <span class="footer-brand">AgentLink</span>
     <a href="https://github.com/yilee/agentlink" rel="noopener">GitHub</a>
   </div>
-  <p>Open source. Free forever.</p>
+  <p>Open source. Free forever. Built for developers who ship from anywhere.</p>
 </footer>
 
 </div>
