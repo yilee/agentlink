@@ -2703,17 +2703,41 @@ body {
   color: var(--text-secondary);
 }
 
-/* Mobile overlay */
-.preview-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: var(--bg);
+/* ── Mobile file preview in sidebar ── */
+.file-preview-mobile {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
-.preview-overlay .preview-panel-body {
+.file-preview-mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.file-preview-mobile-size {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.file-preview-mobile-filename {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.file-preview-mobile .preview-panel-body {
   flex: 1;
   overflow: auto;
 }
@@ -2749,7 +2773,7 @@ body {
     display: none;
   }
 
-  /* Preview panel hidden on mobile — shown as overlay instead */
+  /* Preview panel hidden on mobile — shown inside sidebar instead */
   .preview-panel {
     display: none;
   }

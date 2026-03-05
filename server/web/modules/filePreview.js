@@ -11,6 +11,9 @@ export function createFilePreview(deps) {
     previewPanelWidth,
     previewFile,
     previewLoading,
+    sidebarView,
+    sidebarOpen,
+    isMobile,
   } = deps;
 
   // ── Open / Close ──
@@ -18,17 +21,31 @@ export function createFilePreview(deps) {
   function openPreview(filePath) {
     // Skip re-fetch if same file already loaded
     if (previewFile.value && previewFile.value.filePath === filePath && !previewFile.value.error) {
-      previewPanelOpen.value = true;
+      if (isMobile.value) {
+        sidebarView.value = 'preview';
+        sidebarOpen.value = true;
+      } else {
+        previewPanelOpen.value = true;
+      }
       return;
     }
-    previewPanelOpen.value = true;
+    if (isMobile.value) {
+      sidebarView.value = 'preview';
+      sidebarOpen.value = true;
+    } else {
+      previewPanelOpen.value = true;
+    }
     previewLoading.value = true;
     previewFile.value = null;
     wsSend({ type: 'read_file', filePath });
   }
 
   function closePreview() {
-    previewPanelOpen.value = false;
+    if (isMobile.value) {
+      sidebarView.value = 'files';
+    } else {
+      previewPanelOpen.value = false;
+    }
   }
 
   // ── Handle file_content response ──
@@ -53,6 +70,9 @@ export function createFilePreview(deps) {
     previewPanelOpen.value = false;
     previewFile.value = null;
     previewLoading.value = false;
+    if (sidebarView.value === 'preview') {
+      sidebarView.value = 'sessions';
+    }
   }
 
   // ── Syntax highlighting helpers ──
