@@ -1,11 +1,12 @@
 import WebSocket from 'ws';
 import os from 'os';
 import { existsSync } from 'fs';
-import { readdir } from 'fs/promises';
-import { resolve, isAbsolute, join } from 'path';
+import { readdir, stat } from 'fs/promises';
+import { resolve, isAbsolute, join, basename } from 'path';
 import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
 import { loadRuntimeState, saveRuntimeState } from './config.js';
+import { readFileForPreview } from './file-readers.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -237,6 +238,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'list_directory':
       handleListDirectory(msg as unknown as { dirPath: string; source?: string });
       break;
+    case 'read_file':
+      handleReadFile(msg as unknown as { filePath: string });
+      break;
     case 'change_workdir':
       handleChangeWorkDir(msg as unknown as { workDir: string });
       break;
@@ -388,6 +392,38 @@ async function listDirectoryEntries(dirPath: string): Promise<{ name: string; ty
   });
 
   return entries;
+}
+
+async function handleReadFile(msg: { filePath: string }): Promise<void> {
+  const filePath = msg.filePath;
+  try {
+    const resolved = isAbsolute(filePath) ? resolve(filePath) : resolve(state.workDir, filePath);
+    const stats = await stat(resolved);
+    const result = await readFileForPreview(resolved, stats.size);
+
+    send({
+      type: 'file_content',
+      filePath: resolved,
+      fileName: result.fileName,
+      content: result.content,
+      encoding: result.encoding,
+      mimeType: result.mimeType,
+      truncated: result.truncated,
+      totalSize: stats.size,
+    });
+  } catch (err) {
+    send({
+      type: 'file_content',
+      filePath,
+      fileName: basename(filePath),
+      content: null,
+      encoding: 'utf8',
+      mimeType: 'application/octet-stream',
+      truncated: false,
+      totalSize: 0,
+      error: (err as Error).message,
+    });
+  }
 }
 
 function handleChangeWorkDir(msg: { workDir: string }): void {
