@@ -2548,11 +2548,209 @@ body {
 }
 
 /* ══════════════════════════════════════════
+   File Preview Panel
+   ══════════════════════════════════════════ */
+.preview-panel {
+  width: 400px;
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.preview-panel-resize-handle {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.preview-panel-resize-handle:hover,
+.preview-panel-resize-handle:active {
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+.preview-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.preview-panel-filename {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-panel-size {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.preview-panel-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.preview-panel-close:hover {
+  color: var(--text);
+}
+
+.preview-panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+
+.preview-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.preview-error {
+  padding: 1rem;
+  color: var(--error, #ef4444);
+  font-size: 0.85rem;
+}
+
+.preview-text-container {
+  overflow: auto;
+  height: 100%;
+}
+
+.preview-code {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  background: var(--bg);
+  font-family: var(--font-mono, 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace);
+}
+
+.preview-code code {
+  font-family: inherit;
+}
+
+.preview-image-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  height: 100%;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.preview-truncated-notice {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary, var(--bg-primary));
+  text-align: center;
+}
+
+.preview-binary-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.preview-binary-icon {
+  opacity: 0.4;
+  margin-bottom: 0.5rem;
+}
+
+.preview-binary-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ── Mobile file preview in sidebar ── */
+.file-preview-mobile {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.file-preview-mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.file-preview-mobile-size {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.file-preview-mobile-filename {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.file-preview-mobile .preview-panel-body {
+  flex: 1;
+  overflow: auto;
+}
+
+/* ══════════════════════════════════════════
    Medium screens — file panel narrower
    ══════════════════════════════════════════ */
 @media (max-width: 1200px) and (min-width: 769px) {
   .file-panel {
     max-width: clamp(200px, 20vw, 280px);
+  }
+  .preview-panel {
+    max-width: min(400px, 40vw);
   }
 }
 
@@ -2572,6 +2770,11 @@ body {
 
   /* File panel hidden on mobile — shown inside sidebar instead */
   .file-panel {
+    display: none;
+  }
+
+  /* Preview panel hidden on mobile — shown inside sidebar instead */
+  .preview-panel {
     display: none;
   }
 

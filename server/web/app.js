@@ -17,6 +17,7 @@ import { createStreaming } from './modules/streaming.js';
 import { createSidebar } from './modules/sidebar.js';
 import { createConnection } from './modules/connection.js';
 import { createFileBrowser } from './modules/fileBrowser.js';
+import { createFilePreview } from './modules/filePreview.js';
 
 // ── App ─────────────────────────────────────────────────────────────────────
 const App = {
@@ -102,9 +103,15 @@ const App = {
     const fileTreeRoot = ref(null);
     const fileTreeLoading = ref(false);
     const fileContextMenu = ref(null);
-    const sidebarView = ref('sessions');       // 'sessions' | 'files' (mobile only)
+    const sidebarView = ref('sessions');       // 'sessions' | 'files' | 'preview' (mobile only)
     const isMobile = ref(window.innerWidth <= 768);
     const workdirMenuOpen = ref(false);
+
+    // File preview state
+    const previewPanelOpen = ref(false);
+    const previewPanelWidth = ref(parseInt(localStorage.getItem('agentlink-preview-panel-width'), 10) || 400);
+    const previewFile = ref(null);
+    const previewLoading = ref(false);
 
     // ── switchConversation: save current → load target ──
     // Defined here and used by sidebar.newConversation, sidebar.resumeSession, workdir_changed
@@ -248,7 +255,7 @@ const App = {
       switchConversation,
     });
 
-    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -276,6 +283,13 @@ const App = {
       sidebarOpen, sidebarView,
     });
     setFileBrowser(fileBrowser);
+
+    // File preview module
+    const filePreview = createFilePreview({
+      wsSend, previewPanelOpen, previewPanelWidth, previewFile, previewLoading,
+      sidebarView, sidebarOpen, isMobile,
+    });
+    setFilePreview(filePreview);
 
     // Track mobile state on resize
     let _resizeHandler = () => { isMobile.value = window.innerWidth <= 768; };
@@ -501,6 +515,8 @@ const App = {
       filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
       sidebarView, isMobile, fileBrowser,
       flattenedTree: fileBrowser.flattenedTree,
+      // File preview
+      previewPanelOpen, previewPanelWidth, previewFile, previewLoading, filePreview,
       workdirMenuOpen,
       toggleWorkdirMenu() { workdirMenuOpen.value = !workdirMenuOpen.value; },
       workdirMenuBrowse() {
@@ -578,7 +594,8 @@ const App = {
                   class="file-tree-item"
                   :class="{ folder: item.node.type === 'directory' }"
                   :style="{ paddingLeft: (item.depth * 16 + 8) + 'px' }"
-                  @click="item.node.type === 'directory' ? fileBrowser.toggleFolder(item.node) : fileBrowser.onFileClick($event, item.node)"
+                  @click="item.node.type === 'directory' ? fileBrowser.toggleFolder(item.node) : filePreview.openPreview(item.node.path)"
+                  @contextmenu.prevent="item.node.type !== 'directory' ? fileBrowser.onFileClick($event, item.node) : null"
                 >
                   <span v-if="item.node.type === 'directory'" class="file-tree-arrow" :class="{ expanded: item.node.expanded }">&#9654;</span>
                   <span v-else class="file-tree-file-icon">
@@ -590,6 +607,43 @@ const App = {
                 <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">(empty)</div>
                 <div v-if="item.node.error" class="file-tree-error" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ item.node.error }}</div>
               </template>
+            </div>
+          </div>
+
+          <!-- Mobile: file preview view -->
+          <div v-else-if="isMobile && sidebarView === 'preview'" class="file-preview-mobile">
+            <div class="file-preview-mobile-header">
+              <button class="file-panel-mobile-back" @click="filePreview.closePreview()">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                Files
+              </button>
+              <span v-if="previewFile" class="file-preview-mobile-size">
+                {{ filePreview.formatFileSize(previewFile.totalSize) }}
+              </span>
+            </div>
+            <div class="file-preview-mobile-filename" :title="previewFile?.filePath">
+              {{ previewFile?.fileName || 'Preview' }}
+            </div>
+            <div class="preview-panel-body">
+              <div v-if="previewLoading" class="preview-loading">Loading...</div>
+              <div v-else-if="previewFile?.error" class="preview-error">
+                {{ previewFile.error }}
+              </div>
+              <div v-else-if="previewFile?.encoding === 'base64' && previewFile?.content"
+                   class="preview-image-container">
+                <img :src="'data:' + previewFile.mimeType + ';base64,' + previewFile.content"
+                     :alt="previewFile.fileName" class="preview-image" />
+              </div>
+              <div v-else-if="previewFile?.content" class="preview-text-container">
+                <pre class="preview-code"><code v-html="filePreview.highlightCode(previewFile.content, previewFile.fileName)"></code></pre>
+                <div v-if="previewFile.truncated" class="preview-truncated-notice">
+                  File truncated — showing first 100 KB of {{ filePreview.formatFileSize(previewFile.totalSize) }}
+                </div>
+              </div>
+              <div v-else-if="previewFile && !previewFile.content && !previewFile.error" class="preview-binary-info">
+                <p>Binary file — {{ previewFile.mimeType }}</p>
+                <p>{{ filePreview.formatFileSize(previewFile.totalSize) }}</p>
+              </div>
             </div>
           </div>
 
@@ -742,7 +796,8 @@ const App = {
                 class="file-tree-item"
                 :class="{ folder: item.node.type === 'directory' }"
                 :style="{ paddingLeft: (item.depth * 16 + 8) + 'px' }"
-                @click="item.node.type === 'directory' ? fileBrowser.toggleFolder(item.node) : fileBrowser.onFileClick($event, item.node)"
+                @click="item.node.type === 'directory' ? fileBrowser.toggleFolder(item.node) : filePreview.openPreview(item.node.path)"
+                @contextmenu.prevent="item.node.type !== 'directory' ? fileBrowser.onFileClick($event, item.node) : null"
               >
                 <span v-if="item.node.type === 'directory'" class="file-tree-arrow" :class="{ expanded: item.node.expanded }">&#9654;</span>
                 <span v-else class="file-tree-file-icon">
@@ -970,6 +1025,50 @@ const App = {
             </div>
           </div>
         </div>
+
+        <!-- Preview Panel (desktop) -->
+        <Transition name="file-panel">
+        <div v-if="previewPanelOpen && !isMobile" class="preview-panel" :style="{ width: previewPanelWidth + 'px' }">
+          <div class="preview-panel-resize-handle"
+               @mousedown="filePreview.onResizeStart($event)"
+               @touchstart="filePreview.onResizeStart($event)"></div>
+          <div class="preview-panel-header">
+            <span class="preview-panel-filename" :title="previewFile?.filePath">
+              {{ previewFile?.fileName || 'Preview' }}
+            </span>
+            <span v-if="previewFile" class="preview-panel-size">
+              {{ filePreview.formatFileSize(previewFile.totalSize) }}
+            </span>
+            <button class="preview-panel-close" @click="filePreview.closePreview()" title="Close preview">&times;</button>
+          </div>
+          <div class="preview-panel-body">
+            <div v-if="previewLoading" class="preview-loading">Loading...</div>
+            <div v-else-if="previewFile?.error" class="preview-error">
+              {{ previewFile.error }}
+            </div>
+            <div v-else-if="previewFile?.encoding === 'base64' && previewFile?.content"
+                 class="preview-image-container">
+              <img :src="'data:' + previewFile.mimeType + ';base64,' + previewFile.content"
+                   :alt="previewFile.fileName" class="preview-image" />
+            </div>
+            <div v-else-if="previewFile?.content" class="preview-text-container">
+              <pre class="preview-code"><code v-html="filePreview.highlightCode(previewFile.content, previewFile.fileName)"></code></pre>
+              <div v-if="previewFile.truncated" class="preview-truncated-notice">
+                File truncated — showing first 100 KB of {{ filePreview.formatFileSize(previewFile.totalSize) }}
+              </div>
+            </div>
+            <div v-else-if="previewFile && !previewFile.content && !previewFile.error" class="preview-binary-info">
+              <div class="preview-binary-icon">
+                <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" opacity="0.4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+              </div>
+              <p>Binary file</p>
+              <p class="preview-binary-meta">{{ previewFile.mimeType }}</p>
+              <p class="preview-binary-meta">{{ filePreview.formatFileSize(previewFile.totalSize) }}</p>
+            </div>
+          </div>
+        </div>
+        </Transition>
+
       </div>
 
       <!-- Folder Picker Modal -->
