@@ -141,6 +141,11 @@ export function createConnection(deps) {
     }
 
     if (msg.type === 'claude_output') {
+      // Safety net: restore processing state if output arrives after reconnect
+      if (!cache.isProcessing) {
+        cache.isProcessing = true;
+        processingConversations.value[convId] = true;
+      }
       const data = msg.data;
       if (!data) return;
       if (data.type === 'content_block_delta' && data.delta) {
@@ -353,6 +358,15 @@ export function createConnection(deps) {
     const data = msg.data;
     if (!data) return;
 
+    // Safety net: if streaming output arrives but isProcessing is false
+    // (e.g. after reconnect before active_conversations response), self-correct
+    if (!isProcessing.value) {
+      isProcessing.value = true;
+      if (currentConversationId && currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
+    }
+
     if (data.type === 'content_block_delta' && data.delta) {
       streaming.appendPending(data.delta);
       streaming.startReveal();
@@ -494,6 +508,7 @@ export function createConnection(deps) {
           }
           sidebar.requestSessionList();
           startPing();
+          wsSend({ type: 'query_active_conversations' });
         } else {
           status.value = 'Waiting';
           error.value = 'Agent is not connected yet.';
@@ -536,6 +551,59 @@ export function createConnection(deps) {
         }
         sidebar.requestSessionList();
         startPing();
+        wsSend({ type: 'query_active_conversations' });
+      } else if (msg.type === 'active_conversations') {
+        // Agent's response is authoritative — first clear all processing state,
+        // then re-apply only for conversations the agent reports as active.
+        // This corrects any stale isProcessing=true left by the safety net or
+        // from turns that finished while the socket was down.
+        const activeSet = new Set();
+        const convs = msg.conversations || [];
+        for (const entry of convs) {
+          if (entry.conversationId) activeSet.add(entry.conversationId);
+        }
+
+        // Clear foreground
+        if (!activeSet.has(currentConversationId && currentConversationId.value)) {
+          isProcessing.value = false;
+          isCompacting.value = false;
+        }
+        // Clear all cached background conversations
+        if (conversationCache) {
+          for (const [convId, cached] of Object.entries(conversationCache.value)) {
+            if (!activeSet.has(convId)) {
+              cached.isProcessing = false;
+              cached.isCompacting = false;
+            }
+          }
+        }
+        // Clear processingConversations map
+        if (processingConversations) {
+          for (const convId of Object.keys(processingConversations.value)) {
+            if (!activeSet.has(convId)) {
+              processingConversations.value[convId] = false;
+            }
+          }
+        }
+
+        // Now set state for actually active conversations
+        for (const entry of convs) {
+          const convId = entry.conversationId;
+          if (!convId) continue;
+          if (currentConversationId && currentConversationId.value === convId) {
+            // Foreground conversation
+            isProcessing.value = true;
+            isCompacting.value = !!entry.isCompacting;
+          } else if (conversationCache && conversationCache.value[convId]) {
+            // Background conversation
+            const cached = conversationCache.value[convId];
+            cached.isProcessing = true;
+            cached.isCompacting = !!entry.isCompacting;
+          }
+          if (processingConversations) {
+            processingConversations.value[convId] = true;
+          }
+        }
       } else if (msg.type === 'error') {
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);

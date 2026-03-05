@@ -298,6 +298,22 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       handleRenameSession(m.sessionId, m.newTitle);
       break;
     }
+    case 'query_active_conversations': {
+      const active: Array<{ conversationId: string; claudeSessionId: string | null; isProcessing: boolean; isCompacting: boolean }> = [];
+      for (const [convId, conv] of getConversations()) {
+        if (conv.turnActive) {
+          active.push({
+            conversationId: convId,
+            claudeSessionId: conv.claudeSessionId,
+            isProcessing: true,
+            isCompacting: getIsCompacting(convId),
+          });
+        }
+      }
+      console.log(`[AgentLink] → active_conversations (${active.length} active)`);
+      send({ type: 'active_conversations', conversations: active });
+      break;
+    }
     case 'ping':
       send({ type: 'pong', ts: (msg as unknown as { ts: number }).ts });
       break;

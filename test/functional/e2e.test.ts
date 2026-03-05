@@ -188,7 +188,7 @@ function decryptMsg(encrypted: { n: string; c: string }, key: Uint8Array): unkno
 }
 
 /** Connect a mock agent with encryption support */
-function connectMockAgentEncrypted(name = 'TestAgent', workDir = '/test', password?: string): Promise<{
+function connectMockAgentEncrypted(name = 'TestAgent', workDir = '/test', password?: string, sessionId?: string): Promise<{
   ws: WebSocket;
   sessionId: string;
   sessionKey: Uint8Array;
@@ -198,6 +198,7 @@ function connectMockAgentEncrypted(name = 'TestAgent', workDir = '/test', passwo
   return new Promise((resolve, reject) => {
     const params = new URLSearchParams({ type: 'agent', id: name, name, workDir, hostname: 'test-host' });
     if (password) params.set('password', password);
+    if (sessionId) params.set('sessionId', sessionId);
     const ws = new WebSocket(`ws://localhost:${PORT}/?${params}`);
     let sessionKey: Uint8Array;
 
@@ -1057,6 +1058,171 @@ describe('Functional: File Browser Panel', () => {
 });
 
 // ── Workdir Dropdown Menu ──
+
+// ── Reconnect + active_conversations handshake ──
+
+describe('Functional: Reconnect Processing State', () => {
+  it('sends query_active_conversations on initial connect and on agent_reconnected', async () => {
+    const agent = await connectMockAgentEncrypted('QueryActiveAgent', '/query-active');
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume list_sessions
+      await agent.waitForMessage((m) => m.type === 'list_sessions');
+      agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/query-active' });
+
+      // Web UI should send query_active_conversations on initial connect
+      const activeQuery = await agent.waitForMessage((m) => m.type === 'query_active_conversations');
+      expect(activeQuery.type).toBe('query_active_conversations');
+
+      // No active conversations initially
+      agent.sendEncrypted({ type: 'active_conversations', conversations: [] });
+
+      // No stop button should be visible
+      await page.waitForFunction(() => !document.querySelector('.stop-btn'), { timeout: 3000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('restores processing indicator when active_conversations reports active turn', async () => {
+    const agent = await connectMockAgentEncrypted('RestoreActiveAgent', '/restore-active');
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume list_sessions + query_active_conversations
+      await agent.waitForMessage((m) => m.type === 'list_sessions');
+      agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/restore-active' });
+      await agent.waitForMessage((m) => m.type === 'query_active_conversations');
+      agent.sendEncrypted({ type: 'active_conversations', conversations: [] });
+
+      // Send a chat message so we can capture the real conversationId
+      await page.fill('textarea', 'Test task');
+      await page.click('.send-btn');
+      const chatMsg = await agent.waitForMessage((m) => m.type === 'chat');
+      const realConvId = chatMsg.conversationId as string;
+
+      // Agent reports this conversation as active (simulates post-reconnect restore)
+      agent.sendEncrypted({
+        type: 'active_conversations',
+        conversations: [{ conversationId: realConvId, claudeSessionId: null, isProcessing: true, isCompacting: false }],
+      });
+
+      // The UI should show the stop button since isProcessing was restored
+      await page.waitForSelector('.stop-btn', { timeout: 5000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('clears stale processing state when active_conversations reports none active', async () => {
+    const agent = await connectMockAgentEncrypted('ClearStaleAgent', '/clear-stale');
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume list_sessions
+      await agent.waitForMessage((m) => m.type === 'list_sessions');
+      agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/clear-stale' });
+      await agent.waitForMessage((m) => m.type === 'query_active_conversations');
+
+      // Send a chat message to trigger processing state
+      await page.fill('textarea', 'Hello');
+      await page.click('.send-btn');
+      await agent.waitForMessage((m) => m.type === 'chat');
+
+      // Start streaming — this sets isProcessing=true
+      agent.sendEncrypted({
+        type: 'claude_output',
+        data: { type: 'content_block_delta', delta: 'Working...' },
+      });
+
+      // Stop button should be visible
+      await page.waitForSelector('.stop-btn', { timeout: 3000 });
+
+      // Now simulate what happens after reconnect: the safety net left isProcessing=true
+      // but the agent says actually nothing is active (task finished while disconnected)
+      agent.sendEncrypted({ type: 'active_conversations', conversations: [] });
+
+      // The authoritative active_conversations response should clear stale state
+      // Stop button should disappear
+      await page.waitForFunction(() => !document.querySelector('.stop-btn'), { timeout: 5000 });
+    } finally {
+      await page.close();
+      agent.ws.close();
+    }
+  });
+
+  it('full disconnect-reconnect cycle with active_conversations handshake', async () => {
+    // First agent connects
+    const agent = await connectMockAgentEncrypted('DisconnReconnAgent1', '/disconn-reconn');
+    const savedSessionId = agent.sessionId;
+    const page = await browser.newPage();
+    try {
+      await page.goto(`${BASE_URL}/s/${savedSessionId}`);
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume initial handshake
+      await agent.waitForMessage((m) => m.type === 'list_sessions');
+      agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/disconn-reconn' });
+      await agent.waitForMessage((m) => m.type === 'query_active_conversations');
+      agent.sendEncrypted({ type: 'active_conversations', conversations: [] });
+
+      // Send a chat to capture the real conversationId
+      await page.fill('textarea', 'Running task');
+      await page.click('.send-btn');
+      const chatMsg = await agent.waitForMessage((m) => m.type === 'chat');
+      const realConvId = chatMsg.conversationId as string;
+
+      // Disconnect the agent — server sends agent_disconnected to web client
+      agent.ws.close();
+
+      // Wait for the UI to show disconnected state (status changes to "Waiting")
+      await page.waitForFunction(() => {
+        return document.body.textContent?.includes('disconnected') ||
+               document.body.textContent?.includes('Waiting');
+      }, { timeout: 5000 });
+
+      // Reconnect with a new agent (different id) but same sessionId
+      const agent2 = await connectMockAgentEncrypted('DisconnReconnAgent2', '/disconn-reconn', undefined, savedSessionId);
+
+      // UI should show Connected again via agent_reconnected
+      await page.waitForSelector('text=Connected', { timeout: 5000 });
+
+      // Consume list_sessions
+      await agent2.waitForMessage((m) => m.type === 'list_sessions');
+      agent2.sendEncrypted({ type: 'sessions_list', sessions: [], workDir: '/disconn-reconn' });
+
+      // UI should send query_active_conversations on agent_reconnected
+      const activeQuery = await agent2.waitForMessage((m) => m.type === 'query_active_conversations');
+      expect(activeQuery.type).toBe('query_active_conversations');
+
+      // Agent reports the original conversation is still active (using real convId)
+      agent2.sendEncrypted({
+        type: 'active_conversations',
+        conversations: [{ conversationId: realConvId, claudeSessionId: null, isProcessing: true, isCompacting: false }],
+      });
+
+      // Stop button should appear
+      await page.waitForSelector('.stop-btn', { timeout: 5000 });
+
+      // Now complete the turn
+      agent2.sendEncrypted({ type: 'turn_completed' });
+
+      // Stop button should disappear
+      await page.waitForFunction(() => !document.querySelector('.stop-btn'), { timeout: 5000 });
+    } finally {
+      await page.close();
+    }
+  });
+});
 
 describe('Functional: Workdir Dropdown Menu', () => {
   it('toggles open/close on path row click', async () => {
