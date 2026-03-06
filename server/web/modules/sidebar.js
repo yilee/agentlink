@@ -31,11 +31,19 @@ export function createSidebar(deps) {
     loadingSessions, loadingHistory, workDir, visibleLimit,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
-    hostname, workdirHistory,
+    hostname, workdirHistory, workdirSwitching,
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations,
     switchConversation,
   } = deps;
+
+  // ── Workdir switching timeout ──
+  let _workdirSwitchTimer = null;
+  function setWorkdirSwitching() {
+    workdirSwitching.value = true;
+    clearTimeout(_workdirSwitchTimer);
+    _workdirSwitchTimer = setTimeout(() => { workdirSwitching.value = false; }, 10000);
+  }
 
   // ── Session management ──
 
@@ -278,6 +286,7 @@ export function createSidebar(deps) {
       path = path.replace(/[/\\]$/, '') + sep + folderPickerSelected.value;
     }
     folderPickerOpen.value = false;
+    setWorkdirSwitching();
     wsSend({ type: 'change_workdir', workDir: path });
   }
 
@@ -316,6 +325,7 @@ export function createSidebar(deps) {
   }
 
   function switchToWorkdir(path) {
+    setWorkdirSwitching();
     wsSend({ type: 'change_workdir', workDir: path });
   }
 

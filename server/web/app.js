@@ -80,6 +80,9 @@ const App = {
     // Working directory history
     const workdirHistory = ref([]);
 
+    // Working directory switching loading state
+    const workdirSwitching = ref(false);
+
     // Authentication state
     const authRequired = ref(false);
     const authPassword = ref('');
@@ -250,7 +253,7 @@ const App = {
       folderPickerLoading, folderPickerSelected, streaming,
       deleteConfirmOpen, deleteConfirmTitle,
       renamingSessionId, renameText,
-      hostname, workdirHistory,
+      hostname, workdirHistory, workdirSwitching,
       // Multi-session parallel
       currentConversationId, conversationCache, processingConversations,
       switchConversation,
@@ -264,6 +267,7 @@ const App = {
       folderPickerLoading, folderPickerEntries, folderPickerPath,
       authRequired, authPassword, authError, authAttempts, authLocked,
       streaming, sidebar, scrollToBottom,
+      workdirSwitching,
       // Multi-session parallel
       currentConversationId, processingConversations, conversationCache,
       switchConversation,
@@ -499,6 +503,7 @@ const App = {
       filteredWorkdirHistory: sidebar.filteredWorkdirHistory,
       switchToWorkdir: sidebar.switchToWorkdir,
       removeFromWorkdirHistory: sidebar.removeFromWorkdirHistory,
+      workdirSwitching,
       // Authentication
       authRequired, authPassword, authError, authAttempts, authLocked,
       submitPassword,
@@ -1185,6 +1190,14 @@ const App = {
           </div>
         </div>
       </div>
+
+      <!-- Workdir switching overlay -->
+      <Transition name="fade">
+        <div v-if="workdirSwitching" class="workdir-switching-overlay">
+          <div class="workdir-switching-spinner"></div>
+          <div class="workdir-switching-text">Switching directory...</div>
+        </div>
+      </Transition>
 
       <!-- File context menu -->
       <div

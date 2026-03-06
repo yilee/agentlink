@@ -20,6 +20,7 @@ export function createConnection(deps) {
     authRequired, authPassword, authError, authAttempts, authLocked,
     streaming, sidebar,
     scrollToBottom,
+    workdirSwitching,
     // Multi-session parallel
     currentConversationId, processingConversations, conversationCache,
     switchConversation,
@@ -504,6 +505,8 @@ export function createConnection(deps) {
           sidebar.addToWorkdirHistory(msg.agent.workDir);
           const savedDir = localStorage.getItem(`agentlink-workdir-${sessionId.value}`);
           if (savedDir && savedDir !== msg.agent.workDir) {
+            workdirSwitching.value = true;
+            setTimeout(() => { workdirSwitching.value = false; }, 10000);
             wsSend({ type: 'change_workdir', workDir: savedDir });
           }
           sidebar.requestSessionList();
@@ -797,6 +800,7 @@ export function createConnection(deps) {
       } else if (msg.type === 'file_content') {
         if (filePreview) filePreview.handleFileContent(msg);
       } else if (msg.type === 'workdir_changed') {
+        workdirSwitching.value = false;
         workDir.value = msg.workDir;
         localStorage.setItem(`agentlink-workdir-${sessionId.value}`, msg.workDir);
         sidebar.addToWorkdirHistory(msg.workDir);

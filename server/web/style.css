@@ -1939,6 +1939,42 @@ body {
   color: var(--text-secondary);
 }
 
+/* ── Workdir switching overlay ── */
+.workdir-switching-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  backdrop-filter: blur(2px);
+}
+.workdir-switching-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  animation: workdir-spin 0.7s linear infinite;
+}
+@keyframes workdir-spin {
+  to { transform: rotate(360deg); }
+}
+.workdir-switching-text {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
 /* ── Folder Picker Modal ── */
 .folder-picker-overlay {
   position: fixed;
