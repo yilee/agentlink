@@ -42,10 +42,24 @@ function pathToProjectFolder(workDir: string): string {
   return `${sanitized.slice(0, 200)}-${Math.abs(hash).toString(36)}`;
 }
 
-/** Messages that are pure CLI metadata — always hidden */
+/** Messages that are pure CLI metadata or system tags — always hidden */
 function isHiddenCommand(text: string): boolean {
   return text.includes('<local-command-caveat>') ||
-    text.includes('<command-name>');
+    text.includes('<command-name>') ||
+    text.includes('<task-notification>') ||
+    text.includes('<system-reminder>') ||
+    text.includes('<user-prompt-submit-hook>') ||
+    text.includes('<available-deferred-tools>');
+}
+
+/** Strip system-injected tags from user/assistant text */
+function stripSystemTags(text: string): string {
+  return text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
+    .replace(/<task-notification>[\s\S]*?<\/task-notification>/g, '')
+    .replace(/<user-prompt-submit-hook>[\s\S]*?<\/user-prompt-submit-hook>/g, '')
+    .replace(/<available-deferred-tools>[\s\S]*?<\/available-deferred-tools>/g, '')
+    .trim();
 }
 
 /** Extract displayable output from local command stdout/stderr tags */
@@ -180,7 +194,10 @@ export function readSessionMessages(workDir: string, sessionId: string): History
           if (cmdOutput) {
             result.push({ role: 'user', content: cmdOutput, timestamp: ts, isCommandOutput: true });
           } else {
-            result.push({ role: 'user', content: text, timestamp: ts });
+            const cleaned = stripSystemTags(text);
+            if (cleaned) {
+              result.push({ role: 'user', content: cleaned, timestamp: ts });
+            }
           }
         }
 
