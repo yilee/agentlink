@@ -5,6 +5,8 @@
 [![npm agent](https://img.shields.io/npm/v/@agent-link/agent?label=agent)](https://www.npmjs.com/package/@agent-link/agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+English | [中文](./README.zh-CN.md)
+
 Access your local Claude Code agent from anywhere — through a shareable web URL.
 
 AgentLink runs a lightweight agent on your dev machine, connects it to a cloud relay, and gives you a clean chat interface at `https://msclaude.ai/xxxx`. All code execution happens locally. The relay just forwards encrypted messages.
