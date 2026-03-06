@@ -300,6 +300,24 @@ const App = {
     let _resizeHandler = () => { isMobile.value = window.innerWidth <= 768; };
     window.addEventListener('resize', _resizeHandler);
 
+    // ── iOS Safari keyboard fix ──
+    // Safari doesn't reliably support interactive-widget=resizes-content,
+    // so we use visualViewport API to shrink layout when the keyboard opens.
+    let _vvResizeHandler = null;
+    let _vvScrollHandler = null;
+    if (window.visualViewport) {
+      const vv = window.visualViewport;
+      const updateViewportHeight = () => {
+        // vv.height excludes the virtual keyboard; use it to constrain the layout
+        document.documentElement.style.height = vv.height + 'px';
+      };
+      _vvResizeHandler = updateViewportHeight;
+      _vvScrollHandler = updateViewportHeight;
+      vv.addEventListener('resize', _vvResizeHandler);
+      vv.addEventListener('scroll', _vvScrollHandler);
+      updateViewportHeight();
+    }
+
     // Close workdir menu on outside click or Escape
     let _workdirMenuClickHandler = (e) => {
       if (!workdirMenuOpen.value) return;
@@ -452,7 +470,16 @@ const App = {
 
     // ── Lifecycle ──
     onMounted(() => { connect(scheduleHighlight); });
-    onUnmounted(() => { closeWs(); streaming.cleanup(); window.removeEventListener('resize', _resizeHandler); document.removeEventListener('click', _workdirMenuClickHandler); document.removeEventListener('keydown', _workdirMenuKeyHandler); });
+    onUnmounted(() => {
+      closeWs(); streaming.cleanup();
+      window.removeEventListener('resize', _resizeHandler);
+      document.removeEventListener('click', _workdirMenuClickHandler);
+      document.removeEventListener('keydown', _workdirMenuKeyHandler);
+      if (window.visualViewport) {
+        if (_vvResizeHandler) window.visualViewport.removeEventListener('resize', _vvResizeHandler);
+        if (_vvScrollHandler) window.visualViewport.removeEventListener('scroll', _vvScrollHandler);
+      }
+    });
 
     return {
       status, agentName, hostname, workDir, sessionId, error,
