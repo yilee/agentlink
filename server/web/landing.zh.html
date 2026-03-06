@@ -1,26 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AgentLink — Remote Control for Claude Code</title>
-<meta name="description" content="Remote control for Claude Code. Start a task in your terminal, walk away, and continue from your phone or any browser. Multi-session, end-to-end encrypted.">
-<meta name="keywords" content="Claude Code, remote control, browser IDE, AI coding assistant, AgentLink, end-to-end encrypted, self-hosted, mobile coding">
-<link rel="canonical" href="https://msclaude.ai/">
+<title>AgentLink — Claude Code 开源版远程控制</title>
+<meta name="description" content="Claude Code 开源版远程控制。在手机、平板或任何浏览器上远程操控你开发机器上的 Claude，端到端加密，无需注册。">
+<meta name="keywords" content="Claude Code, Claude Code开源版远程控制, 远程控制, 浏览器 IDE, AI 编程助手, AgentLink, 端到端加密, 自建部署, 移动编程">
+<link rel="canonical" href="https://msclaude.ai/zh">
 <link rel="alternate" hreflang="en" href="https://msclaude.ai/">
 <link rel="alternate" hreflang="zh" href="https://msclaude.ai/zh">
 <link rel="alternate" hreflang="x-default" href="https://msclaude.ai/">
 <!-- Open Graph -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="AgentLink — Remote Control for Claude Code">
-<meta property="og:description" content="Remote control for Claude Code. Start a task in your terminal, walk away, and continue from your phone or any browser. Multi-session, end-to-end encrypted.">
-<meta property="og:url" content="https://msclaude.ai/">
+<meta property="og:title" content="AgentLink — Claude Code 开源版远程控制">
+<meta property="og:description" content="Claude Code 开源版远程控制。在手机、平板或任何浏览器上远程操控你开发机器上的 Claude，端到端加密，无需注册。">
+<meta property="og:url" content="https://msclaude.ai/zh">
 <meta property="og:image" content="https://msclaude.ai/iPad.png">
 <meta property="og:site_name" content="AgentLink">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="AgentLink — Remote Control for Claude Code">
-<meta name="twitter:description" content="Remote control for Claude Code. Start a task in your terminal, walk away, and continue from your phone or any browser. Multi-session, end-to-end encrypted.">
+<meta name="twitter:title" content="AgentLink — Claude Code 开源版远程控制">
+<meta name="twitter:description" content="Claude Code 开源版远程控制。在手机、平板或任何浏览器上远程操控你开发机器上的 Claude，端到端加密，无需注册。">
 <meta name="twitter:image" content="https://msclaude.ai/iPad.png">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <script type="application/ld+json">
@@ -28,8 +30,8 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "AgentLink",
-  "description": "Remote control for Claude Code. Start a task in your terminal, walk away, and continue from your phone or any browser. Multi-session, end-to-end encrypted.",
-  "url": "https://msclaude.ai/",
+  "description": "Claude Code 开源版远程控制。在手机、平板或任何浏览器上远程操控你开发机器上的 Claude，端到端加密，无需注册。",
+  "url": "https://msclaude.ai/zh",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Windows, macOS, Linux",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -37,7 +39,7 @@
 }
 </script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700;800;900&display=swap');
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -61,7 +63,7 @@
   }
 
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Noto Sans SC', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.6;
@@ -269,7 +271,7 @@
     font-size: clamp(2.8rem, 6vw, 4.5rem);
     font-weight: 800;
     letter-spacing: -0.04em;
-    line-height: 1.08;
+    line-height: 1.2;
     margin-bottom: 1.75rem;
     animation: fadeInUp 0.8s ease-out 0.1s both;
   }
@@ -300,7 +302,7 @@
     max-width: 600px;
     margin: 0 auto 3rem;
     font-weight: 400;
-    line-height: 1.7;
+    line-height: 1.8;
     animation: fadeInUp 0.8s ease-out 0.2s both;
   }
 
@@ -463,7 +465,7 @@
     transition: all 0.3s;
     pointer-events: none;
     z-index: 100;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Noto Sans SC', 'Inter', sans-serif;
   }
 
   .terminal-copy-toast.show {
@@ -500,7 +502,6 @@
     filter: blur(60px);
   }
 
-  /* Subtle connecting line between devices */
   .showcase::after {
     content: '';
     position: absolute;
@@ -592,7 +593,7 @@
     font-size: clamp(1.6rem, 3.5vw, 2.4rem);
     font-weight: 700;
     letter-spacing: -0.03em;
-    line-height: 1.25;
+    line-height: 1.35;
     margin-bottom: 1.5rem;
   }
 
@@ -604,7 +605,7 @@
   .philosophy p {
     color: var(--text-mid);
     font-size: 1.05rem;
-    line-height: 1.8;
+    line-height: 1.9;
     max-width: 560px;
     margin: 0 auto;
   }
@@ -748,7 +749,7 @@
   .bento-card p {
     font-size: 0.85rem;
     color: var(--text-dim);
-    line-height: 1.55;
+    line-height: 1.65;
   }
 
   /* ── How It Works ── */
@@ -830,7 +831,7 @@
   .step-content p {
     font-size: 0.88rem;
     color: var(--text-dim);
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   .step-content code {
@@ -985,9 +986,9 @@
     <div class="logo-text">Agent<span>Link</span></div>
   </div>
   <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#how-it-works">How It Works</a>
-    <a href="/zh" class="nav-lang">中文</a>
+    <a href="#features">功能</a>
+    <a href="#how-it-works">使用方式</a>
+    <a href="/" class="nav-lang">EN</a>
     <a href="https://github.com/yilee/agentlink" target="_blank" rel="noopener" class="nav-gh">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       GitHub
@@ -1002,25 +1003,24 @@
 <section class="hero">
   <div class="hero-badge">
     <div class="hero-badge-dot"></div>
-    Open Source &middot; End-to-End Encrypted
+    开源免费 &middot; 端到端加密
   </div>
   <h1>
-    <span class="line">Control Claude Code.</span>
-    <span class="line"><em>From anywhere.</em></span>
+    <span class="line">Claude Code</span>
+    <span class="line"><em>开源版远程控制。</em></span>
   </h1>
   <p class="hero-sub">
-    Start Claude Code on your machine. Walk away.
-    <strong>Pick it up from your phone, tablet, or any browser</strong> &mdash;
-    end-to-end encrypted, zero configuration.
+    在开发机器上启动 Agent，出门遛弯期间用<strong>手机或 iPad 继续写代码</strong> &mdash;
+    不用装 App，不用注册账号，打开浏览器就能用。
   </p>
   <div class="cta-group">
     <button class="cta-primary" onclick="copyInstall()">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-      Quick Install
+      一键安装
     </button>
     <a href="https://github.com/yilee/agentlink" target="_blank" rel="noopener" class="cta-secondary">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-      View on GitHub
+      查看源码
     </a>
   </div>
 
@@ -1030,7 +1030,7 @@
       <div class="terminal-dot"></div>
       <div class="terminal-dot"></div>
       <div class="terminal-dot"></div>
-      <div class="terminal-title">Terminal</div>
+      <div class="terminal-title">终端</div>
     </div>
     <div class="terminal-body">
       <div class="terminal-line" onclick="copyCmd('npm install -g @agent-link/agent')">
@@ -1042,7 +1042,7 @@
         <span class="terminal-cmd">agentlink-client start -D</span>
       </div>
       <div class="terminal-output">
-        Session ready &rarr; <a>https://msclaude.ai/s/abc123</a>
+        会话就绪 &rarr; <a>https://msclaude.ai/s/abc123</a>
       </div>
     </div>
   </div>
@@ -1053,13 +1053,13 @@
   <div class="device device-ipad">
     <picture>
       <source srcset="/iPad.webp" type="image/webp">
-      <img src="/iPad.png" alt="AgentLink web interface running Claude Code on an iPad" loading="eager">
+      <img src="/iPad.png" alt="AgentLink 网页端在 iPad 上运行 Claude Code" loading="eager">
     </picture>
   </div>
   <div class="device device-iphone">
     <picture>
       <source srcset="/iPhone.webp" type="image/webp">
-      <img src="/iPhone.png" alt="AgentLink mobile interface on iPhone" loading="eager">
+      <img src="/iPhone.png" alt="AgentLink 手机端界面" loading="eager">
     </picture>
   </div>
 </section>
@@ -1068,12 +1068,11 @@
 
 <!-- Philosophy -->
 <section class="philosophy reveal">
-  <div class="philosophy-label">Philosophy</div>
-  <h2>Code shouldn't be <em>chained to a desk.</em></h2>
+  <div class="philosophy-label">为什么做这个</div>
+  <h2>写代码不应该<em>被绑在电脑前。</em></h2>
   <p>
-    AgentLink turns Claude Code into a truly portable experience.
-    One command, one URL &mdash; your AI assistant is accessible from any device,
-    with real encryption and zero accounts required.
+    Claude Code 很强，但只能在终端里用。AgentLink 把它变成一个可以随身携带的体验 &mdash;
+    一行命令，一个链接，在手机或 iPad 上继续你的工作。不需要账号，不需要配置，端到端加密。
   </p>
 </section>
 
@@ -1081,21 +1080,21 @@
 
 <!-- Bento Features -->
 <section class="bento reveal" id="features">
-  <h2 class="sr-only">Features</h2>
+  <h2 class="sr-only">功能</h2>
 
   <!-- E2E Encryption — wide -->
   <div class="bento-card wide">
     <div class="bento-visual">
       <div class="encrypt-visual">
-        <div class="encrypt-block">hello world</div>
+        <div class="encrypt-block">你的代码</div>
         <div class="encrypt-arrow">&rarr;</div>
         <div class="encrypt-block locked">x9f#k2$mQ...</div>
         <div class="encrypt-arrow">&rarr;</div>
-        <div class="encrypt-block">hello world</div>
+        <div class="encrypt-block">你的代码</div>
       </div>
     </div>
-    <h3>End-to-End Encrypted</h3>
-    <p>XSalsa20-Poly1305 encryption. The relay server is a blind forwarder &mdash; it never sees your code, your prompts, or your data.</p>
+    <h3>端到端加密</h3>
+    <p>XSalsa20-Poly1305 加密。中继服务器只是个盲转发器 &mdash; 看不到你的代码、提示词或任何数据。</p>
   </div>
 
   <!-- Zero Config -->
@@ -1105,8 +1104,8 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
       </div>
     </div>
-    <h3>Zero Config</h3>
-    <p>No accounts. No registration. Install, start, open &mdash; done.</p>
+    <h3>开箱即用</h3>
+    <p>不用注册账号，不用配置环境。安装、启动、打开链接，三步搞定。</p>
   </div>
 
   <!-- Any Device -->
@@ -1116,8 +1115,8 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
       </div>
     </div>
-    <h3>Any Device</h3>
-    <p>Phone, tablet, laptop &mdash; any browser becomes your Claude Code terminal.</p>
+    <h3>任何设备</h3>
+    <p>手机、平板、笔记本 &mdash; 有浏览器就行，随时切到你的 Claude。</p>
   </div>
 
   <!-- Full Claude Code — wide -->
@@ -1126,27 +1125,27 @@
       <div class="device-flow">
         <div class="device-pill">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-          Terminal
+          终端
         </div>
         <div class="flow-line"></div>
         <div class="device-pill">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-          Files
+          文件
         </div>
         <div class="flow-line"></div>
         <div class="device-pill">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          Search
+          搜索
         </div>
         <div class="flow-line"></div>
         <div class="device-pill">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          Chat
+          对话
         </div>
       </div>
     </div>
-    <h3>Full Claude Code Experience</h3>
-    <p>File editing, shell commands, search, multi-turn conversations &mdash; every capability, now in your browser.</p>
+    <h3>完整的 Claude Code 体验</h3>
+    <p>文件编辑、Shell 命令、代码搜索、多轮对话 &mdash; 所有能力，现在搬到了浏览器里。</p>
   </div>
 
   <!-- Self-hostable -->
@@ -1156,8 +1155,8 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
       </div>
     </div>
-    <h3>Self-Hostable</h3>
-    <p>Run your own relay server. Your infrastructure, your rules, your data.</p>
+    <h3>可自建部署</h3>
+    <p>一条命令启动你自己的中继服务器。你的基础设施，你的规则。</p>
   </div>
 
   <!-- Multi Session -->
@@ -1167,8 +1166,8 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="8" height="8" rx="1.5"></rect><rect x="14" y="3" width="8" height="8" rx="1.5"></rect><rect x="2" y="13" width="8" height="8" rx="1.5"></rect><rect x="14" y="13" width="8" height="8" rx="1.5"></rect></svg>
       </div>
     </div>
-    <h3>Multi Session</h3>
-    <p>Run multiple conversations in parallel. Switch between tasks without losing context.</p>
+    <h3>多会话并行</h3>
+    <p>同时跑多个对话，自由切换，互不干扰。</p>
   </div>
 
   <!-- Password Protection -->
@@ -1178,8 +1177,8 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
       </div>
     </div>
-    <h3>Optional Password</h3>
-    <p>Add <code style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:0.8rem">--password</code> to lock your session. Brute-force protection built in.</p>
+    <h3>密码保护</h3>
+    <p>加个 <code style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:0.8rem">--password</code> 参数锁住会话，自带暴力破解防护。</p>
   </div>
 </section>
 
@@ -1187,28 +1186,28 @@
 
 <!-- How It Works -->
 <section class="workflow reveal" id="how-it-works">
-  <div class="workflow-label">How It Works</div>
-  <h2>Three steps. That's it.</h2>
+  <div class="workflow-label">使用方式</div>
+  <h2>三步，就这么简单。</h2>
   <div class="workflow-steps">
     <div class="workflow-step">
       <div class="step-marker">01</div>
       <div class="step-content">
-        <h3>Start the agent</h3>
-        <p>Run <code>agentlink-client start -D</code> in your project directory. It prints a unique session URL.</p>
+        <h3>启动 Agent</h3>
+        <p>在项目目录下运行 <code>agentlink-client start -D</code>，终端会打印一个会话链接。</p>
       </div>
     </div>
     <div class="workflow-step">
       <div class="step-marker">02</div>
       <div class="step-content">
-        <h3>Open the URL, anywhere</h3>
-        <p>Phone, tablet, a friend's laptop &mdash; any browser works. Traffic is end-to-end encrypted automatically; the relay never sees your data.</p>
+        <h3>在任意设备打开链接</h3>
+        <p>手机、平板、别人的电脑 &mdash; 只要有浏览器就行。所有通信自动端到端加密，中继服务器看不到任何内容。</p>
       </div>
     </div>
     <div class="workflow-step">
       <div class="step-marker">03</div>
       <div class="step-content">
-        <h3>Run sessions in parallel, switch freely</h3>
-        <p>Multiple conversations, multiple projects &mdash; all running at once. Jump between them from any device, with full history preserved.</p>
+        <h3>开始干活</h3>
+        <p>多个对话并行运行，随时切换项目。完整的会话历史随时可以恢复，工作不会丢。</p>
       </div>
     </div>
   </div>
@@ -1221,13 +1220,13 @@
     <span class="footer-brand">AgentLink</span>
     <a href="https://github.com/yilee/agentlink" rel="noopener">GitHub</a>
   </div>
-  <p>Open source. Free forever. Built for developers who ship from anywhere.</p>
+  <p>开源免费，永远免费。为随时随地写代码的开发者而生。</p>
 </footer>
 
 </div>
 
 <!-- Toast for copy -->
-<div class="terminal-copy-toast" id="copyToast">Copied to clipboard</div>
+<div class="terminal-copy-toast" id="copyToast">已复制到剪贴板</div>
 
 <script>
 function copyCmd(text) {

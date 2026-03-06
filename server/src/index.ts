@@ -37,6 +37,11 @@ app.get('/', (_req, res) => {
   res.sendFile(join(webDir, 'landing.html'));
 });
 
+// Chinese landing page
+app.get('/zh', (_req, res) => {
+  res.sendFile(join(webDir, 'landing.zh.html'));
+});
+
 // Serve versioned index.html with no-store (cache-busting for browsers like iPhone Safari)
 const sendIndexHtml = (_req: express.Request, res: express.Response) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
