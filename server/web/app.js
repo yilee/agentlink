@@ -112,6 +112,7 @@ const App = {
     const previewPanelWidth = ref(parseInt(localStorage.getItem('agentlink-preview-panel-width'), 10) || 400);
     const previewFile = ref(null);
     const previewLoading = ref(false);
+    const previewMarkdownRendered = ref(false);
 
     // ── switchConversation: save current → load target ──
     // Defined here and used by sidebar.newConversation, sidebar.resumeSession, workdir_changed
@@ -287,7 +288,7 @@ const App = {
     // File preview module
     const filePreview = createFilePreview({
       wsSend, previewPanelOpen, previewPanelWidth, previewFile, previewLoading,
-      sidebarView, sidebarOpen, isMobile,
+      previewMarkdownRendered, sidebarView, sidebarOpen, isMobile, renderMarkdown,
     });
     setFilePreview(filePreview);
 
@@ -516,7 +517,7 @@ const App = {
       sidebarView, isMobile, fileBrowser,
       flattenedTree: fileBrowser.flattenedTree,
       // File preview
-      previewPanelOpen, previewPanelWidth, previewFile, previewLoading, filePreview,
+      previewPanelOpen, previewPanelWidth, previewFile, previewLoading, previewMarkdownRendered, filePreview,
       workdirMenuOpen,
       toggleWorkdirMenu() { workdirMenuOpen.value = !workdirMenuOpen.value; },
       workdirMenuBrowse() {
@@ -617,9 +618,17 @@ const App = {
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
                 Files
               </button>
-              <span v-if="previewFile" class="file-preview-mobile-size">
-                {{ filePreview.formatFileSize(previewFile.totalSize) }}
-              </span>
+              <div class="preview-header-actions">
+                <button v-if="previewFile?.content && filePreview.isMarkdownFile(previewFile.fileName)"
+                        class="preview-md-toggle" :class="{ active: previewMarkdownRendered }"
+                        @click="previewMarkdownRendered = !previewMarkdownRendered"
+                        :title="previewMarkdownRendered ? 'Show source' : 'Render markdown'">
+                  <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3zM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5z"/></svg>
+                </button>
+                <span v-if="previewFile" class="file-preview-mobile-size">
+                  {{ filePreview.formatFileSize(previewFile.totalSize) }}
+                </span>
+              </div>
             </div>
             <div class="file-preview-mobile-filename" :title="previewFile?.filePath">
               {{ previewFile?.fileName || 'Preview' }}
@@ -633,6 +642,9 @@ const App = {
                    class="preview-image-container">
                 <img :src="'data:' + previewFile.mimeType + ';base64,' + previewFile.content"
                      :alt="previewFile.fileName" class="preview-image" />
+              </div>
+              <div v-else-if="previewFile?.content && previewMarkdownRendered && filePreview.isMarkdownFile(previewFile.fileName)"
+                   class="preview-markdown-rendered markdown-body" v-html="filePreview.renderedMarkdownHtml(previewFile.content)">
               </div>
               <div v-else-if="previewFile?.content" class="preview-text-container">
                 <pre class="preview-code"><code v-html="filePreview.highlightCode(previewFile.content, previewFile.fileName)"></code></pre>
@@ -1036,6 +1048,12 @@ const App = {
             <span class="preview-panel-filename" :title="previewFile?.filePath">
               {{ previewFile?.fileName || 'Preview' }}
             </span>
+            <button v-if="previewFile?.content && filePreview.isMarkdownFile(previewFile.fileName)"
+                    class="preview-md-toggle" :class="{ active: previewMarkdownRendered }"
+                    @click="previewMarkdownRendered = !previewMarkdownRendered"
+                    :title="previewMarkdownRendered ? 'Show source' : 'Render markdown'">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3zM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5z"/></svg>
+            </button>
             <span v-if="previewFile" class="preview-panel-size">
               {{ filePreview.formatFileSize(previewFile.totalSize) }}
             </span>
@@ -1050,6 +1068,9 @@ const App = {
                  class="preview-image-container">
               <img :src="'data:' + previewFile.mimeType + ';base64,' + previewFile.content"
                    :alt="previewFile.fileName" class="preview-image" />
+            </div>
+            <div v-else-if="previewFile?.content && previewMarkdownRendered && filePreview.isMarkdownFile(previewFile.fileName)"
+                 class="preview-markdown-rendered markdown-body" v-html="filePreview.renderedMarkdownHtml(previewFile.content)">
             </div>
             <div v-else-if="previewFile?.content" class="preview-text-container">
               <pre class="preview-code"><code v-html="filePreview.highlightCode(previewFile.content, previewFile.fileName)"></code></pre>

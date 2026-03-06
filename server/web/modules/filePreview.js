@@ -11,9 +11,11 @@ export function createFilePreview(deps) {
     previewPanelWidth,
     previewFile,
     previewLoading,
+    previewMarkdownRendered,
     sidebarView,
     sidebarOpen,
     isMobile,
+    renderMarkdown,
   } = deps;
 
   // ── Open / Close ──
@@ -52,6 +54,7 @@ export function createFilePreview(deps) {
 
   function handleFileContent(msg) {
     previewLoading.value = false;
+    previewMarkdownRendered.value = false;
     previewFile.value = {
       filePath: msg.filePath,
       fileName: msg.fileName,
@@ -174,6 +177,17 @@ export function createFilePreview(deps) {
     localStorage.setItem('agentlink-preview-panel-width', String(previewPanelWidth.value));
   }
 
+  // ── Markdown preview ──
+
+  function isMarkdownFile(fileName) {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase();
+    return ext === 'md' || ext === 'mdx';
+  }
+
+  function renderedMarkdownHtml(content) {
+    return renderMarkdown(content || '');
+  }
+
   return {
     openPreview,
     closePreview,
@@ -183,5 +197,7 @@ export function createFilePreview(deps) {
     highlightCode,
     formatFileSize,
     onResizeStart,
+    isMarkdownFile,
+    renderedMarkdownHtml,
   };
 }
