@@ -24,6 +24,9 @@ import {
 const require = createRequire(import.meta.url);
 const serverPkg = require('../package.json');
 
+// Per-client message processing queue to guarantee relay order
+const clientSendQueues = new Map<string, Promise<void>>();
+
 export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   const sessionId = url.searchParams.get('sessionId');
@@ -196,11 +199,13 @@ function completeConnection(
   console.log(`[Web] Client ${clientId.slice(0, 8)} connected to session ${sessionId}, agent: ${agent ? agent.name : 'none'}${authToken ? ' (authenticated)' : ''}`);
 
   ws.on('message', (data) => {
-    handleWebMessage(clientId, data.toString());
+    const prev = clientSendQueues.get(clientId) || Promise.resolve();
+    clientSendQueues.set(clientId, prev.then(() => handleWebMessage(clientId, data.toString())).catch(() => {}));
   });
 
   ws.on('close', () => {
     console.log(`[Web] Client ${clientId.slice(0, 8)} disconnected`);
+    clientSendQueues.delete(clientId);
     webClients.delete(clientId);
   });
 
@@ -228,10 +233,10 @@ async function handleWebMessage(clientId: string, raw: string): Promise<void> {
   const agent = agentId ? agents.get(agentId) : undefined;
 
   if (!agent || agent.ws.readyState !== WebSocket.OPEN) {
-    encryptAndSend(client.ws, { type: 'error', message: 'Agent not connected' }, client.sessionKey);
+    await encryptAndSend(client.ws, { type: 'error', message: 'Agent not connected' }, client.sessionKey);
     return;
   }
 
   // Forward web client message to agent, encrypted with agent's session key
-  encryptAndSend(agent.ws, msg, agent.sessionKey);
+  await encryptAndSend(agent.ws, msg, agent.sessionKey);
 }

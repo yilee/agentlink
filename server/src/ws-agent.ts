@@ -12,6 +12,12 @@ import {
 import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
 import { hashPassword } from './auth.js';
 
+// Per-agent message processing queue to guarantee relay order.
+// Without this, concurrent async handleAgentMessage calls can finish out-of-order
+// (e.g. a large message needing gzip encryption completes after a smaller subsequent one),
+// causing turn_completed to arrive before the last claude_output on the web client.
+const agentSendQueues = new Map<string, Promise<void>>();
+
 export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   const agentId = url.searchParams.get('id') || randomUUID();
@@ -82,11 +88,14 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   }
 
   ws.on('message', (data) => {
-    handleAgentMessage(agentId, data.toString());
+    // Chain through per-agent queue to preserve message order across async encryption
+    const prev = agentSendQueues.get(agentId) || Promise.resolve();
+    agentSendQueues.set(agentId, prev.then(() => handleAgentMessage(agentId, data.toString())).catch(() => {}));
   });
 
   ws.on('close', () => {
     console.log(`[Agent] Disconnected: ${name} (${agentId})`);
+    agentSendQueues.delete(agentId);
 
     // Only clean up if this WebSocket is still the current one for this agent.
     // On reconnect, the new connection overwrites the agents Map entry before
@@ -136,7 +145,7 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
   let relayCount = 0;
   for (const [, client] of webClients) {
     if (client.sessionId === agent.sessionId && client.ws.readyState === WebSocket.OPEN) {
-      encryptAndSend(client.ws, msg, client.sessionKey);
+      await encryptAndSend(client.ws, msg, client.sessionKey);
       relayCount++;
     }
   }
