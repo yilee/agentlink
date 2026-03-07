@@ -8,6 +8,9 @@
  */
 
 import { randomUUID } from 'crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, renameSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { CONFIG_DIR } from './config.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -126,6 +129,8 @@ type SendFn = (msg: Record<string, unknown>) => void;
 let activeTeam: TeamState | null = null;
 let sendFn: SendFn = () => {};
 let agentMessageIdCounter = 0;
+
+const TEAMS_DIR = join(CONFIG_DIR, 'teams');
 
 // ── Public API ─────────────────────────────────────────────────────────
 
@@ -377,6 +382,161 @@ export function serializeTeam(team: TeamState): TeamStateSerialized {
   };
 }
 
+// ── Persistence ──────────────────────────────────────────────────────────
+
+function ensureTeamsDir(): void {
+  if (!existsSync(TEAMS_DIR)) {
+    mkdirSync(TEAMS_DIR, { recursive: true });
+  }
+}
+
+/**
+ * Deserialize a TeamStateSerialized back into a live TeamState.
+ */
+function deserializeTeam(data: TeamStateSerialized): TeamState {
+  const agents = new Map<string, AgentTeammate>();
+  for (const a of data.agents) {
+    agents.set(a.id, {
+      role: { id: a.id, name: a.name, color: a.color },
+      toolUseId: a.toolUseId,
+      agentTaskId: a.agentTaskId,
+      status: a.status as AgentTeammate['status'],
+      currentTaskId: a.currentTaskId,
+      messages: [], // messages are not persisted (too large)
+    });
+  }
+
+  return {
+    teamId: data.teamId,
+    title: data.title,
+    config: data.config,
+    conversationId: data.conversationId,
+    claudeSessionId: data.claudeSessionId,
+    agents,
+    tasks: data.tasks,
+    feed: data.feed,
+    status: data.status as TeamState['status'],
+    summary: data.summary,
+    totalCost: data.totalCost,
+    durationMs: data.durationMs,
+    createdAt: data.createdAt,
+  };
+}
+
+/**
+ * Persist team state to disk (atomic write: tmp → rename).
+ */
+export function persistTeam(team: TeamState): void {
+  ensureTeamsDir();
+  const serialized = serializeTeam(team);
+  const filePath = join(TEAMS_DIR, `${team.teamId}.json`);
+  const tmpPath = filePath + '.tmp';
+
+  writeFileSync(tmpPath, JSON.stringify(serialized, null, 2), 'utf-8');
+  renameSync(tmpPath, filePath);
+}
+
+// Debounce timers for persist calls per team
+const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * Debounced persist — coalesces rapid state changes into a single write.
+ * Flushes after 500ms of quiet.
+ */
+export function persistTeamDebounced(team: TeamState): void {
+  const existing = persistTimers.get(team.teamId);
+  if (existing) clearTimeout(existing);
+
+  persistTimers.set(team.teamId, setTimeout(() => {
+    persistTimers.delete(team.teamId);
+    persistTeam(team);
+  }, 500));
+}
+
+/**
+ * Flush all pending debounced persists immediately.
+ */
+export function flushPendingPersists(): void {
+  for (const [teamId, timer] of persistTimers.entries()) {
+    clearTimeout(timer);
+    persistTimers.delete(teamId);
+    if (activeTeam?.teamId === teamId) {
+      persistTeam(activeTeam);
+    }
+  }
+}
+
+/**
+ * Load a team from disk by teamId.
+ */
+export function loadTeam(teamId: string): TeamState | null {
+  const filePath = join(TEAMS_DIR, `${teamId}.json`);
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    const data = JSON.parse(raw) as TeamStateSerialized;
+    return deserializeTeam(data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Summary info for listing teams.
+ */
+export interface TeamSummaryInfo {
+  teamId: string;
+  title: string;
+  status: string;
+  template: string | undefined;
+  agentCount: number;
+  totalCost: number;
+  createdAt: number;
+}
+
+/**
+ * List all persisted teams, sorted by createdAt descending (newest first).
+ */
+export function listTeams(): TeamSummaryInfo[] {
+  ensureTeamsDir();
+
+  const files = readdirSync(TEAMS_DIR).filter(f => f.endsWith('.json'));
+  const teams: TeamSummaryInfo[] = [];
+
+  for (const file of files) {
+    try {
+      const raw = readFileSync(join(TEAMS_DIR, file), 'utf-8');
+      const data = JSON.parse(raw) as TeamStateSerialized;
+      teams.push({
+        teamId: data.teamId,
+        title: data.title,
+        status: data.status,
+        template: data.config.template,
+        agentCount: data.agents.length,
+        totalCost: data.totalCost,
+        createdAt: data.createdAt,
+      });
+    } catch {
+      // Skip corrupted files
+    }
+  }
+
+  teams.sort((a, b) => b.createdAt - a.createdAt);
+  return teams;
+}
+
+/**
+ * Delete a persisted team file.
+ */
+export function deleteTeam(teamId: string): boolean {
+  const filePath = join(TEAMS_DIR, `${teamId}.json`);
+  try {
+    unlinkSync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ── Template definitions ────────────────────────────────────────────────
 
 interface AgentDef {
@@ -528,4 +688,277 @@ Available agents (use the Agent tool to delegate to them):
 ${agentList}
 
 User's request: "${config.instruction}"`;
+}
+
+// ── Output stream parser (observer callback) ────────────────────────────
+
+/**
+ * Output observer callback for the Lead's stdout stream.
+ * Registered via setOutputObserver() when a team is active.
+ * Returns true to suppress the message from normal web client forwarding.
+ */
+export function onLeadOutput(conversationId: string, msg: Record<string, unknown>): boolean {
+  if (!activeTeam || conversationId !== activeTeam.conversationId) {
+    return false; // not our team's conversation
+  }
+
+  const team = activeTeam;
+
+  // Capture session ID from system init
+  if (msg.type === 'system' && msg.session_id) {
+    team.claudeSessionId = msg.session_id as string;
+  }
+
+  // 1. assistant message → check for Agent tool calls
+  if (msg.type === 'assistant' && msg.message) {
+    const message = msg.message as { content?: Array<Record<string, unknown>> };
+    const content = message.content;
+    if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block.type === 'tool_use' && block.name === 'Agent') {
+          const input = (block.input || {}) as { name?: string; description?: string; prompt?: string };
+          const toolUseId = block.id as string;
+          const agent = registerSubagent(team, toolUseId, input);
+
+          // Emit agent status + task update to web
+          sendFn({
+            type: 'team_agent_status',
+            teamId: team.teamId,
+            agent: {
+              id: agent.role.id,
+              name: agent.role.name,
+              color: agent.role.color,
+              status: agent.status,
+              taskId: agent.currentTaskId,
+            },
+          });
+
+          const task = team.tasks.find(t => t.assignee === agent.role.id);
+          if (task) {
+            sendFn({
+              type: 'team_task_update',
+              teamId: team.teamId,
+              task,
+            });
+          }
+
+          addFeedEntry(team, agent.role.id, 'status_change', `${agent.role.name} joined the team`);
+          sendFn({
+            type: 'team_feed',
+            teamId: team.teamId,
+            entry: team.feed[team.feed.length - 1],
+          });
+        }
+      }
+    }
+    // Don't suppress Lead's assistant messages — they need to be forwarded
+    // with team context for the Lead planning view
+    if (!msg.parent_tool_use_id) {
+      return false; // let normal forwarding handle Lead's own messages
+    }
+  }
+
+  // 2. system.task_started → subagent began executing
+  if (msg.type === 'system' && msg.subtype === 'task_started') {
+    const toolUseId = msg.tool_use_id as string;
+    const taskId = msg.task_id as string;
+    const agent = linkSubagentTaskId(team, toolUseId, taskId);
+
+    if (agent) {
+      addFeedEntry(team, agent.role.id, 'task_started', `${agent.role.name} started working`);
+      sendFn({
+        type: 'team_agent_status',
+        teamId: team.teamId,
+        agent: {
+          id: agent.role.id,
+          name: agent.role.name,
+          color: agent.role.color,
+          status: agent.status,
+          taskId: agent.currentTaskId,
+        },
+      });
+      sendFn({
+        type: 'team_feed',
+        teamId: team.teamId,
+        entry: team.feed[team.feed.length - 1],
+      });
+
+      const task = team.tasks.find(t => t.assignee === agent.role.id);
+      if (task) {
+        sendFn({
+          type: 'team_task_update',
+          teamId: team.teamId,
+          task,
+        });
+      }
+    }
+    return true; // suppress system.task_started from normal forwarding
+  }
+
+  // 3. Messages with parent_tool_use_id → route to specific subagent
+  if (msg.parent_tool_use_id) {
+    const agent = findAgentByToolUseId(team, msg.parent_tool_use_id as string);
+    if (agent) {
+      routeMessageToAgent(team, agent, msg);
+      return true; // suppress from normal forwarding
+    }
+  }
+
+  // 4. user message with tool_use_result → check for subagent completion
+  if (msg.type === 'user' && msg.message) {
+    const message = msg.message as { content?: Array<Record<string, unknown>> };
+    if (Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (block.type === 'tool_result' && block.tool_use_id) {
+          // Check if this is a result for an Agent tool call
+          const agent = findAgentByToolUseId(team, block.tool_use_id as string);
+          if (agent) {
+            agent.status = 'done';
+            if (agent.currentTaskId) {
+              updateTaskStatus(team, agent.currentTaskId, 'done');
+            }
+            addFeedEntry(team, agent.role.id, 'task_completed', `${agent.role.name} completed work`);
+
+            sendFn({
+              type: 'team_agent_status',
+              teamId: team.teamId,
+              agent: {
+                id: agent.role.id,
+                name: agent.role.name,
+                color: agent.role.color,
+                status: agent.status,
+                taskId: agent.currentTaskId,
+              },
+            });
+
+            const task = team.tasks.find(t => t.assignee === agent.role.id);
+            if (task) {
+              sendFn({
+                type: 'team_task_update',
+                teamId: team.teamId,
+                task,
+              });
+            }
+
+            sendFn({
+              type: 'team_feed',
+              teamId: team.teamId,
+              entry: team.feed[team.feed.length - 1],
+            });
+
+            // Check if all subagents are done → transition to summarizing
+            if (allSubagentsDone(team) && team.status === 'running') {
+              team.status = 'summarizing';
+            }
+
+            return true; // suppress from normal forwarding
+          }
+        }
+      }
+    }
+  }
+
+  // 5. result message → team completed
+  if (msg.type === 'result') {
+    team.totalCost = (msg.total_cost_usd as number) || 0;
+    team.durationMs = (msg.duration_ms as number) || 0;
+    return false; // let normal forwarding handle result (turn_completed)
+  }
+
+  // Default: don't suppress (Lead's own messages flow through normally)
+  return false;
+}
+
+/**
+ * Route a subagent message to the agent's message list and forward to web.
+ */
+function routeMessageToAgent(
+  team: TeamState,
+  agent: AgentTeammate,
+  msg: Record<string, unknown>,
+): void {
+  // Extract useful content from the message for agent detail view
+  if (msg.type === 'assistant' && msg.message) {
+    const message = msg.message as { content?: Array<Record<string, unknown>> };
+    if (Array.isArray(message.content)) {
+      // Text content
+      const textBlocks = message.content.filter(b => b.type === 'text');
+      for (const block of textBlocks) {
+        if (block.text) {
+          addAgentMessage(agent, 'assistant', { content: block.text as string });
+        }
+      }
+      // Tool use blocks
+      const toolBlocks = message.content.filter(b => b.type === 'tool_use');
+      for (const block of toolBlocks) {
+        addAgentMessage(agent, 'tool', {
+          toolName: block.name as string,
+          toolInput: typeof block.input === 'string' ? block.input : JSON.stringify(block.input),
+        });
+
+        addFeedEntry(team, agent.role.id, 'tool_call', `${agent.role.name} → ${block.name}`);
+      }
+    }
+  }
+
+  // Tool results (user messages within subagent context)
+  if (msg.type === 'user' && msg.message) {
+    const message = msg.message as { content?: Array<Record<string, unknown>> };
+    if (Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (block.type === 'tool_result') {
+          const content = typeof block.content === 'string'
+            ? block.content
+            : Array.isArray(block.content)
+              ? (block.content as Array<{ text?: string }>).map(b => b.text || '').join('')
+              : '';
+          addAgentMessage(agent, 'tool', {
+            toolOutput: content.slice(0, 2000), // cap for memory
+            hasResult: true,
+          });
+        }
+      }
+    }
+  }
+
+  // Forward to web with team + agent context — extract delta like claude.ts does
+  const data = extractOutputData(msg);
+  if (data) {
+    sendFn({
+      type: 'claude_output',
+      teamId: team.teamId,
+      agentRole: agent.role.id,
+      data,
+    });
+  }
+}
+
+/**
+ * Extract the output data payload from a raw message (similar to claude.ts processing).
+ */
+function extractOutputData(msg: Record<string, unknown>): Record<string, unknown> | null {
+  if (msg.type === 'assistant' && msg.message) {
+    const message = msg.message as { content?: Array<Record<string, unknown>> };
+    if (Array.isArray(message.content)) {
+      const textBlocks = message.content.filter(b => b.type === 'text');
+      const fullText = textBlocks.map(b => (b.text as string) || '').join('');
+      const toolBlocks = message.content.filter(b => b.type === 'tool_use');
+
+      const result: Record<string, unknown> = {};
+      if (fullText) {
+        result.type = 'content_block_delta';
+        result.delta = fullText;
+      }
+      if (toolBlocks.length > 0) {
+        return { type: 'tool_use', tools: toolBlocks };
+      }
+      if (fullText) return result;
+    }
+  }
+
+  if (msg.type === 'user') {
+    return msg as Record<string, unknown>;
+  }
+
+  return null;
 }

@@ -2,7 +2,24 @@
  * Tests for team.ts state management functions.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdirSync, existsSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+
+// Use a temp directory for team persistence tests
+// NOTE: vi.mock is hoisted, so we use a static expression inside the factory
+vi.mock('../../agent/src/config.js', () => {
+  const path = require('path');
+  const os = require('os');
+  return {
+    CONFIG_DIR: path.join(os.tmpdir(), `agentlink-team-test-${process.pid}`),
+  };
+});
+
+// Resolve the same path for test cleanup
+const TEST_CONFIG_DIR = join(tmpdir(), `agentlink-team-test-${process.pid}`);
+
 import {
   createTeamState,
   clearActiveTeam,
@@ -20,6 +37,12 @@ import {
   buildLeadPrompt,
   onLeadOutput,
   setTeamSendFn,
+  persistTeam,
+  loadTeam,
+  listTeams,
+  deleteTeam,
+  flushPendingPersists,
+  persistTeamDebounced,
   type TeamConfig,
   type TeamState,
 } from '../../agent/src/team.js';
@@ -229,6 +252,136 @@ describe('team.ts state management', () => {
       expect(serialized.agents[1].id).toBe('worker');
       expect(serialized.tasks).toEqual(team.tasks);
       expect(serialized.status).toBe(team.status);
+    });
+  });
+
+  describe('persistence', () => {
+    const teamsDir = join(TEST_CONFIG_DIR, 'teams');
+
+    beforeEach(() => {
+      // Ensure clean teams dir
+      if (existsSync(teamsDir)) {
+        rmSync(teamsDir, { recursive: true });
+      }
+    });
+
+    afterEach(() => {
+      flushPendingPersists();
+      if (existsSync(TEST_CONFIG_DIR)) {
+        rmSync(TEST_CONFIG_DIR, { recursive: true });
+      }
+    });
+
+    describe('persistTeam / loadTeam round-trip', () => {
+      it('persists and loads a team with correct data', () => {
+        registerSubagent(team, 'tu-1', { name: 'Worker', prompt: 'Do stuff' });
+        addFeedEntry(team, 'worker', 'status_change', 'Worker joined');
+
+        persistTeam(team);
+
+        const loaded = loadTeam(team.teamId);
+        expect(loaded).not.toBeNull();
+        expect(loaded!.teamId).toBe(team.teamId);
+        expect(loaded!.title).toBe(team.title);
+        expect(loaded!.config).toEqual(team.config);
+        expect(loaded!.conversationId).toBe(team.conversationId);
+        expect(loaded!.status).toBe(team.status);
+        expect(loaded!.agents.size).toBe(2); // Lead + Worker
+        expect(loaded!.agents.get('lead')?.role.name).toBe('Lead');
+        expect(loaded!.agents.get('worker')?.role.name).toBe('Worker');
+        expect(loaded!.tasks).toHaveLength(1);
+        expect(loaded!.tasks[0].assignee).toBe('worker');
+        expect(loaded!.feed).toHaveLength(1);
+      });
+
+      it('loaded team has empty messages arrays (not persisted)', () => {
+        const agent = registerSubagent(team, 'tu-1', { name: 'Talker' });
+        addAgentMessage(agent, 'assistant', { content: 'hello' });
+        expect(agent.messages).toHaveLength(1);
+
+        persistTeam(team);
+        const loaded = loadTeam(team.teamId);
+        expect(loaded!.agents.get('talker')?.messages).toHaveLength(0);
+      });
+    });
+
+    describe('loadTeam', () => {
+      it('returns null for nonexistent team', () => {
+        expect(loadTeam('nonexistent-id')).toBeNull();
+      });
+    });
+
+    describe('listTeams', () => {
+      it('returns empty array when no teams', () => {
+        expect(listTeams()).toEqual([]);
+      });
+
+      it('lists persisted teams sorted by createdAt descending', () => {
+        // Create and persist two teams
+        persistTeam(team);
+
+        clearActiveTeam();
+        const team2Config: TeamConfig = { instruction: 'Second task' };
+        const team2 = createTeamState(team2Config, 'conv-list-2');
+        persistTeam(team2);
+
+        const list = listTeams();
+        expect(list).toHaveLength(2);
+        // team2 created after team1, so it should be first
+        expect(list[0].teamId).toBe(team2.teamId);
+        expect(list[1].teamId).toBe(team.teamId);
+      });
+
+      it('returns correct summary fields', () => {
+        registerSubagent(team, 'tu-1', { name: 'Agent1' });
+        team.totalCost = 0.25;
+        persistTeam(team);
+
+        const list = listTeams();
+        expect(list).toHaveLength(1);
+        expect(list[0].title).toBe(team.title);
+        expect(list[0].status).toBe(team.status);
+        expect(list[0].template).toBe('code-review');
+        expect(list[0].agentCount).toBe(2); // Lead + Agent1
+        expect(list[0].totalCost).toBe(0.25);
+      });
+    });
+
+    describe('deleteTeam', () => {
+      it('deletes a persisted team', () => {
+        persistTeam(team);
+        expect(loadTeam(team.teamId)).not.toBeNull();
+
+        const result = deleteTeam(team.teamId);
+        expect(result).toBe(true);
+        expect(loadTeam(team.teamId)).toBeNull();
+      });
+
+      it('returns false for nonexistent team', () => {
+        expect(deleteTeam('nonexistent')).toBe(false);
+      });
+    });
+
+    describe('persistTeamDebounced', () => {
+      it('eventually persists the team', async () => {
+        persistTeamDebounced(team);
+
+        // Should not be persisted yet
+        expect(loadTeam(team.teamId)).toBeNull();
+
+        // Wait for debounce to fire
+        await new Promise(r => setTimeout(r, 600));
+
+        expect(loadTeam(team.teamId)).not.toBeNull();
+      });
+
+      it('flushPendingPersists writes immediately', () => {
+        persistTeamDebounced(team);
+        expect(loadTeam(team.teamId)).toBeNull();
+
+        flushPendingPersists();
+        expect(loadTeam(team.teamId)).not.toBeNull();
+      });
     });
   });
 
