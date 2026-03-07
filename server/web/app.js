@@ -593,6 +593,13 @@ const App = {
         if (!task.assignedTo) return null;
         return team.findAgent(task.assignedTo);
       },
+      viewAgentWithHistory(agentId) {
+        team.viewAgent(agentId);
+        // For historical teams, request agent conversation history from server
+        if (team.historicalTeam.value && team.historicalTeam.value.teamId) {
+          team.requestAgentHistory(team.historicalTeam.value.teamId, agentId);
+        }
+      },
     };
   },
   template: `
@@ -761,6 +768,30 @@ const App = {
                     <button class="workdir-history-delete" @click.stop="removeFromWorkdirHistory(path)" title="Remove from history">
                       <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Teams section -->
+          <div v-if="teamsList.length > 0" class="sidebar-section sidebar-teams">
+            <div class="sidebar-section-header">
+              <span>Teams</span>
+            </div>
+            <div class="team-history-list">
+              <div
+                v-for="t in teamsList" :key="t.teamId"
+                :class="['team-history-item', { active: displayTeam && displayTeam.teamId === t.teamId }]"
+                @click="viewHistoricalTeam(t.teamId)"
+                :title="t.title"
+              >
+                <svg class="team-history-icon" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                <div class="team-history-info">
+                  <div class="team-history-title">{{ t.title || 'Untitled team' }}</div>
+                  <div class="team-history-meta">
+                    <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + t.status]">{{ t.status }}</span>
+                    <span v-if="t.taskCount" class="team-history-tasks">{{ t.taskCount }} tasks</span>
                   </div>
                 </div>
               </div>
@@ -1015,6 +1046,26 @@ const App = {
                     </div>
                   </div>
 
+                  <!-- Completion stats -->
+                  <div v-if="displayTeam.status === 'completed' || displayTeam.status === 'failed'" class="team-stats-bar">
+                    <div class="team-stat">
+                      <span class="team-stat-label">Tasks</span>
+                      <span class="team-stat-value">{{ doneTasks.length }}/{{ displayTeam.tasks.length }}</span>
+                    </div>
+                    <div v-if="displayTeam.durationMs" class="team-stat">
+                      <span class="team-stat-label">Duration</span>
+                      <span class="team-stat-value">{{ Math.round(displayTeam.durationMs / 1000) }}s</span>
+                    </div>
+                    <div v-if="displayTeam.totalCost" class="team-stat">
+                      <span class="team-stat-label">Cost</span>
+                      <span class="team-stat-value">${{ displayTeam.totalCost.toFixed(2) }}</span>
+                    </div>
+                    <div class="team-stat">
+                      <span class="team-stat-label">Agents</span>
+                      <span class="team-stat-value">{{ (displayTeam.agents || []).length }}</span>
+                    </div>
+                  </div>
+
                   <!-- Completion summary -->
                   <div v-if="displayTeam.status === 'completed' && displayTeam.summary" class="team-summary">
                     <div class="team-summary-header">Summary</div>
@@ -1076,7 +1127,7 @@ const App = {
                     <div
                       v-for="agent in (displayTeam.agents || [])" :key="agent.id"
                       :class="['team-agent-item', { active: activeAgentView === agent.id }]"
-                      @click="viewAgent(agent.id)"
+                      @click="historicalTeam ? viewAgentWithHistory(agent.id) : viewAgent(agent.id)"
                     >
                       <span class="team-agent-dot" :style="{ background: getAgentColor(agent.id) }"></span>
                       <div class="team-agent-info">

@@ -567,6 +567,7 @@ export function createConnection(deps) {
           sidebar.addToWorkdirHistory(msg.agent.workDir);
         }
         sidebar.requestSessionList();
+        if (team) team.requestTeamsList();
         startPing();
         wsSend({ type: 'query_active_conversations' });
       } else if (msg.type === 'active_conversations') {
