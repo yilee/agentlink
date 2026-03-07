@@ -2826,6 +2826,522 @@ body {
 }
 
 /* ══════════════════════════════════════════
+   Team Mode
+   ══════════════════════════════════════════ */
+
+/* ── Team mode toggle ── */
+.team-mode-toggle {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 2px;
+  width: fit-content;
+}
+
+.team-mode-btn {
+  padding: 4px 14px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.team-mode-btn.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+.team-mode-btn:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+/* ── Team create panel ── */
+.team-create-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.team-create-inner {
+  max-width: 560px;
+  width: 100%;
+}
+
+.team-create-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.team-create-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.team-create-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.team-create-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 100px;
+  line-height: 1.4;
+}
+
+.team-create-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.team-create-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.team-create-launch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.team-create-launch:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.team-create-launch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.team-create-cancel {
+  padding: 8px 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.team-create-cancel:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* ── Team dashboard ── */
+.team-dashboard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.team-dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.team-dash-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-dash-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.team-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.team-status-planning {
+  background: rgba(234,179,8,0.15);
+  color: #eab308;
+}
+
+.team-status-running {
+  background: rgba(59,130,246,0.15);
+  color: #3b82f6;
+}
+
+.team-status-summarizing {
+  background: rgba(139,92,246,0.15);
+  color: #8b5cf6;
+}
+
+.team-status-completed {
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
+}
+
+.team-status-failed {
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+}
+
+.team-dash-header-right {
+  display: flex;
+  gap: 8px;
+}
+
+.team-dissolve-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--error);
+  border-radius: 5px;
+  background: none;
+  color: var(--error);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.team-dissolve-btn:hover {
+  background: rgba(212,84,84,0.1);
+}
+
+.team-back-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.team-back-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* ── Dashboard body ── */
+.team-dash-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.team-dash-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Kanban board ── */
+.team-kanban {
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+}
+
+.team-kanban-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.team-kanban-col-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-kanban-col-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.team-kanban-col-dot.pending { background: var(--text-secondary); }
+.team-kanban-col-dot.active { background: var(--accent); }
+.team-kanban-col-dot.done { background: var(--success); }
+.team-kanban-col-dot.failed { background: var(--error); }
+
+.team-kanban-col-count {
+  margin-left: auto;
+  background: var(--bg-tertiary);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+
+.team-kanban-col-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.team-kanban-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* ── Task cards ── */
+.team-task-card {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s;
+}
+
+.team-task-card.active {
+  border-left: 3px solid var(--accent);
+}
+
+.team-task-card.done {
+  opacity: 0.8;
+}
+
+.team-task-card.failed {
+  border-left: 3px solid var(--error);
+}
+
+.team-task-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.team-task-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.team-task-assignee {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ── Agent dot ── */
+.team-agent-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* ── Activity feed ── */
+.team-feed {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.team-feed-header {
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-feed-list {
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.team-feed-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  padding: 2px 0;
+}
+
+.team-feed-time {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+.team-feed-text {
+  color: var(--text-primary);
+}
+
+/* ── Team summary (completion) ── */
+.team-summary {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.team-summary-header {
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-summary-body {
+  padding: 12px;
+}
+
+/* ── Agent sidebar ── */
+.team-agents-panel {
+  width: 200px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.team-agents-header {
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.team-agents-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.team-agent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.team-agent-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.team-agent-item.active {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent);
+}
+
+.team-agent-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.team-agent-name {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-agent-status {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.team-agents-empty {
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* ══════════════════════════════════════════
    Mobile responsive — max-width: 768px
    ══════════════════════════════════════════ */
 @media (max-width: 768px) {
@@ -2987,6 +3503,30 @@ body {
   /* AskUserQuestion — larger tap targets */
   .ask-question-option {
     min-height: 44px;
+  }
+
+  /* Team dashboard — stack kanban columns */
+  .team-kanban {
+    flex-direction: column;
+  }
+
+  .team-dash-body {
+    flex-direction: column;
+  }
+
+  .team-agents-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    max-height: 150px;
+  }
+
+  .team-dash-main {
+    padding: 12px;
+  }
+
+  .team-create-panel {
+    padding: 1rem;
   }
 }
 
