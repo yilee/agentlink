@@ -792,7 +792,7 @@ const App = {
                   <div class="team-history-meta">
                     <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + t.status]">{{ t.status }}</span>
                     <span v-if="t.taskCount" class="team-history-tasks">{{ t.taskCount }} tasks</span>
-                    <span v-if="t.totalCost" class="team-history-tasks">${{ t.totalCost.toFixed(2) }}</span>
+                    <span v-if="t.totalCost" class="team-history-tasks">{{'$' + t.totalCost.toFixed(2) }}</span>
                   </div>
                 </div>
               </div>
@@ -1059,7 +1059,7 @@ const App = {
                     </div>
                     <div v-if="displayTeam.totalCost" class="team-stat">
                       <span class="team-stat-label">Cost</span>
-                      <span class="team-stat-value">${{ displayTeam.totalCost.toFixed(2) }}</span>
+                      <span class="team-stat-value">{{ '$' + displayTeam.totalCost.toFixed(2) }}</span>
                     </div>
                     <div class="team-stat">
                       <span class="team-stat-label">Agents</span>
