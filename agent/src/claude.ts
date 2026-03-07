@@ -172,16 +172,23 @@ export function clearSessionId(conversationId?: string): void {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
+/** Options for handleChat() */
+export interface HandleChatOptions {
+  resumeSessionId?: string;
+  extraArgs?: string[];
+}
+
 /**
  * Handle a chat message from the web client.
  * Lazily starts the Claude process on the first message.
  * If resumeSessionId is provided, resumes that Claude session.
+ * If extraArgs is provided, they are appended to the Claude CLI args on spawn.
  */
 export function handleChat(
   conversationId: string | undefined,
   prompt: string,
   workDir: string,
-  resumeSessionId?: string,
+  options?: HandleChatOptions,
   files?: ChatFile[],
 ): void {
   const convId = conversationId || DEFAULT_CONVERSATION_ID;
@@ -189,8 +196,8 @@ export function handleChat(
 
   if (!existing || !existing.inputStream) {
     // If the process exited but we still know the session ID, resume it
-    const sessionToResume = resumeSessionId || existing?.claudeSessionId || existing?.lastClaudeSessionId || undefined;
-    startQuery(convId, workDir, sessionToResume);
+    const sessionToResume = options?.resumeSessionId || existing?.claudeSessionId || existing?.lastClaudeSessionId || undefined;
+    startQuery(convId, workDir, sessionToResume, options?.extraArgs);
   }
 
   const state = conversations.get(convId)!;
@@ -338,7 +345,7 @@ function processFilesForClaude(files: ChatFile[], workDir: string, prompt: strin
   return content;
 }
 
-function startQuery(conversationId: string, workDir: string, resumeSessionId?: string): void {
+function startQuery(conversationId: string, workDir: string, resumeSessionId?: string, extraArgs?: string[]): void {
   // Tear down previous process for THIS conversation only (not others)
   const existing = conversations.get(conversationId);
   if (existing) {
@@ -386,6 +393,11 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
   if (resumeSessionId) {
     args.push('--resume', resumeSessionId);
     console.log(`[Claude:${conversationId.slice(0, 8)}] Resuming session: ${resumeSessionId}`);
+  }
+
+  if (extraArgs && extraArgs.length > 0) {
+    args.push(...extraArgs);
+    console.log(`[Claude:${conversationId.slice(0, 8)}] Extra args: ${extraArgs.join(' ')}`);
   }
 
   const { command, prefixArgs, spawnOpts } = resolveClaudeCommand();

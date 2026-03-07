@@ -227,7 +227,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
         existingConv?.workDir || state.workDir,
-        (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
+        { resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId },
         (msg as unknown as { files?: ChatFile[] }).files,
       );
       break;
