@@ -104,6 +104,22 @@ export function clearOutputObserver(): void {
   outputObserver = null;
 }
 
+// ── Close observer ────────────────────────────────────────────────────────
+// Optional callback invoked when a Claude process exits. Receives
+// (conversationId, exitCode, resultReceived). Allows the team module to
+// detect Lead crashes (process exited without a result message).
+
+type CloseObserverFn = (conversationId: string, exitCode: number | null, resultReceived: boolean) => void;
+let closeObserver: CloseObserverFn | null = null;
+
+export function setCloseObserver(fn: CloseObserverFn): void {
+  closeObserver = fn;
+}
+
+export function clearCloseObserver(): void {
+  closeObserver = null;
+}
+
 export function setSendFn(fn: SendFn): void {
   sendFn = fn;
 }
@@ -726,6 +742,11 @@ async function processOutput(
       sendWithConvId({ type: 'turn_completed' });
     }
     state.turnActive = false;
+
+    // Notify close observer (used by team module to detect Lead crash)
+    if (closeObserver) {
+      closeObserver(state.conversationId, child.exitCode, resultHandled);
+    }
 
     // Only clean up if this conversation is still in the map with the same state
     if (conversations.get(state.conversationId) === state) {

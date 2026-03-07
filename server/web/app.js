@@ -792,6 +792,7 @@ const App = {
                   <div class="team-history-meta">
                     <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + t.status]">{{ t.status }}</span>
                     <span v-if="t.taskCount" class="team-history-tasks">{{ t.taskCount }} tasks</span>
+                    <span v-if="t.totalCost" class="team-history-tasks">${{ t.totalCost.toFixed(2) }}</span>
                   </div>
                 </div>
               </div>
@@ -1080,7 +1081,7 @@ const App = {
                       <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
                       Dashboard
                     </button>
-                    <span class="team-agent-dot" :style="{ background: getAgentColor(activeAgentView) }"></span>
+                    <span :class="['team-agent-dot', { working: findAgent(activeAgentView)?.status === 'working' || findAgent(activeAgentView)?.status === 'starting' }]" :style="{ background: getAgentColor(activeAgentView) }"></span>
                     <span class="team-agent-detail-name">{{ findAgent(activeAgentView)?.name || activeAgentView }}</span>
                     <span class="team-agent-detail-status">{{ findAgent(activeAgentView)?.status }}</span>
                   </div>
@@ -1129,7 +1130,7 @@ const App = {
                       :class="['team-agent-item', { active: activeAgentView === agent.id }]"
                       @click="historicalTeam ? viewAgentWithHistory(agent.id) : viewAgent(agent.id)"
                     >
-                      <span class="team-agent-dot" :style="{ background: getAgentColor(agent.id) }"></span>
+                      <span :class="['team-agent-dot', { working: agent.status === 'working' || agent.status === 'starting' }]" :style="{ background: getAgentColor(agent.id) }"></span>
                       <div class="team-agent-info">
                         <div class="team-agent-name">{{ agent.name || agent.id }}</div>
                         <div class="team-agent-status">{{ agent.status }}</div>

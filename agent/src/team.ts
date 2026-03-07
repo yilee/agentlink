@@ -134,6 +134,8 @@ type HandleChatFn = (
 type CancelExecutionFn = (conversationId?: string) => void;
 type SetOutputObserverFn = (fn: (conversationId: string, msg: Record<string, unknown>) => boolean | void) => void;
 type ClearOutputObserverFn = () => void;
+type SetCloseObserverFn = (fn: (conversationId: string, exitCode: number | null, resultReceived: boolean) => void) => void;
+type ClearCloseObserverFn = () => void;
 
 let activeTeam: TeamState | null = null;
 let sendFn: SendFn = () => {};
@@ -141,6 +143,8 @@ let handleChatFn: HandleChatFn | null = null;
 let cancelExecutionFn: CancelExecutionFn | null = null;
 let setOutputObserverFn: SetOutputObserverFn | null = null;
 let clearOutputObserverFn: ClearOutputObserverFn | null = null;
+let setCloseObserverFn: SetCloseObserverFn | null = null;
+let clearCloseObserverFn: ClearCloseObserverFn | null = null;
 let agentMessageIdCounter = 0;
 
 const TEAMS_DIR = join(CONFIG_DIR, 'teams');
@@ -160,11 +164,15 @@ export function setTeamClaudeFns(fns: {
   cancelExecution: CancelExecutionFn;
   setOutputObserver: SetOutputObserverFn;
   clearOutputObserver: ClearOutputObserverFn;
+  setCloseObserver: SetCloseObserverFn;
+  clearCloseObserver: ClearCloseObserverFn;
 }): void {
   handleChatFn = fns.handleChat;
   cancelExecutionFn = fns.cancelExecution;
   setOutputObserverFn = fns.setOutputObserver;
   clearOutputObserverFn = fns.clearOutputObserver;
+  setCloseObserverFn = fns.setCloseObserver;
+  clearCloseObserverFn = fns.clearCloseObserver;
 }
 
 export function getActiveTeam(): TeamState | null {
@@ -518,6 +526,7 @@ export interface TeamSummaryInfo {
   status: string;
   template: string | undefined;
   agentCount: number;
+  taskCount: number;
   totalCost: number;
   createdAt: number;
 }
@@ -541,6 +550,7 @@ export function listTeams(): TeamSummaryInfo[] {
         status: data.status,
         template: data.config.template,
         agentCount: data.agents.length,
+        taskCount: data.tasks.length,
         totalCost: data.totalCost,
         createdAt: data.createdAt,
       });
@@ -842,11 +852,13 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
           // Check if this is a result for an Agent tool call
           const agent = findAgentByToolUseId(team, block.tool_use_id as string);
           if (agent) {
-            agent.status = 'done';
+            const isError = !!block.is_error;
+            agent.status = isError ? 'error' : 'done';
             if (agent.currentTaskId) {
-              updateTaskStatus(team, agent.currentTaskId, 'done');
+              updateTaskStatus(team, agent.currentTaskId, isError ? 'failed' : 'done');
             }
-            addFeedEntry(team, agent.role.id, 'task_completed', `${agent.role.name} completed work`);
+            addFeedEntry(team, agent.role.id, isError ? 'task_failed' : 'task_completed',
+              isError ? `${agent.role.name} failed` : `${agent.role.name} completed work`);
 
             sendFn({
               type: 'team_agent_status',
@@ -901,6 +913,54 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
 
   // Default: don't suppress (Lead's own messages flow through normally)
   return false;
+}
+
+/**
+ * Close observer callback for the Lead's process exit.
+ * Detects Lead crash (process exited without a result message) and dissolves the team.
+ */
+export function onLeadClose(conversationId: string, _exitCode: number | null, resultReceived: boolean): void {
+  if (!activeTeam || conversationId !== activeTeam.conversationId) return;
+
+  // If result was received, completeTeam() was already called from onLeadOutput
+  if (resultReceived) return;
+
+  // Lead process crashed without producing a result — dissolve the team
+  console.log(`[Team] Lead process exited without result — marking team as failed`);
+  const team = activeTeam;
+
+  // Mark remaining agents as error
+  for (const agent of team.agents.values()) {
+    if (agent.status === 'starting' || agent.status === 'working') {
+      agent.status = 'error';
+    }
+  }
+
+  // Mark remaining tasks as failed
+  for (const task of team.tasks) {
+    if (task.status === 'pending' || task.status === 'active') {
+      task.status = 'failed';
+      task.updatedAt = Date.now();
+    }
+  }
+
+  team.status = 'failed';
+  team.durationMs = Date.now() - team.createdAt;
+  persistTeam(team);
+
+  // Remove observers
+  if (clearOutputObserverFn) clearOutputObserverFn();
+  if (clearCloseObserverFn) clearCloseObserverFn();
+
+  // Notify clients
+  sendFn({
+    type: 'team_completed',
+    teamId: team.teamId,
+    status: 'failed',
+    team: serializeTeam(team),
+  });
+
+  clearActiveTeam();
 }
 
 /**
@@ -1021,6 +1081,11 @@ export function createTeam(config: TeamConfig, workDir: string): TeamState {
   // Attach output observer before spawning
   setOutputObserverFn(onLeadOutput);
 
+  // Attach close observer to detect Lead crash
+  if (setCloseObserverFn) {
+    setCloseObserverFn(onLeadClose);
+  }
+
   // Spawn the Lead process with --agents flag
   handleChatFn(conversationId, leadPrompt, workDir, {
     extraArgs: ['--agents', agentsJson],
@@ -1074,6 +1139,11 @@ export function dissolveTeam(): void {
     clearOutputObserverFn();
   }
 
+  // Remove close observer
+  if (clearCloseObserverFn) {
+    clearCloseObserverFn();
+  }
+
   // Notify clients
   sendFn({
     type: 'team_completed',
@@ -1109,6 +1179,11 @@ export function completeTeam(summary?: string): void {
   // Remove output observer
   if (clearOutputObserverFn) {
     clearOutputObserverFn();
+  }
+
+  // Remove close observer
+  if (clearCloseObserverFn) {
+    clearCloseObserverFn();
   }
 
   // Notify clients
