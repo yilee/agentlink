@@ -38,6 +38,10 @@ export function createConnection(deps) {
   let filePreview = null;
   function setFilePreview(fp) { filePreview = fp; }
 
+  // Team module — set after creation to resolve circular dependency
+  let team = null;
+  function setTeam(t) { team = t; }
+
   let ws = null;
   let sessionKey = null;
   let reconnectAttempts = 0;
@@ -473,6 +477,16 @@ export function createConnection(deps) {
         msg = parsed;
       }
 
+      // ── Team messages: route before normal conversation routing ──
+      if (team && (msg.type?.startsWith('team_') || (msg.type === 'claude_output' && msg.teamId))) {
+        if (msg.type === 'claude_output' && msg.teamId) {
+          team.handleTeamAgentOutput(msg);
+        } else {
+          team.handleTeamMessage(msg);
+        }
+        return;
+      }
+
       // ── Multi-session: route messages to background conversations ──
       // Messages with a conversationId that doesn't match the current foreground
       // conversation are routed to their cached background state.
@@ -606,6 +620,11 @@ export function createConnection(deps) {
           if (processingConversations) {
             processingConversations.value[convId] = true;
           }
+        }
+
+        // Restore active team state on reconnect
+        if (team && msg.activeTeam) {
+          team.handleActiveTeamRestore(msg.activeTeam);
         }
       } else if (msg.type === 'error') {
         streaming.flushReveal();
@@ -880,5 +899,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }

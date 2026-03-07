@@ -18,6 +18,7 @@ import { createSidebar } from './modules/sidebar.js';
 import { createConnection } from './modules/connection.js';
 import { createFileBrowser } from './modules/fileBrowser.js';
 import { createFilePreview } from './modules/filePreview.js';
+import { createTeam } from './modules/team.js';
 
 // ── App ─────────────────────────────────────────────────────────────────────
 const App = {
@@ -259,7 +260,7 @@ const App = {
       switchConversation,
     });
 
-    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -280,6 +281,12 @@ const App = {
     _getToolMsgMap = getToolMsgMap;
     _restoreToolMsgMap = restoreToolMsgMap;
     _clearToolMsgMap = clearToolMsgMap;
+
+    // Team module
+    const team = createTeam({
+      wsSend, scrollToBottom,
+    });
+    setTeam(team);
 
     // File browser module
     const fileBrowser = createFileBrowser({
@@ -543,6 +550,30 @@ const App = {
         workdirMenuOpen.value = false;
         navigator.clipboard.writeText(workDir.value);
       },
+      // Team mode
+      team,
+      teamState: team.teamState,
+      teamMode: team.teamMode,
+      activeAgentView: team.activeAgentView,
+      historicalTeam: team.historicalTeam,
+      teamsList: team.teamsList,
+      isTeamActive: team.isTeamActive,
+      isTeamRunning: team.isTeamRunning,
+      displayTeam: team.displayTeam,
+      pendingTasks: team.pendingTasks,
+      activeTasks: team.activeTasks,
+      doneTasks: team.doneTasks,
+      failedTasks: team.failedTasks,
+      launchTeam: team.launchTeam,
+      dissolveTeam: team.dissolveTeam,
+      viewAgent: team.viewAgent,
+      viewDashboard: team.viewDashboard,
+      viewHistoricalTeam: team.viewHistoricalTeam,
+      requestTeamsList: team.requestTeamsList,
+      getAgentColor: team.getAgentColor,
+      findAgent: team.findAgent,
+      getAgentMessages: team.getAgentMessages,
+      backToChat: team.backToChat,
     };
   },
   template: `
