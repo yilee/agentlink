@@ -376,3 +376,156 @@ export function serializeTeam(team: TeamState): TeamStateSerialized {
     createdAt: team.createdAt,
   };
 }
+
+// ── Template definitions ────────────────────────────────────────────────
+
+interface AgentDef {
+  description: string;
+  prompt: string;
+  tools: string[];
+}
+
+type AgentsDefMap = Record<string, AgentDef>;
+
+const TEMPLATE_AGENTS: Record<string, AgentsDefMap> = {
+  'code-review': {
+    'security-reviewer': {
+      description: 'Security expert focused on cryptographic, auth, and injection vulnerabilities',
+      prompt: 'You are a security reviewer. Analyze code for vulnerabilities including injection attacks, authentication/authorization flaws, cryptographic issues, and data exposure risks. Provide specific file/line references and severity ratings.',
+      tools: ['Read', 'Grep', 'Glob'],
+    },
+    'quality-reviewer': {
+      description: 'Code quality expert focused on maintainability, patterns, and best practices',
+      prompt: 'You are a code quality reviewer. Analyze code structure, naming conventions, error handling, test coverage, and adherence to best practices. Identify code smells, unnecessary complexity, and improvement opportunities.',
+      tools: ['Read', 'Grep', 'Glob'],
+    },
+    'performance-reviewer': {
+      description: 'Performance expert focused on efficiency, resource usage, and scalability',
+      prompt: 'You are a performance reviewer. Identify performance bottlenecks, memory leaks, inefficient algorithms, unnecessary allocations, and scalability concerns. Suggest concrete optimizations with benchmarks where possible.',
+      tools: ['Read', 'Grep', 'Glob'],
+    },
+  },
+  'full-stack': {
+    'backend-dev': {
+      description: 'Backend developer for API endpoints, database, and server-side logic',
+      prompt: 'You are a backend developer. Implement server-side features including API endpoints, data models, business logic, and integrations. Write clean, tested, production-ready code.',
+      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
+    },
+    'frontend-dev': {
+      description: 'Frontend developer for UI components, styling, and client-side logic',
+      prompt: 'You are a frontend developer. Build user interface components, handle state management, implement responsive layouts, and ensure good UX. Follow the project\'s existing patterns and framework conventions.',
+      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
+    },
+    'test-engineer': {
+      description: 'Test engineer for unit tests, integration tests, and quality assurance',
+      prompt: 'You are a test engineer. Write comprehensive tests (unit, integration, E2E) for new and existing code. Ensure edge cases are covered, mocks are appropriate, and tests are maintainable.',
+      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
+    },
+  },
+  'debug': {
+    'hypothesis-a': {
+      description: 'Debug investigator exploring the first hypothesis',
+      prompt: 'You are a debugging specialist. Investigate the bug by exploring one specific hypothesis. Read relevant code, trace execution paths, check logs, and report your findings with evidence.',
+      tools: ['Read', 'Grep', 'Glob', 'Bash'],
+    },
+    'hypothesis-b': {
+      description: 'Debug investigator exploring an alternative hypothesis',
+      prompt: 'You are a debugging specialist. Investigate the bug by exploring an alternative hypothesis different from other investigators. Read relevant code, trace execution paths, check logs, and report your findings with evidence.',
+      tools: ['Read', 'Grep', 'Glob', 'Bash'],
+    },
+    'hypothesis-c': {
+      description: 'Debug investigator exploring a third hypothesis',
+      prompt: 'You are a debugging specialist. Investigate the bug by exploring yet another hypothesis different from the other investigators. Think creatively about less obvious causes. Report findings with evidence.',
+      tools: ['Read', 'Grep', 'Glob', 'Bash'],
+    },
+  },
+  'custom': {
+    'worker-1': {
+      description: 'General-purpose development agent',
+      prompt: 'You are a skilled software engineer. Complete the assigned task thoroughly and report your results.',
+      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
+    },
+    'worker-2': {
+      description: 'General-purpose development agent',
+      prompt: 'You are a skilled software engineer. Complete the assigned task thoroughly and report your results.',
+      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
+    },
+    'worker-3': {
+      description: 'General-purpose development agent',
+      prompt: 'You are a skilled software engineer. Complete the assigned task thoroughly and report your results.',
+      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
+    },
+  },
+};
+
+const TEMPLATE_LEAD_INSTRUCTIONS: Record<string, string> = {
+  'code-review': `You are a team lead coordinating a code review.
+
+Instructions:
+1. First, analyze the codebase to understand its structure and what needs reviewing
+2. Use the Agent tool to spawn each reviewer IN PARALLEL (multiple Agent calls simultaneously)
+3. Give each reviewer specific, detailed instructions referencing exact files and directories to review
+4. After all reviewers complete, synthesize their findings into a unified summary with prioritized action items
+
+Important: Spawn agents in parallel for efficiency. Each agent should focus on their specialty area.`,
+
+  'full-stack': `You are a team lead coordinating full-stack development.
+
+Instructions:
+1. First, analyze the codebase to understand the architecture, existing patterns, and what needs building
+2. Break the task into backend, frontend, and test subtasks
+3. Use the Agent tool to assign each subtask to the appropriate specialist IN PARALLEL
+4. Provide each agent with specific, detailed instructions including file paths, API contracts, and data schemas
+5. After all agents complete, review their work and provide a summary of what was built
+
+Important: Define clear interfaces between frontend and backend before spawning agents. Coordinate shared data types.`,
+
+  'debug': `You are a team lead coordinating a debugging investigation.
+
+Instructions:
+1. First, analyze the bug report and relevant code to understand the problem space
+2. Formulate 3 distinct hypotheses about the root cause
+3. Use the Agent tool to assign each hypothesis to a different investigator IN PARALLEL
+4. Give each investigator specific areas of code to examine and tests to run
+5. After all investigators complete, compare their findings and synthesize a diagnosis with a recommended fix
+
+Important: Each investigator should explore a DIFFERENT hypothesis. Avoid overlap.`,
+
+  'custom': `You are a team lead coordinating a development task.
+
+Instructions:
+1. First, analyze the codebase and the user's request to understand what needs to be done
+2. Break the task into independent subtasks that can be worked on in parallel
+3. Use the Agent tool to assign subtasks to workers IN PARALLEL
+4. Give each worker specific, detailed instructions
+5. After all workers complete, review their work and provide a summary
+
+Important: Maximize parallelism. Each agent should work on an independent piece.`,
+};
+
+/**
+ * Build the agents definition JSON for the --agents CLI flag.
+ */
+export function buildAgentsDef(template?: string): AgentsDefMap {
+  const key = template && TEMPLATE_AGENTS[template] ? template : 'custom';
+  return { ...TEMPLATE_AGENTS[key] };
+}
+
+/**
+ * Build the lead prompt that instructs the Lead to use Agent tool.
+ */
+export function buildLeadPrompt(config: TeamConfig, agentsDef: AgentsDefMap): string {
+  const template = config.template || 'custom';
+  const instructions = TEMPLATE_LEAD_INSTRUCTIONS[template] || TEMPLATE_LEAD_INSTRUCTIONS['custom'];
+
+  const agentList = Object.entries(agentsDef)
+    .map(([id, def]) => `- ${id}: ${def.description}`)
+    .join('\n');
+
+  return `${instructions}
+
+Available agents (use the Agent tool to delegate to them):
+${agentList}
+
+User's request: "${config.instruction}"`;
+}

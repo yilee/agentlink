@@ -16,6 +16,8 @@ import {
   updateTaskStatus,
   allSubagentsDone,
   serializeTeam,
+  buildAgentsDef,
+  buildLeadPrompt,
   type TeamConfig,
   type TeamState,
 } from '../../agent/src/team.js';
@@ -225,6 +227,66 @@ describe('team.ts state management', () => {
       expect(serialized.agents[1].id).toBe('worker');
       expect(serialized.tasks).toEqual(team.tasks);
       expect(serialized.status).toBe(team.status);
+    });
+  });
+
+  describe('buildAgentsDef', () => {
+    it('returns code-review agents for code-review template', () => {
+      const agents = buildAgentsDef('code-review');
+      expect(Object.keys(agents)).toContain('security-reviewer');
+      expect(Object.keys(agents)).toContain('quality-reviewer');
+      expect(Object.keys(agents)).toContain('performance-reviewer');
+      expect(agents['security-reviewer'].tools).toContain('Read');
+    });
+
+    it('returns full-stack agents for full-stack template', () => {
+      const agents = buildAgentsDef('full-stack');
+      expect(Object.keys(agents)).toContain('backend-dev');
+      expect(Object.keys(agents)).toContain('frontend-dev');
+      expect(Object.keys(agents)).toContain('test-engineer');
+    });
+
+    it('returns debug agents for debug template', () => {
+      const agents = buildAgentsDef('debug');
+      expect(Object.keys(agents)).toContain('hypothesis-a');
+      expect(Object.keys(agents)).toContain('hypothesis-b');
+    });
+
+    it('falls back to custom for unknown template', () => {
+      const agents = buildAgentsDef('nonexistent');
+      expect(Object.keys(agents)).toContain('worker-1');
+    });
+
+    it('returns custom agents when no template specified', () => {
+      const agents = buildAgentsDef();
+      expect(Object.keys(agents)).toContain('worker-1');
+    });
+  });
+
+  describe('buildLeadPrompt', () => {
+    it('includes user instruction', () => {
+      const agents = buildAgentsDef('code-review');
+      const prompt = buildLeadPrompt(config, agents);
+      expect(prompt).toContain(config.instruction);
+    });
+
+    it('lists available agents', () => {
+      const agents = buildAgentsDef('code-review');
+      const prompt = buildLeadPrompt(config, agents);
+      expect(prompt).toContain('security-reviewer');
+      expect(prompt).toContain('quality-reviewer');
+    });
+
+    it('includes template-specific instructions', () => {
+      const agents = buildAgentsDef('code-review');
+      const prompt = buildLeadPrompt({ ...config, template: 'code-review' }, agents);
+      expect(prompt).toContain('code review');
+    });
+
+    it('uses custom instructions for unknown template', () => {
+      const agents = buildAgentsDef('custom');
+      const prompt = buildLeadPrompt({ instruction: 'do stuff', template: 'custom' }, agents);
+      expect(prompt).toContain('development task');
     });
   });
 });
