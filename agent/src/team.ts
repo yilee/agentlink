@@ -125,9 +125,22 @@ const AGENT_COLORS = [
 // ── Module state ───────────────────────────────────────────────────────
 
 type SendFn = (msg: Record<string, unknown>) => void;
+type HandleChatFn = (
+  conversationId: string | undefined,
+  prompt: string,
+  workDir: string,
+  options?: { resumeSessionId?: string; extraArgs?: string[] },
+) => void;
+type CancelExecutionFn = (conversationId?: string) => void;
+type SetOutputObserverFn = (fn: (conversationId: string, msg: Record<string, unknown>) => boolean | void) => void;
+type ClearOutputObserverFn = () => void;
 
 let activeTeam: TeamState | null = null;
 let sendFn: SendFn = () => {};
+let handleChatFn: HandleChatFn | null = null;
+let cancelExecutionFn: CancelExecutionFn | null = null;
+let setOutputObserverFn: SetOutputObserverFn | null = null;
+let clearOutputObserverFn: ClearOutputObserverFn | null = null;
 let agentMessageIdCounter = 0;
 
 const TEAMS_DIR = join(CONFIG_DIR, 'teams');
@@ -136,6 +149,22 @@ const TEAMS_DIR = join(CONFIG_DIR, 'teams');
 
 export function setTeamSendFn(fn: SendFn): void {
   sendFn = fn;
+}
+
+/**
+ * Inject claude.ts dependencies to avoid circular imports.
+ * Called once during agent startup from connection.ts.
+ */
+export function setTeamClaudeFns(fns: {
+  handleChat: HandleChatFn;
+  cancelExecution: CancelExecutionFn;
+  setOutputObserver: SetOutputObserverFn;
+  clearOutputObserver: ClearOutputObserverFn;
+}): void {
+  handleChatFn = fns.handleChat;
+  cancelExecutionFn = fns.cancelExecution;
+  setOutputObserverFn = fns.setOutputObserver;
+  clearOutputObserverFn = fns.clearOutputObserver;
 }
 
 export function getActiveTeam(): TeamState | null {
@@ -862,6 +891,11 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
   if (msg.type === 'result') {
     team.totalCost = (msg.total_cost_usd as number) || 0;
     team.durationMs = (msg.duration_ms as number) || 0;
+
+    // Extract summary from result if available
+    const resultText = (msg.result as string) || undefined;
+    completeTeam(resultText);
+
     return false; // let normal forwarding handle result (turn_completed)
   }
 
@@ -961,4 +995,129 @@ function extractOutputData(msg: Record<string, unknown>): Record<string, unknown
   }
 
   return null;
+}
+
+// ── Team lifecycle ──────────────────────────────────────────────────────
+
+/**
+ * Create and launch a team. Returns the TeamState.
+ * Spawns the Lead Claude process with --agents flag and attaches the output observer.
+ */
+export function createTeam(config: TeamConfig, workDir: string): TeamState {
+  if (!handleChatFn || !setOutputObserverFn) {
+    throw new Error('Team claude functions not initialized. Call setTeamClaudeFns() first.');
+  }
+
+  const conversationId = `team-${randomUUID().slice(0, 8)}`;
+  const team = createTeamState(config, conversationId);
+
+  // Build agents definition for --agents flag
+  const agentsDef = buildAgentsDef(config.template);
+  const agentsJson = JSON.stringify(agentsDef);
+
+  // Build the lead prompt
+  const leadPrompt = buildLeadPrompt(config, agentsDef);
+
+  // Attach output observer before spawning
+  setOutputObserverFn(onLeadOutput);
+
+  // Spawn the Lead process with --agents flag
+  handleChatFn(conversationId, leadPrompt, workDir, {
+    extraArgs: ['--agents', agentsJson],
+  });
+
+  // Persist initial state
+  persistTeam(team);
+
+  // Notify clients
+  sendFn({
+    type: 'team_created',
+    team: serializeTeam(team),
+  });
+
+  return team;
+}
+
+/**
+ * Dissolve (cancel) the active team.
+ */
+export function dissolveTeam(): void {
+  if (!activeTeam) return;
+
+  const team = activeTeam;
+
+  // Cancel the Lead process
+  if (cancelExecutionFn) {
+    cancelExecutionFn(team.conversationId);
+  }
+
+  // Mark remaining agents as error
+  for (const agent of team.agents.values()) {
+    if (agent.status === 'starting' || agent.status === 'working') {
+      agent.status = 'error';
+    }
+  }
+
+  // Mark remaining tasks as failed
+  for (const task of team.tasks) {
+    if (task.status === 'pending' || task.status === 'active') {
+      task.status = 'failed';
+      task.updatedAt = Date.now();
+    }
+  }
+
+  team.status = 'failed';
+  persistTeam(team);
+
+  // Remove output observer
+  if (clearOutputObserverFn) {
+    clearOutputObserverFn();
+  }
+
+  // Notify clients
+  sendFn({
+    type: 'team_completed',
+    teamId: team.teamId,
+    status: 'failed',
+    team: serializeTeam(team),
+  });
+
+  clearActiveTeam();
+}
+
+/**
+ * Called when the Lead's result message arrives (from onLeadOutput).
+ * Marks the team as completed, persists state, and notifies clients.
+ */
+export function completeTeam(summary?: string): void {
+  if (!activeTeam) return;
+
+  const team = activeTeam;
+  team.status = 'completed';
+  if (summary) {
+    team.summary = summary;
+  }
+
+  // Mark Lead as done
+  const lead = team.agents.get('lead');
+  if (lead) {
+    lead.status = 'done';
+  }
+
+  persistTeam(team);
+
+  // Remove output observer
+  if (clearOutputObserverFn) {
+    clearOutputObserverFn();
+  }
+
+  // Notify clients
+  sendFn({
+    type: 'team_completed',
+    teamId: team.teamId,
+    status: 'completed',
+    team: serializeTeam(team),
+  });
+
+  clearActiveTeam();
 }

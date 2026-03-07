@@ -37,12 +37,16 @@ import {
   buildLeadPrompt,
   onLeadOutput,
   setTeamSendFn,
+  setTeamClaudeFns,
   persistTeam,
   loadTeam,
   listTeams,
   deleteTeam,
   flushPendingPersists,
   persistTeamDebounced,
+  createTeam,
+  dissolveTeam,
+  completeTeam,
   type TeamConfig,
   type TeamState,
 } from '../../agent/src/team.js';
@@ -897,6 +901,436 @@ describe('team.ts state management', () => {
         });
 
         expect(result).toBe(false);
+      });
+    });
+  });
+
+  describe('Team lifecycle (createTeam, dissolveTeam, completeTeam)', () => {
+    let mockHandleChat: ReturnType<typeof vi.fn>;
+    let mockCancelExecution: ReturnType<typeof vi.fn>;
+    let mockSetOutputObserver: ReturnType<typeof vi.fn>;
+    let mockClearOutputObserver: ReturnType<typeof vi.fn>;
+    let sentMessages: Record<string, unknown>[];
+
+    beforeEach(() => {
+      // Reset any active team
+      clearActiveTeam();
+      sentMessages = [];
+      setTeamSendFn((msg) => sentMessages.push(msg));
+
+      // Set up mock claude functions
+      mockHandleChat = vi.fn();
+      mockCancelExecution = vi.fn();
+      mockSetOutputObserver = vi.fn();
+      mockClearOutputObserver = vi.fn();
+
+      setTeamClaudeFns({
+        handleChat: mockHandleChat,
+        cancelExecution: mockCancelExecution,
+        setOutputObserver: mockSetOutputObserver,
+        clearOutputObserver: mockClearOutputObserver,
+      });
+    });
+
+    afterEach(() => {
+      clearActiveTeam();
+    });
+
+    describe('createTeam()', () => {
+      it('creates a team and sets it as active', () => {
+        const teamConfig: TeamConfig = {
+          instruction: 'Build a REST API',
+          template: 'full-stack',
+        };
+
+        const team = createTeam(teamConfig, '/projects/myapp');
+
+        expect(team).not.toBeNull();
+        expect(getActiveTeam()).toBe(team);
+        expect(team.status).toBe('planning');
+        expect(team.config).toBe(teamConfig);
+      });
+
+      it('calls handleChat with correct conversationId, prompt, and extraArgs', () => {
+        const teamConfig: TeamConfig = {
+          instruction: 'Build a REST API',
+          template: 'full-stack',
+        };
+
+        const team = createTeam(teamConfig, '/projects/myapp');
+
+        expect(mockHandleChat).toHaveBeenCalledTimes(1);
+        const [convId, prompt, workDir, options] = mockHandleChat.mock.calls[0];
+        expect(convId).toBe(team.conversationId);
+        expect(convId).toMatch(/^team-/);
+        expect(prompt).toContain('Build a REST API');
+        expect(workDir).toBe('/projects/myapp');
+        expect(options).toBeDefined();
+        expect(options.extraArgs).toBeDefined();
+        expect(options.extraArgs[0]).toBe('--agents');
+        // extraArgs[1] should be valid JSON
+        const agentsDef = JSON.parse(options.extraArgs[1]);
+        expect(agentsDef).toHaveProperty('backend-dev');
+        expect(agentsDef).toHaveProperty('frontend-dev');
+        expect(agentsDef).toHaveProperty('test-engineer');
+      });
+
+      it('registers the output observer before spawning', () => {
+        createTeam({ instruction: 'test', template: 'custom' }, '/tmp');
+
+        expect(mockSetOutputObserver).toHaveBeenCalledTimes(1);
+        // Output observer should be set before handleChat
+        const setObserverOrder = mockSetOutputObserver.mock.invocationCallOrder[0];
+        const handleChatOrder = mockHandleChat.mock.invocationCallOrder[0];
+        expect(setObserverOrder).toBeLessThan(handleChatOrder);
+      });
+
+      it('sends team_created message with serialized team', () => {
+        const team = createTeam({ instruction: 'test task', template: 'debug' }, '/tmp');
+
+        const msg = sentMessages.find(m => m.type === 'team_created');
+        expect(msg).toBeDefined();
+        expect(msg!.team).toBeDefined();
+        const serialized = msg!.team as Record<string, unknown>;
+        expect(serialized.teamId).toBe(team.teamId);
+        expect(serialized.status).toBe('planning');
+      });
+
+      it('persists team to disk', () => {
+        const team = createTeam({ instruction: 'persist test', template: 'custom' }, '/tmp');
+
+        const loaded = loadTeam(team.teamId);
+        expect(loaded).not.toBeNull();
+        expect(loaded!.teamId).toBe(team.teamId);
+        expect(loaded!.config.instruction).toBe('persist test');
+      });
+
+      it('throws if claude functions not initialized', () => {
+        // Reset claude fns
+        setTeamClaudeFns({
+          handleChat: null as unknown as any,
+          cancelExecution: mockCancelExecution,
+          setOutputObserver: null as unknown as any,
+          clearOutputObserver: mockClearOutputObserver,
+        });
+
+        expect(() => createTeam({ instruction: 'fail' }, '/tmp')).toThrow(
+          'Team claude functions not initialized',
+        );
+      });
+
+      it('throws if another team is already active', () => {
+        createTeam({ instruction: 'first', template: 'custom' }, '/tmp');
+
+        expect(() => createTeam({ instruction: 'second', template: 'custom' }, '/tmp'))
+          .toThrow('A team is already active');
+      });
+
+      it('uses correct template agents based on config', () => {
+        createTeam({ instruction: 'review code', template: 'code-review' }, '/tmp');
+
+        const [, , , options] = mockHandleChat.mock.calls[0];
+        const agentsDef = JSON.parse(options.extraArgs[1]);
+        expect(agentsDef).toHaveProperty('security-reviewer');
+        expect(agentsDef).toHaveProperty('quality-reviewer');
+        expect(agentsDef).toHaveProperty('performance-reviewer');
+      });
+
+      it('defaults to custom template when no template specified', () => {
+        createTeam({ instruction: 'do stuff' }, '/tmp');
+
+        const [, , , options] = mockHandleChat.mock.calls[0];
+        const agentsDef = JSON.parse(options.extraArgs[1]);
+        expect(agentsDef).toHaveProperty('worker-1');
+        expect(agentsDef).toHaveProperty('worker-2');
+        expect(agentsDef).toHaveProperty('worker-3');
+      });
+    });
+
+    describe('dissolveTeam()', () => {
+      it('does nothing if no active team', () => {
+        dissolveTeam();
+        expect(sentMessages).toHaveLength(0);
+        expect(mockCancelExecution).not.toHaveBeenCalled();
+      });
+
+      it('cancels execution with the correct conversationId', () => {
+        const team = createTeam({ instruction: 'dissolve me', template: 'custom' }, '/tmp');
+        sentMessages = [];
+
+        dissolveTeam();
+
+        expect(mockCancelExecution).toHaveBeenCalledWith(team.conversationId);
+      });
+
+      it('marks active agents as error', () => {
+        const team = createTeam({ instruction: 'dissolve me', template: 'custom' }, '/tmp');
+        // Register some subagents
+        registerSubagent(team, 'tu-1', { name: 'Worker A' });
+        registerSubagent(team, 'tu-2', { name: 'Worker B' });
+        linkSubagentTaskId(team, 'tu-1', 'task-1');
+        // Worker A is now 'working', Worker B is 'starting'
+
+        dissolveTeam();
+
+        // Both should be error (they were active)
+        // Team has been cleared, but we captured state before clearing via the sent message
+        const completedMsg = sentMessages.find(m => m.type === 'team_completed');
+        const serialized = completedMsg!.team as { agents: Array<{ id: string; status: string }> };
+        const workerA = serialized.agents.find(a => a.id === 'worker-a');
+        const workerB = serialized.agents.find(a => a.id === 'worker-b');
+        expect(workerA?.status).toBe('error');
+        expect(workerB?.status).toBe('error');
+      });
+
+      it('marks pending/active tasks as failed', () => {
+        const team = createTeam({ instruction: 'dissolve me', template: 'custom' }, '/tmp');
+        registerSubagent(team, 'tu-1', { name: 'Worker A' });
+        linkSubagentTaskId(team, 'tu-1', 'task-1');
+        // task is 'active' now
+
+        dissolveTeam();
+
+        const completedMsg = sentMessages.find(m => m.type === 'team_completed');
+        const serialized = completedMsg!.team as { tasks: Array<{ status: string }> };
+        for (const task of serialized.tasks) {
+          expect(task.status).toBe('failed');
+        }
+      });
+
+      it('sets team status to failed', () => {
+        createTeam({ instruction: 'dissolve me', template: 'custom' }, '/tmp');
+        sentMessages = [];
+
+        dissolveTeam();
+
+        const msg = sentMessages.find(m => m.type === 'team_completed');
+        expect(msg).toBeDefined();
+        expect(msg!.status).toBe('failed');
+      });
+
+      it('clears the output observer', () => {
+        createTeam({ instruction: 'dissolve me', template: 'custom' }, '/tmp');
+        mockClearOutputObserver.mockClear();
+
+        dissolveTeam();
+
+        expect(mockClearOutputObserver).toHaveBeenCalled();
+      });
+
+      it('clears activeTeam after dissolving', () => {
+        createTeam({ instruction: 'dissolve me', template: 'custom' }, '/tmp');
+
+        dissolveTeam();
+
+        expect(getActiveTeam()).toBeNull();
+      });
+
+      it('persists team state before clearing', () => {
+        const team = createTeam({ instruction: 'dissolve persist', template: 'custom' }, '/tmp');
+        const teamId = team.teamId;
+
+        dissolveTeam();
+
+        const loaded = loadTeam(teamId);
+        expect(loaded).not.toBeNull();
+        expect(loaded!.status).toBe('failed');
+      });
+
+      it('preserves already-done agents status', () => {
+        const team = createTeam({ instruction: 'dissolve me', template: 'custom' }, '/tmp');
+        registerSubagent(team, 'tu-1', { name: 'Worker Done' });
+        const agent = findAgentByToolUseId(team, 'tu-1')!;
+        agent.status = 'done';
+        registerSubagent(team, 'tu-2', { name: 'Worker Active' });
+
+        dissolveTeam();
+
+        const completedMsg = sentMessages.find(m => m.type === 'team_completed');
+        const serialized = completedMsg!.team as { agents: Array<{ id: string; status: string }> };
+        const done = serialized.agents.find(a => a.id === 'worker-done');
+        const active = serialized.agents.find(a => a.id === 'worker-active');
+        expect(done?.status).toBe('done'); // preserved
+        expect(active?.status).toBe('error'); // was starting → error
+      });
+    });
+
+    describe('completeTeam()', () => {
+      it('does nothing if no active team', () => {
+        completeTeam('summary');
+        expect(sentMessages).toHaveLength(0);
+      });
+
+      it('sets team status to completed', () => {
+        createTeam({ instruction: 'complete me', template: 'custom' }, '/tmp');
+        sentMessages = [];
+
+        completeTeam('All done!');
+
+        const msg = sentMessages.find(m => m.type === 'team_completed');
+        expect(msg).toBeDefined();
+        expect(msg!.status).toBe('completed');
+      });
+
+      it('stores the summary', () => {
+        const team = createTeam({ instruction: 'complete me', template: 'custom' }, '/tmp');
+        const teamId = team.teamId;
+        sentMessages = [];
+
+        completeTeam('My final summary');
+
+        const msg = sentMessages.find(m => m.type === 'team_completed');
+        const serialized = msg!.team as { summary: string };
+        expect(serialized.summary).toBe('My final summary');
+
+        // Also persisted
+        const loaded = loadTeam(teamId);
+        expect(loaded!.summary).toBe('My final summary');
+      });
+
+      it('marks Lead agent as done', () => {
+        createTeam({ instruction: 'complete me', template: 'custom' }, '/tmp');
+        sentMessages = [];
+
+        completeTeam();
+
+        const msg = sentMessages.find(m => m.type === 'team_completed');
+        const serialized = msg!.team as { agents: Array<{ id: string; status: string }> };
+        const lead = serialized.agents.find(a => a.id === 'lead');
+        expect(lead?.status).toBe('done');
+      });
+
+      it('clears the output observer', () => {
+        createTeam({ instruction: 'complete me', template: 'custom' }, '/tmp');
+        mockClearOutputObserver.mockClear();
+
+        completeTeam();
+
+        expect(mockClearOutputObserver).toHaveBeenCalled();
+      });
+
+      it('clears activeTeam after completing', () => {
+        createTeam({ instruction: 'complete me', template: 'custom' }, '/tmp');
+
+        completeTeam();
+
+        expect(getActiveTeam()).toBeNull();
+      });
+
+      it('works without summary argument', () => {
+        const team = createTeam({ instruction: 'complete me', template: 'custom' }, '/tmp');
+        const teamId = team.teamId;
+
+        completeTeam();
+
+        const loaded = loadTeam(teamId);
+        expect(loaded!.summary).toBeNull();
+        expect(loaded!.status).toBe('completed');
+      });
+    });
+
+    describe('Full lifecycle: create → run → complete', () => {
+      it('handles create → subagent registration → completion via onLeadOutput', () => {
+        const team = createTeam({ instruction: 'full lifecycle test', template: 'custom' }, '/tmp');
+        sentMessages = [];
+
+        // Simulate session init
+        onLeadOutput(team.conversationId, {
+          type: 'system',
+          session_id: 'sess-lifecycle-1',
+        });
+        expect(team.claudeSessionId).toBe('sess-lifecycle-1');
+
+        // Simulate Lead spawning an agent
+        onLeadOutput(team.conversationId, {
+          type: 'assistant',
+          message: {
+            content: [{
+              type: 'tool_use',
+              id: 'tu-lc-1',
+              name: 'Agent',
+              input: { name: 'Implementer', prompt: 'Build the feature' },
+            }],
+          },
+        });
+        expect(team.agents.size).toBe(2); // Lead + Implementer
+        expect(team.status).toBe('running');
+
+        // Simulate task_started
+        onLeadOutput(team.conversationId, {
+          type: 'system',
+          subtype: 'task_started',
+          tool_use_id: 'tu-lc-1',
+          task_id: 'task-lc-1',
+        });
+        const agent = findAgentByToolUseId(team, 'tu-lc-1')!;
+        expect(agent.status).toBe('working');
+
+        // Simulate subagent completion (tool_result for Agent call)
+        onLeadOutput(team.conversationId, {
+          type: 'user',
+          message: {
+            content: [{
+              type: 'tool_result',
+              tool_use_id: 'tu-lc-1',
+              content: 'Feature built successfully',
+            }],
+          },
+        });
+
+        // Agent should be done, team should be summarizing
+        // (team object was mutated before completeTeam clears it)
+        const agentStatus = sentMessages.find(
+          m => m.type === 'team_agent_status' &&
+            (m.agent as Record<string, unknown>).id === 'implementer' &&
+            (m.agent as Record<string, unknown>).status === 'done',
+        );
+        expect(agentStatus).toBeDefined();
+
+        // Simulate result message → completes the team
+        onLeadOutput(team.conversationId, {
+          type: 'result',
+          total_cost_usd: 0.05,
+          duration_ms: 30000,
+          result: 'All tasks completed successfully.',
+        });
+
+        // Team should be completed
+        const completedMsg = sentMessages.find(m => m.type === 'team_completed');
+        expect(completedMsg).toBeDefined();
+        expect(completedMsg!.status).toBe('completed');
+        const serialized = completedMsg!.team as Record<string, unknown>;
+        expect(serialized.summary).toBe('All tasks completed successfully.');
+        expect(serialized.totalCost).toBe(0.05);
+        expect(serialized.durationMs).toBe(30000);
+
+        // Active team should be cleared
+        expect(getActiveTeam()).toBeNull();
+      });
+
+      it('handles create → dissolve mid-execution', () => {
+        const team = createTeam({ instruction: 'dissolve mid', template: 'custom' }, '/tmp');
+
+        // Simulate some agents starting
+        onLeadOutput(team.conversationId, {
+          type: 'assistant',
+          message: {
+            content: [{
+              type: 'tool_use',
+              id: 'tu-mid-1',
+              name: 'Agent',
+              input: { name: 'Worker' },
+            }],
+          },
+        });
+
+        sentMessages = [];
+        dissolveTeam();
+
+        // Should have sent team_completed with failed status
+        const msg = sentMessages.find(m => m.type === 'team_completed');
+        expect(msg!.status).toBe('failed');
+        expect(getActiveTeam()).toBeNull();
       });
     });
   });
