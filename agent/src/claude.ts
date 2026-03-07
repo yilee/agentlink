@@ -88,6 +88,22 @@ const conversations = new Map<string, ConversationState>();
 let sendFn: SendFn = () => {};
 const pendingControlRequests = new Map<string, PendingControlRequest>();
 
+// ── Output observer ────────────────────────────────────────────────────────
+// Optional callback invoked for every parsed JSON line from Claude stdout.
+// Receives (conversationId, rawMessage). If it returns true, the message is
+// suppressed from normal forwarding to the web client.
+
+type OutputObserverFn = (conversationId: string, msg: ClaudeMessage) => boolean | void;
+let outputObserver: OutputObserverFn | null = null;
+
+export function setOutputObserver(fn: OutputObserverFn): void {
+  outputObserver = fn;
+}
+
+export function clearOutputObserver(): void {
+  outputObserver = null;
+}
+
 export function setSendFn(fn: SendFn): void {
   sendFn = fn;
 }
@@ -490,6 +506,12 @@ async function processOutput(
         if (!line.trim()) continue;
         try {
           const msg: ClaudeMessage = JSON.parse(line);
+
+          // Notify output observer (if set) before any processing.
+          // If observer returns true, suppress this message from normal handling.
+          if (outputObserver && outputObserver(state.conversationId, msg)) {
+            continue;
+          }
 
           // Capture session ID from system init
           if (msg.type === 'system' && msg.session_id) {
