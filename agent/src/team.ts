@@ -247,6 +247,70 @@ export function getNextAgentColor(team: TeamState): string {
 }
 
 /**
+ * Derive a human-readable display name for a subagent from the Agent tool input.
+ * Priority: descriptive input.name → short description → colon-prefixed description → prompt extraction → "Agent N"
+ */
+function deriveAgentDisplayName(
+  input: { name?: string; description?: string; prompt?: string },
+  agentIndex: number,
+): string {
+  // If input.name is descriptive (not a generic ID like "worker-1", "agent-2"), use it directly
+  if (input.name && !/^(worker|agent|hypothesis)-\d+$/i.test(input.name)) {
+    return input.name;
+  }
+
+  // Short description → use directly (e.g. "Implement the login page")
+  if (input.description && input.description.length <= 60) {
+    return input.description;
+  }
+
+  // Colon-prefixed description → use prefix (e.g. "Designer: review design doc" → "Designer")
+  if (input.description) {
+    const colonIdx = input.description.indexOf(':');
+    if (colonIdx > 0 && colonIdx <= 30) {
+      return input.description.slice(0, colonIdx).trim();
+    }
+  }
+
+  // Extract role from prompt text
+  const text = input.prompt || input.description || '';
+  if (text) {
+    // "You are tasked with writing/creating/implementing/..." pattern
+    const taskMatch = text.match(/\btasked with\s+(writing|creating|implementing|reviewing|testing|designing|building|debugging|analyzing|refactoring|fixing|optimizing|setting up|configuring)\b\s*(.*)/i);
+    if (taskMatch) {
+      const verb = taskMatch[1].toLowerCase();
+      const rest = taskMatch[2];
+      const roleMap: Record<string, string> = {
+        'writing': 'Writer', 'creating': 'Creator', 'implementing': 'Implementer',
+        'reviewing': 'Reviewer', 'testing': 'Tester', 'designing': 'Designer',
+        'building': 'Builder', 'debugging': 'Debugger', 'analyzing': 'Analyst',
+        'refactoring': 'Refactorer', 'fixing': 'Fixer', 'optimizing': 'Optimizer',
+        'setting up': 'Setup', 'configuring': 'Config',
+      };
+      let roleName = roleMap[verb] || verb.charAt(0).toUpperCase() + verb.slice(1);
+      // Extract object for specificity (e.g. "writing tests" → "Tester", "writing a design document" → "Designer")
+      const objectMatch = rest.match(/^(?:a\s+|the\s+)?(\w+)/i);
+      if (objectMatch) {
+        const obj = objectMatch[1].toLowerCase();
+        if (obj === 'tests' || obj === 'test') roleName = 'Tester';
+        else if (obj === 'design') roleName = 'Designer';
+        else if (obj === 'docs' || obj === 'documentation') roleName = 'Docs Writer';
+        else roleName = obj.charAt(0).toUpperCase() + obj.slice(1) + ' ' + roleName;
+      }
+      return roleName;
+    }
+
+    // "You are a [role]..." pattern
+    const roleMatch = text.match(/\bYou are (?:a |an |the )?([A-Z][\w\s]{2,30}?)(?:\.|,|\s+(?:who|that|tasked|responsible|focused))/);
+    if (roleMatch) {
+      return roleMatch[1].trim();
+    }
+  }
+
+  return input.name || `Agent ${agentIndex}`;
+}
+
+/**
  * Register a subagent when Lead calls the Agent tool.
  */
 export function registerSubagent(
@@ -255,17 +319,7 @@ export function registerSubagent(
   input: { name?: string; description?: string; prompt?: string },
 ): AgentTeammate {
   const agentId = (input.name || `agent-${team.agents.size}`).toLowerCase().replace(/\s+/g, '-');
-  // Derive a role-based display name from the description (e.g. "Designer: review design doc" → "Designer")
-  // Fall back to input.name, then generic "Agent N"
-  let displayName = input.name || `Agent ${team.agents.size}`;
-  if (input.description) {
-    const colonIdx = input.description.indexOf(':');
-    if (colonIdx > 0 && colonIdx <= 30) {
-      // Use role prefix from description (e.g. "Designer: review design doc" → "Designer")
-      displayName = input.description.slice(0, colonIdx).trim();
-    }
-    // Otherwise keep input.name as-is — don't override with raw description
-  }
+  const displayName = deriveAgentDisplayName(input, team.agents.size);
   const color = getNextAgentColor(team);
 
   const teammate: AgentTeammate = {

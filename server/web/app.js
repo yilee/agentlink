@@ -660,8 +660,9 @@ const App = {
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       },
       getTaskAgent(task) {
-        if (!task.assignedTo) return null;
-        return team.findAgent(task.assignedTo);
+        const assignee = task.assignee || task.assignedTo;
+        if (!assignee) return null;
+        return team.findAgent(assignee);
       },
       viewAgentWithHistory(agentId) {
         team.viewAgent(agentId);
@@ -1166,8 +1167,8 @@ const App = {
                             <div class="team-task-title">{{ task.title }}</div>
                             <div v-if="task.description" class="team-task-desc team-task-desc-clamp" @click.stop="$event.target.classList.toggle('team-task-desc-expanded')">{{ task.description }}</div>
                             <div v-if="getTaskAgent(task)" class="team-task-assignee">
-                              <span class="team-agent-dot" :style="{ background: getAgentColor(task.assignedTo) }"></span>
-                              {{ getTaskAgent(task).name || task.assignedTo }}
+                              <span class="team-agent-dot" :style="{ background: getAgentColor(task.assignee || task.assignedTo) }"></span>
+                              {{ getTaskAgent(task).name || task.assignee || task.assignedTo }}
                             </div>
                           </div>
                           <div v-if="activeTasks.length === 0" class="team-kanban-empty">No tasks</div>
@@ -1184,8 +1185,8 @@ const App = {
                             <div class="team-task-title">{{ task.title }}</div>
                             <div v-if="task.description" class="team-task-desc team-task-desc-clamp" @click.stop="$event.target.classList.toggle('team-task-desc-expanded')">{{ task.description }}</div>
                             <div v-if="getTaskAgent(task)" class="team-task-assignee">
-                              <span class="team-agent-dot" :style="{ background: getAgentColor(task.assignedTo) }"></span>
-                              {{ getTaskAgent(task).name || task.assignedTo }}
+                              <span class="team-agent-dot" :style="{ background: getAgentColor(task.assignee || task.assignedTo) }"></span>
+                              {{ getTaskAgent(task).name || task.assignee || task.assignedTo }}
                             </div>
                           </div>
                           <div v-if="doneTasks.length === 0" class="team-kanban-empty">No tasks</div>
