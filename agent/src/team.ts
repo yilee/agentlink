@@ -247,67 +247,99 @@ export function getNextAgentColor(team: TeamState): string {
 }
 
 /**
- * Derive a human-readable display name for a subagent from the Agent tool input.
- * Priority: descriptive input.name → short description → colon-prefixed description → prompt extraction → "Agent N"
+ * Fictional character pools grouped by role archetype.
+ * Each subagent gets a character name that fits its role.
+ */
+const CHARACTER_POOLS: Record<string, string[]> = {
+  builder:   ['Tony Stark', 'Neo', 'Hiro Hamada', 'Rocket', 'Q'],
+  designer:  ['Elsa', 'Remy', 'Edna Mode', 'Violet', 'WALL-E'],
+  tester:    ['Sherlock', 'L', 'Conan', 'Poirot', 'Columbo'],
+  writer:    ['Hermione', 'Gandalf', 'Dumbledore', 'Yoda', 'Jarvis'],
+  reviewer:  ['Spock', 'Baymax', 'Alfred', 'Morpheus', 'Obi-Wan'],
+  debugger:  ['MacGyver', 'Strange', 'Lelouch', 'House', 'Lupin'],
+  analyst:   ['Data', 'Cortana', 'Oracle', 'Vision', 'Friday'],
+  ops:       ['Scotty', 'R2-D2', 'BB-8', 'C-3PO', 'HAL'],
+  general:   ['Aragorn', 'Leia', 'Zoro', 'Totoro', 'Pikachu'],
+};
+
+/** Track which characters have been used in this team to avoid duplicates. */
+function pickCharacter(team: TeamState, category: string): string {
+  const pool = CHARACTER_POOLS[category] || CHARACTER_POOLS.general;
+  const usedNames = new Set([...team.agents.values()].map(a => a.role.name));
+  // Find an unused character from the pool
+  for (const name of pool) {
+    if (!usedNames.has(name)) return name;
+  }
+  // Fallback: try other pools
+  for (const names of Object.values(CHARACTER_POOLS)) {
+    for (const name of names) {
+      if (!usedNames.has(name)) return name;
+    }
+  }
+  return `Agent ${team.agents.size}`;
+}
+
+/**
+ * Classify a subagent's role from its tool input into a character category.
+ */
+function classifyRole(input: { name?: string; description?: string; prompt?: string }): string {
+  const text = [input.name, input.description, input.prompt].filter(Boolean).join(' ').toLowerCase();
+
+  if (/\b(test|testing|qa|verify|validation|spec)\b/.test(text)) return 'tester';
+  if (/\b(review|audit|check|inspect|security|lint)\b/.test(text)) return 'reviewer';
+  if (/\b(debug|fix|bug|patch|troubleshoot|diagnose)\b/.test(text)) return 'debugger';
+  if (/\b(design|ui|ux|layout|style|css|visual|mockup)\b/.test(text)) return 'designer';
+  if (/\b(writ|doc|readme|comment|markdown|copy)\b/.test(text)) return 'writer';
+  if (/\b(analy|research|investigat|explor|study|benchmark)\b/.test(text)) return 'analyst';
+  if (/\b(deploy|ci|cd|devops|infra|docker|k8s|config|setup|install|pipeline)\b/.test(text)) return 'ops';
+  if (/\b(build|implement|creat|develop|code|program|engineer|construct|make|add)\b/.test(text)) return 'builder';
+  return 'general';
+}
+
+/**
+ * Derive a fictional character name for a subagent based on its role.
  */
 function deriveAgentDisplayName(
+  team: TeamState,
   input: { name?: string; description?: string; prompt?: string },
-  agentIndex: number,
 ): string {
-  // If input.name is descriptive (not a generic ID like "worker-1", "agent-2"), use it directly
+  const category = classifyRole(input);
+  return pickCharacter(team, category);
+}
+
+/**
+ * Derive a human-readable task title from the Agent tool input.
+ * Used on the Kanban board to describe what the agent is working on.
+ */
+function deriveTaskTitle(input: { name?: string; description?: string; prompt?: string }): string {
+  // Short description → use directly
+  if (input.description && input.description.length <= 80) {
+    return input.description;
+  }
+
+  // Colon-prefixed description → use the full thing if ≤ 80, otherwise prefix
+  if (input.description) {
+    if (input.description.length <= 80) return input.description;
+    const colonIdx = input.description.indexOf(':');
+    if (colonIdx > 0 && colonIdx <= 40) {
+      return input.description.slice(0, colonIdx).trim();
+    }
+    return input.description.slice(0, 77) + '...';
+  }
+
+  // Descriptive input.name (not a generic ID)
   if (input.name && !/^(worker|agent|hypothesis)-\d+$/i.test(input.name)) {
     return input.name;
   }
 
-  // Short description → use directly (e.g. "Implement the login page")
-  if (input.description && input.description.length <= 60) {
-    return input.description;
+  // Extract from prompt
+  if (input.prompt) {
+    const first = input.prompt.split('\n')[0].trim();
+    if (first.length <= 80) return first;
+    return first.slice(0, 77) + '...';
   }
 
-  // Colon-prefixed description → use prefix (e.g. "Designer: review design doc" → "Designer")
-  if (input.description) {
-    const colonIdx = input.description.indexOf(':');
-    if (colonIdx > 0 && colonIdx <= 30) {
-      return input.description.slice(0, colonIdx).trim();
-    }
-  }
-
-  // Extract role from prompt text
-  const text = input.prompt || input.description || '';
-  if (text) {
-    // "You are tasked with writing/creating/implementing/..." pattern
-    const taskMatch = text.match(/\btasked with\s+(writing|creating|implementing|reviewing|testing|designing|building|debugging|analyzing|refactoring|fixing|optimizing|setting up|configuring)\b\s*(.*)/i);
-    if (taskMatch) {
-      const verb = taskMatch[1].toLowerCase();
-      const rest = taskMatch[2];
-      const roleMap: Record<string, string> = {
-        'writing': 'Writer', 'creating': 'Creator', 'implementing': 'Implementer',
-        'reviewing': 'Reviewer', 'testing': 'Tester', 'designing': 'Designer',
-        'building': 'Builder', 'debugging': 'Debugger', 'analyzing': 'Analyst',
-        'refactoring': 'Refactorer', 'fixing': 'Fixer', 'optimizing': 'Optimizer',
-        'setting up': 'Setup', 'configuring': 'Config',
-      };
-      let roleName = roleMap[verb] || verb.charAt(0).toUpperCase() + verb.slice(1);
-      // Extract object for specificity (e.g. "writing tests" → "Tester", "writing a design document" → "Designer")
-      const objectMatch = rest.match(/^(?:a\s+|the\s+)?(\w+)/i);
-      if (objectMatch) {
-        const obj = objectMatch[1].toLowerCase();
-        if (obj === 'tests' || obj === 'test') roleName = 'Tester';
-        else if (obj === 'design') roleName = 'Designer';
-        else if (obj === 'docs' || obj === 'documentation') roleName = 'Docs Writer';
-        else roleName = obj.charAt(0).toUpperCase() + obj.slice(1) + ' ' + roleName;
-      }
-      return roleName;
-    }
-
-    // "You are a [role]..." pattern
-    const roleMatch = text.match(/\bYou are (?:a |an |the )?([A-Z][\w\s]{2,30}?)(?:\.|,|\s+(?:who|that|tasked|responsible|focused))/);
-    if (roleMatch) {
-      return roleMatch[1].trim();
-    }
-  }
-
-  return input.name || `Agent ${agentIndex}`;
+  return input.name || 'Task';
 }
 
 /**
@@ -319,7 +351,8 @@ export function registerSubagent(
   input: { name?: string; description?: string; prompt?: string },
 ): AgentTeammate {
   const agentId = (input.name || `agent-${team.agents.size}`).toLowerCase().replace(/\s+/g, '-');
-  const displayName = deriveAgentDisplayName(input, team.agents.size);
+  const displayName = deriveAgentDisplayName(team, input);
+  const taskTitle = deriveTaskTitle(input);
   const color = getNextAgentColor(team);
 
   const teammate: AgentTeammate = {
@@ -336,7 +369,7 @@ export function registerSubagent(
   // Auto-create a task for this agent
   const task: TaskItem = {
     id: `task-${randomUUID().slice(0, 8)}`,
-    title: displayName,
+    title: taskTitle,
     description: input.prompt || input.description || '',
     status: 'pending',
     assignee: agentId,
