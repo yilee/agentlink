@@ -73,7 +73,7 @@ describe('team.ts state management', () => {
       expect(team.agents.size).toBe(1); // Lead
       expect(team.agents.get('lead')?.role.name).toBe('Lead');
       expect(team.tasks).toHaveLength(0);
-      expect(team.feed).toHaveLength(0);
+      expect(team.feed).toHaveLength(1); // Initial "Lead is analyzing..." entry
       expect(team.summary).toBeNull();
       expect(team.totalCost).toBe(0);
     });
@@ -195,10 +195,12 @@ describe('team.ts state management', () => {
 
   describe('addFeedEntry', () => {
     it('adds feed entries', () => {
+      const initialFeedLen = team.feed.length;
       addFeedEntry(team, 'lead', 'status_change', 'Team planning started');
-      expect(team.feed).toHaveLength(1);
-      expect(team.feed[0].agentId).toBe('lead');
-      expect(team.feed[0].type).toBe('status_change');
+      expect(team.feed).toHaveLength(initialFeedLen + 1);
+      const added = team.feed[team.feed.length - 1];
+      expect(added.agentId).toBe('lead');
+      expect(added.type).toBe('status_change');
     });
 
     it('caps feed at 200 entries', () => {
@@ -295,17 +297,18 @@ describe('team.ts state management', () => {
         expect(loaded!.agents.get('worker')?.role.name).toBe('Worker');
         expect(loaded!.tasks).toHaveLength(1);
         expect(loaded!.tasks[0].assignee).toBe('worker');
-        expect(loaded!.feed).toHaveLength(1);
+        expect(loaded!.feed).toHaveLength(2); // 1 initial + 1 added
       });
 
-      it('loaded team has empty messages arrays (not persisted)', () => {
+      it('loaded team preserves agent messages', () => {
         const agent = registerSubagent(team, 'tu-1', { name: 'Talker' });
         addAgentMessage(agent, 'assistant', { content: 'hello' });
         expect(agent.messages).toHaveLength(1);
 
         persistTeam(team);
         const loaded = loadTeam(team.teamId);
-        expect(loaded!.agents.get('talker')?.messages).toHaveLength(0);
+        expect(loaded!.agents.get('talker')?.messages).toHaveLength(1);
+        expect(loaded!.agents.get('talker')?.messages[0].content).toBe('hello');
       });
     });
 
@@ -701,7 +704,7 @@ describe('team.ts state management', () => {
         const feedEntries = team.feed.filter(f => f.type === 'tool_call' && f.agentId === 'agentx');
         expect(feedEntries.length).toBeGreaterThan(0);
         expect(feedEntries[0].content).toContain('AgentX');
-        expect(feedEntries[0].content).toContain('Read');
+        expect(feedEntries[0].content).toContain('reading');
       });
 
       it('routes tool results (user messages) to agent', () => {

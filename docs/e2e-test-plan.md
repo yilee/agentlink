@@ -398,7 +398,7 @@ User changes workdir
 | 8 | Cancel execution mid-stream (quantum computing essay) | PASSED |
 | 9 | Cancel isolation — other conversations unaffected | PASSED |
 | 10 | Follow-up in completed/cancelled conversation (3-bullet summary) | PASSED |
-| 11 | Cancel before session_started, then resume with new message (5+5=10) | PASSED |
+| 11 | Cancel before session_started, then resume with new message (5+5=10) | FAILED |
 | 12 | Rapid switching between 5 conversations — all state correct | PASSED |
 | 13 | Page refresh → sessions reload from JSONL history | PASSED |
 | 14 | Change workdir while idle — new conversation, session list refreshes | PASSED |
@@ -407,4 +407,285 @@ User changes workdir
 | 17 | New message in changed workdir — confirms new cwd | PASSED |
 | 18 | Change workdir back to original — session list shows original sessions | PASSED |
 
-All 18 tests passed (2026-03-04).
+17 of 18 tests passed. TC-11 FAILED — cancel before session_started breaks conversation permanently (known edge case, pre-existing). (2026-03-08)
+
+---
+
+## Team Feature E2E Tests
+
+Tests for the agent team mode feature: creation, dashboard, agent detail view, completion, dissolution, history, and page refresh recovery.
+
+### Prerequisites
+
+Same as above (ephemeral server + agent running, browser open to session URL), plus:
+- Working directory must contain some code files (e.g., `test/e2e-workdir/`) so agents have something to work on
+- Claude CLI must support `--agents` flag (native subagent feature)
+
+### TC-19: Team mode toggle and creation panel
+
+**Steps:**
+1. Open the web UI in chat mode (default)
+2. Click the "Team" toggle button in the input area
+3. Observe the creation panel
+
+**Expected:**
+- Mode toggle shows two buttons: "Chat" and "Team"
+- Clicking "Team" switches to team creation panel
+- Creation panel shows:
+  - Instruction textarea with placeholder text
+  - Three example cards (clickable)
+  - Template selector buttons: Code Review, Full-Stack, Debug, Custom
+  - "Launch Team" button (disabled when instruction is empty)
+- Clicking "Chat" switches back to normal chat input
+
+### TC-20: Example cards populate instruction
+
+**Steps:**
+1. Switch to Team mode
+2. Click the first example card
+3. Observe the instruction textarea
+4. Click the third example card
+
+**Expected:**
+- First card populates the instruction textarea with code review text
+- Third card populates with the Markdown preview tool text (includes Doc + Dev + Test workflow description)
+- Template selector auto-selects appropriate template for each card
+- Launch button becomes enabled after clicking a card
+
+### TC-21: Launch team with custom instruction
+
+**Steps:**
+1. Switch to Team mode
+2. Type a custom instruction: "Review the files in this directory and write a summary of what each file does"
+3. Select "Custom" template
+4. Click "Launch Team"
+5. Wait for the team to be created
+
+**Expected:**
+- UI transitions to team dashboard
+- Team status shows "planning" initially
+- Lead status text appears (e.g., "Lead is analyzing the codebase...")
+- After a few seconds, team status transitions to "running"
+- At least one subagent card appears on the dashboard
+
+### TC-22: Team dashboard — agent cards and status
+
+**Steps:**
+1. After TC-21 (team running)
+2. Observe the agent cards on the dashboard
+
+**Expected:**
+- Each agent card shows:
+  - Agent name (role-based, e.g., "Reviewer", "Analyst" — not generic "Agent 1")
+  - Color-coded left border (distinct colors per agent)
+  - Current status badge ("working", "idle", "done")
+  - Assigned task (if any)
+- Lead card appears separately (purple color)
+- Agent statuses update in real-time as agents start and finish work
+
+### TC-23: Team dashboard — task board (kanban)
+
+**Steps:**
+1. After TC-21 (team running)
+2. Observe the task board / kanban section
+
+**Expected:**
+- Tasks organized in columns: Pending, Active, Done
+- Each task card shows:
+  - Task description text
+  - Assigned agent name (if active/done)
+  - Status badge
+- Tasks move between columns as agents pick them up and complete them
+- Task count updates in column headers
+
+### TC-24: Team dashboard — activity feed with personified messages
+
+**Steps:**
+1. After TC-21 (team running)
+2. Observe the activity feed section at the bottom of the dashboard
+
+**Expected:**
+- Feed shows real-time entries as agents work
+- Messages use personified verb forms, e.g.:
+  - "[AgentName] is reading src/file.ts" (not "Read src/file.ts")
+  - "[AgentName] is creating output.md" (not "Write output.md")
+  - "[AgentName] is modifying config.json" (not "Edit config.json")
+  - "[AgentName] is running `npm test`" (not "Bash npm test")
+  - "[AgentName] is searching for ..." (not "Grep ...")
+  - "[AgentName] is looking for files matching ..." (not "Glob ...")
+- Each feed entry shows a timestamp
+- Feed entries are color-coded to match their agent
+- Feed auto-scrolls to show newest entries
+
+### TC-25: Agent detail view — streaming messages
+
+**Steps:**
+1. While a team is running, click on an active agent card (status: "working")
+2. Observe the agent detail view
+
+**Expected:**
+- View shows the agent's conversation in real-time
+- Assistant messages stream in as text blocks
+- Tool use blocks appear with tool name and input
+- Tool results appear below tool use blocks
+- A "Back" button returns to the dashboard
+- Agent name and status shown in the header
+
+### TC-26: Agent detail view — back navigation
+
+**Steps:**
+1. In agent detail view (from TC-25)
+2. Click the "Back" button
+
+**Expected:**
+- Returns to team dashboard
+- Dashboard state is preserved (same agents, tasks, feed)
+- Can click on a different agent to view their detail
+
+### TC-27: Team completion
+
+**Steps:**
+1. Launch a team with a small task (e.g., "List all files in this directory and describe them")
+2. Wait for the team to complete (all agents finish, Lead produces summary)
+
+**Expected:**
+- All agent cards show status "done"
+- All tasks show status "done" in the kanban
+- Team status shows "completed"
+- Lead summary / final result appears on the dashboard
+- Completion stats are visible (agent count, task count, duration)
+- "New Team" and "Back to Chat" buttons appear
+
+### TC-28: Dissolve team (cancel)
+
+**Steps:**
+1. Launch a team with a long-running task (e.g., "Do a thorough analysis of every file in the codebase")
+2. While agents are actively working, click the "Dissolve" / "Cancel" button
+
+**Expected:**
+- Team stops processing
+- Team status changes to "failed" or "completed" (with partial results)
+- Agent statuses update to reflect termination
+- User can start a new team or return to chat
+- No lingering processes or stuck state
+
+### TC-29: Team history — sidebar listing
+
+**Steps:**
+1. Complete at least one team (from TC-27 or previous runs)
+2. Open the team sidebar / history panel
+3. Observe the teams list
+
+**Expected:**
+- Completed teams appear in the list with:
+  - Team instruction (truncated)
+  - Completion status
+  - Timestamp
+- Clicking a team opens it as a read-only historical view
+
+### TC-30: Team history — read-only dashboard
+
+**Steps:**
+1. From TC-29, click on a completed team in the history list
+
+**Expected:**
+- Historical team dashboard loads in read-only mode
+- Shows all agents with their final statuses ("done")
+- Shows all tasks with "done" status
+- Activity feed shows all entries from the completed run
+- No "Dissolve" button (team already completed)
+- "New Team" and "Back to Chat" buttons are available
+
+### TC-31: Team history — agent detail (historical)
+
+**Steps:**
+1. From TC-30 (viewing a historical team)
+2. Click on an agent card
+
+**Expected:**
+- Agent detail view opens
+- Shows agent's conversation history (if available from persistence)
+- Or shows "Agent messages are not available for completed teams." message
+- Back button returns to historical dashboard
+
+### TC-32: Page refresh during active team
+
+**Steps:**
+1. Launch a team and wait until at least 1 subagent is working
+2. Refresh the browser page (F5)
+
+**Expected:**
+- Dashboard re-enters team mode automatically
+- Team status shows "running"
+- All agents visible before refresh still appear with current statuses
+- Activity feed preserves entries from before refresh
+- Kanban shows correct task statuses
+- Agents continue to update in real-time
+- Clicking an agent shows "No messages yet." (streaming messages are ephemeral)
+
+### TC-33: Page refresh after team completion
+
+**Steps:**
+1. Let a team complete fully
+2. Observe completed state on dashboard
+3. Refresh the browser page (F5)
+
+**Expected:**
+- Dashboard automatically loads the completed team as historical view
+- Team status shows "completed"
+- All agents show status "done"
+- All tasks show "done" in kanban
+- Activity feed contains all entries from the completed run
+
+### TC-34: Chat ↔ Team mode isolation
+
+**Steps:**
+1. Have an ongoing chat conversation (send a message, get a response)
+2. Switch to Team mode, launch a team
+3. While team is running, click "Back to Chat"
+4. Verify chat messages are preserved
+5. Switch back to Team mode
+
+**Expected:**
+- Chat conversation messages are preserved when switching to team mode
+- Team dashboard state is preserved when switching to chat
+- Team continues processing in background while viewing chat
+- No cross-contamination between chat and team messages
+
+### TC-35: Multiple sequential teams
+
+**Steps:**
+1. Launch a team, wait for completion
+2. Click "New Team"
+3. Launch another team with a different instruction
+
+**Expected:**
+- First team is saved to history
+- Second team starts fresh with clean dashboard
+- New agent cards, tasks, and feed
+- First team remains viewable in history
+- No state leak from first team to second
+
+## Team Test Results Log
+
+| # | Test | Status |
+|---|------|--------|
+| 19 | Team mode toggle and creation panel | PASSED |
+| 20 | Example cards populate instruction | PASSED |
+| 21 | Launch team with custom instruction | PASSED |
+| 22 | Team dashboard — agent cards and status | PASSED |
+| 23 | Team dashboard — task board (kanban) | PASSED |
+| 24 | Team dashboard — activity feed with personified messages | PASSED |
+| 25 | Agent detail view — streaming messages | PASSED |
+| 26 | Agent detail view — back navigation | PASSED |
+| 27 | Team completion | PASSED |
+| 28 | Dissolve team (cancel) | PASSED |
+| 29 | Team history — sidebar listing | PASSED |
+| 30 | Team history — read-only dashboard | PASSED |
+| 31 | Team history — agent detail (historical) | PASSED |
+| 32 | Page refresh during active team | PASSED |
+| 33 | Page refresh after team completion | PASSED |
+| 34 | Chat ↔ Team mode isolation | PASSED |
+| 35 | Multiple sequential teams | PASSED |
+
+All 17 team tests passed (2026-03-08).

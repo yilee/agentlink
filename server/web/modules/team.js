@@ -101,6 +101,7 @@ export function createTeam(deps) {
   }
 
   function getAgentColor(agentId) {
+    if (agentId === 'lead') return '#A78BFA'; // purple for lead
     const t = displayTeam.value;
     if (!t || !t.agents) return AGENT_COLORS[0];
     const idx = t.agents.findIndex(a => a.id === agentId);
@@ -108,6 +109,7 @@ export function createTeam(deps) {
   }
 
   function findAgent(agentId) {
+    if (agentId === 'lead') return { id: 'lead', name: 'Lead', color: '#A78BFA', status: 'working' };
     const t = displayTeam.value;
     if (!t || !t.agents) return null;
     return t.agents.find(a => a.id === agentId) || null;
@@ -121,6 +123,16 @@ export function createTeam(deps) {
     teamMode.value = 'chat';
     historicalTeam.value = null;
     activeAgentView.value = null;
+  }
+
+  function newTeam() {
+    historicalTeam.value = null;
+    activeAgentView.value = null;
+    // If completed team is still in teamState, clear it so create panel shows
+    if (teamState.value && (teamState.value.status === 'completed' || teamState.value.status === 'failed')) {
+      teamState.value = null;
+    }
+    requestTeamsList();
   }
 
   // ── Message routing ──
@@ -138,6 +150,8 @@ export function createTeam(deps) {
         activeAgentView.value = null;
         agentMessages.value = {};
         agentMsgIdCounter = 0;
+        // Initialize lead message list
+        agentMessages.value['lead'] = [];
         // Initialize agent message lists
         if (msg.team.agents) {
           for (const agent of msg.team.agents) {
@@ -196,6 +210,12 @@ export function createTeam(deps) {
         return true;
       }
 
+      case 'team_lead_status': {
+        if (!teamState.value || teamState.value.teamId !== msg.teamId) return false;
+        teamState.value.leadStatus = msg.leadStatus;
+        return true;
+      }
+
       case 'teams_list':
         teamsList.value = msg.teams || [];
         return true;
@@ -207,8 +227,16 @@ export function createTeam(deps) {
         return true;
 
       case 'team_agent_history': {
-        if (msg.messages && msg.agentId) {
-          agentMessages.value[msg.agentId] = msg.messages;
+        if (msg.agentId) {
+          if (msg.messages && msg.messages.length > 0) {
+            // Default expand tool messages in history view
+            for (const m of msg.messages) {
+              if (m.role === 'tool' && m.expanded === undefined) m.expanded = true;
+            }
+            agentMessages.value[msg.agentId] = msg.messages;
+          } else {
+            agentMessages.value[msg.agentId] = [];
+          }
         }
         return true;
       }
@@ -257,7 +285,7 @@ export function createTeam(deps) {
           id: ++agentMsgIdCounter, role: 'tool',
           toolId: tool.id, toolName: tool.name || 'unknown',
           toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
-          hasResult: false, timestamp: Date.now(),
+          hasResult: false, expanded: true, timestamp: Date.now(),
         });
       }
     } else if (data.type === 'user' && data.tool_use_result) {
@@ -285,6 +313,9 @@ export function createTeam(deps) {
     teamState.value = activeTeam;
     teamMode.value = 'team';
     // Re-initialize agent message lists (messages lost on reconnect)
+    if (!agentMessages.value['lead']) {
+      agentMessages.value['lead'] = [];
+    }
     if (activeTeam.agents) {
       for (const agent of activeTeam.agents) {
         if (!agentMessages.value[agent.id]) {
@@ -304,7 +335,7 @@ export function createTeam(deps) {
     // Methods
     launchTeam, dissolveTeam, viewAgent, viewDashboard,
     viewHistoricalTeam, requestTeamsList, requestAgentHistory,
-    getAgentColor, findAgent, getAgentMessages, backToChat,
+    getAgentColor, findAgent, getAgentMessages, backToChat, newTeam,
     // Message handling
     handleTeamMessage, handleTeamAgentOutput, handleActiveTeamRestore,
   };

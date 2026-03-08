@@ -13,7 +13,7 @@ const pkg = require('../package.json');
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
-import { setTeamSendFn, setTeamClaudeFns, createTeam, dissolveTeam, getActiveTeam, loadTeam, listTeams, serializeTeam, type TeamConfig } from './team.js';
+import { setTeamSendFn, setTeamClaudeFns, createTeam, dissolveTeam, getActiveTeam, getLastCompletedTeamId, loadTeam, listTeams, serializeTeam, type TeamConfig } from './team.js';
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 30_000;
@@ -331,6 +331,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         type: 'active_conversations',
         conversations: active,
         activeTeam: activeTeamState ? serializeTeam(activeTeamState) : null,
+        lastCompletedTeamId: !activeTeamState ? getLastCompletedTeamId() : null,
       });
       break;
     }
@@ -375,7 +376,14 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
           send({ type: 'error', message: `Agent not found: ${m.agentId}` });
         }
       } else {
-        send({ type: 'error', message: 'Agent history only available for active teams.' });
+        // Historical team — load from disk (messages are persisted)
+        const team = loadTeam(m.teamId);
+        if (team && team.agents.has(m.agentId)) {
+          const agent = team.agents.get(m.agentId)!;
+          send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
+        } else {
+          send({ type: 'error', message: `Agent not found: ${m.agentId}` });
+        }
       }
       break;
     }

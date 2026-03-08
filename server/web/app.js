@@ -113,6 +113,25 @@ const App = {
 
     // Team creation state
     const teamInstruction = ref('');
+    const teamExamples = [
+      {
+        icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>',
+        title: 'Full-stack App',
+        text: 'Build a single-page calculator app: one agent creates the HTML/CSS UI, one implements the JavaScript logic, and one writes tests.',
+      },
+      {
+        icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+        title: 'Code Review',
+        text: 'Review this project for code quality, security vulnerabilities, and test coverage. Generate a prioritized report for each area.',
+      },
+      {
+        icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>',
+        title: 'Doc + Dev + Test',
+        text: '创建一个 Markdown 转 HTML 的在线预览工具：一个 Agent 编写 Design文档（左右分栏，左侧输入 Markdown，右侧实时预览），一个基于设计文档实现核心功能，一个等实现完的设计测试并执行同时给出测试结果。',
+      },
+    ];
+    const kanbanExpanded = ref(false);
+    const instructionExpanded = ref(false);
 
     // File preview state
     const previewPanelOpen = ref(false);
@@ -577,7 +596,11 @@ const App = {
       findAgent: team.findAgent,
       getAgentMessages: team.getAgentMessages,
       backToChat: team.backToChat,
+      newTeam: team.newTeam,
       teamInstruction,
+      teamExamples,
+      kanbanExpanded,
+      instructionExpanded,
       launchTeamFromPanel() {
         const inst = teamInstruction.value.trim();
         if (!inst) return;
@@ -600,6 +623,18 @@ const App = {
           team.requestAgentHistory(team.historicalTeam.value.teamId, agentId);
         }
       },
+      getLatestAgentActivity(agentId) {
+        // Find the latest feed entry for this agent
+        const t = team.displayTeam.value;
+        if (!t || !t.feed) return '';
+        for (let i = t.feed.length - 1; i >= 0; i--) {
+          const entry = t.feed[i];
+          if (entry.agentId === agentId && entry.type === 'tool_call') {
+            return entry.content;
+          }
+        }
+        return '';
+      },
     };
   },
   template: `
@@ -615,6 +650,10 @@ const App = {
           <span :class="['badge', status.toLowerCase()]">{{ status }}</span>
           <span v-if="latency !== null && status === 'Connected'" class="latency" :class="{ good: latency < 100, ok: latency >= 100 && latency < 500, bad: latency >= 500 }">{{ latency }}ms</span>
           <span v-if="agentName" class="agent-label">{{ agentName }}</span>
+          <div class="team-mode-toggle">
+            <button :class="['team-mode-btn', { active: teamMode === 'chat' }]" @click="teamMode = 'chat'">Chat</button>
+            <button :class="['team-mode-btn', { active: teamMode === 'team' }]" @click="teamMode = 'team'">Team</button>
+          </div>
           <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
             <svg v-if="theme === 'dark'" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
             <svg v-else viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
@@ -840,7 +879,10 @@ const App = {
                     <button class="session-rename-ok" @click.stop="confirmRename" title="Confirm">&#10003;</button>
                     <button class="session-rename-cancel" @click.stop="cancelRename" title="Cancel">&times;</button>
                   </div>
-                  <div v-else class="session-title">{{ s.title }}</div>
+                  <div v-else class="session-title">
+                    <svg v-if="s.title && s.title.startsWith('You are a team lead')" class="session-team-icon" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                    {{ s.title }}
+                  </div>
                   <div class="session-meta">
                     <span>{{ formatRelativeTime(s.lastModified) }}</span>
                     <span v-if="renamingSessionId !== s.sessionId" class="session-actions">
@@ -944,6 +986,44 @@ const App = {
                   </button>
                   <button class="team-create-cancel" @click="backToChat()">Back to Chat</button>
                 </div>
+
+                <!-- Example instructions -->
+                <div class="team-examples-section">
+                  <div class="team-examples-header">Examples</div>
+                  <div class="team-examples-list">
+                    <div class="team-example-card" v-for="(ex, i) in teamExamples" :key="i">
+                      <div class="team-example-icon" v-html="ex.icon"></div>
+                      <div class="team-example-body">
+                        <div class="team-example-title">{{ ex.title }}</div>
+                        <div class="team-example-text">{{ ex.text }}</div>
+                      </div>
+                      <button class="team-example-try" @click="teamInstruction = ex.text">Try it</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Historical teams -->
+                <div v-if="teamsList.length > 0" class="team-history-section">
+                  <div class="team-history-section-header">Previous Teams</div>
+                  <div class="team-history-list">
+                    <div
+                      v-for="t in teamsList" :key="t.teamId"
+                      class="team-history-item"
+                      @click="viewHistoricalTeam(t.teamId)"
+                      :title="t.title"
+                    >
+                      <svg class="team-history-icon" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                      <div class="team-history-info">
+                        <div class="team-history-title">{{ t.title || 'Untitled team' }}</div>
+                        <div class="team-history-meta">
+                          <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + t.status]">{{ t.status }}</span>
+                          <span v-if="t.taskCount" class="team-history-tasks">{{ t.taskCount }} tasks</span>
+                          <span v-if="t.totalCost" class="team-history-tasks">{{'$' + t.totalCost.toFixed(2) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -951,85 +1031,128 @@ const App = {
             <div v-else class="team-dashboard">
               <!-- Dashboard header -->
               <div class="team-dash-header">
-                <div class="team-dash-header-left">
-                  <h2 class="team-dash-title">{{ displayTeam.title || 'Agent Team' }}</h2>
+                <div class="team-dash-header-top">
                   <span :class="['team-status-badge', 'team-status-' + displayTeam.status]">{{ displayTeam.status }}</span>
+                  <div class="team-dash-header-right">
+                    <button v-if="isTeamRunning" class="team-dissolve-btn" @click="dissolveTeam()">Dissolve Team</button>
+                    <button v-if="!isTeamActive" class="team-new-btn" @click="newTeam()">New Team</button>
+                    <button v-if="!isTeamActive" class="team-back-btn" @click="backToChat()">Back to Chat</button>
+                  </div>
                 </div>
-                <div class="team-dash-header-right">
-                  <button v-if="isTeamRunning" class="team-dissolve-btn" @click="dissolveTeam()">Dissolve Team</button>
-                  <button v-if="!isTeamActive" class="team-back-btn" @click="backToChat()">Back to Chat</button>
+                <div class="team-dash-instruction" :class="{ expanded: instructionExpanded }">
+                  <div class="team-dash-instruction-text">{{ displayTeam.config?.instruction || displayTeam.title || 'Agent Team' }}</div>
+                  <button v-if="(displayTeam.config?.instruction || '').length > 120" class="team-dash-instruction-toggle" @click="instructionExpanded = !instructionExpanded">
+                    {{ instructionExpanded ? 'Show less' : 'Show more' }}
+                  </button>
                 </div>
               </div>
 
-              <!-- Dashboard body: kanban + agents sidebar -->
+              <!-- Lead status bar (clickable to view lead detail) -->
+              <div v-if="displayTeam.leadStatus && (displayTeam.status === 'planning' || displayTeam.status === 'running' || displayTeam.status === 'summarizing')" class="team-lead-bar team-lead-bar-clickable" @click="viewAgent('lead')">
+                <span class="team-lead-dot"></span>
+                <span class="team-lead-label">Lead</span>
+                <span class="team-lead-text">{{ displayTeam.leadStatus }}</span>
+              </div>
+
+              <!-- Dashboard body -->
               <div class="team-dash-body">
 
-                <!-- Main content: kanban + feed (dashboard view) -->
+                <!-- Main content: kanban + agents + feed (dashboard view) -->
                 <div v-if="!activeAgentView" class="team-dash-main">
 
-                  <!-- Kanban board -->
-                  <div class="team-kanban">
-                    <div class="team-kanban-col">
-                      <div class="team-kanban-col-header">
-                        <span class="team-kanban-col-dot pending"></span>
-                        Pending
-                        <span class="team-kanban-col-count">{{ pendingTasks.length }}</span>
-                      </div>
-                      <div class="team-kanban-col-body">
-                        <div v-for="task in pendingTasks" :key="task.id" class="team-task-card">
-                          <div class="team-task-title">{{ task.title }}</div>
-                          <div v-if="task.description" class="team-task-desc">{{ task.description }}</div>
-                        </div>
-                        <div v-if="pendingTasks.length === 0" class="team-kanban-empty">No tasks</div>
-                      </div>
+                  <!-- Kanban board (collapsible) -->
+                  <div class="team-kanban-section">
+                    <div class="team-kanban-section-header" @click="kanbanExpanded = !kanbanExpanded">
+                      <span class="team-kanban-section-toggle">{{ kanbanExpanded ? '\u25BC' : '\u25B6' }}</span>
+                      <span class="team-kanban-section-title">Tasks</span>
+                      <span class="team-kanban-section-summary">{{ doneTasks.length }}/{{ displayTeam.tasks.length }} done</span>
                     </div>
-                    <div class="team-kanban-col">
-                      <div class="team-kanban-col-header">
-                        <span class="team-kanban-col-dot active"></span>
-                        Active
-                        <span class="team-kanban-col-count">{{ activeTasks.length }}</span>
+                    <div v-show="kanbanExpanded" class="team-kanban">
+                      <div class="team-kanban-col">
+                        <div class="team-kanban-col-header">
+                          <span class="team-kanban-col-dot pending"></span>
+                          Pending
+                          <span class="team-kanban-col-count">{{ pendingTasks.length }}</span>
+                        </div>
+                        <div class="team-kanban-col-body">
+                          <div v-for="task in pendingTasks" :key="task.id" class="team-task-card">
+                            <div class="team-task-title">{{ task.title }}</div>
+                            <div v-if="task.description" class="team-task-desc team-task-desc-clamp" @click.stop="$event.target.classList.toggle('team-task-desc-expanded')">{{ task.description }}</div>
+                          </div>
+                          <div v-if="pendingTasks.length === 0" class="team-kanban-empty">No tasks</div>
+                        </div>
                       </div>
-                      <div class="team-kanban-col-body">
-                        <div v-for="task in activeTasks" :key="task.id" class="team-task-card active">
-                          <div class="team-task-title">{{ task.title }}</div>
-                          <div v-if="task.description" class="team-task-desc">{{ task.description }}</div>
-                          <div v-if="getTaskAgent(task)" class="team-task-assignee">
-                            <span class="team-agent-dot" :style="{ background: getAgentColor(task.assignedTo) }"></span>
-                            {{ getTaskAgent(task).name || task.assignedTo }}
+                      <div class="team-kanban-col">
+                        <div class="team-kanban-col-header">
+                          <span class="team-kanban-col-dot active"></span>
+                          Active
+                          <span class="team-kanban-col-count">{{ activeTasks.length }}</span>
+                        </div>
+                        <div class="team-kanban-col-body">
+                          <div v-for="task in activeTasks" :key="task.id" class="team-task-card active">
+                            <div class="team-task-title">{{ task.title }}</div>
+                            <div v-if="task.description" class="team-task-desc team-task-desc-clamp" @click.stop="$event.target.classList.toggle('team-task-desc-expanded')">{{ task.description }}</div>
+                            <div v-if="getTaskAgent(task)" class="team-task-assignee">
+                              <span class="team-agent-dot" :style="{ background: getAgentColor(task.assignedTo) }"></span>
+                              {{ getTaskAgent(task).name || task.assignedTo }}
+                            </div>
+                          </div>
+                          <div v-if="activeTasks.length === 0" class="team-kanban-empty">No tasks</div>
+                        </div>
+                      </div>
+                      <div class="team-kanban-col">
+                        <div class="team-kanban-col-header">
+                          <span class="team-kanban-col-dot done"></span>
+                          Done
+                          <span class="team-kanban-col-count">{{ doneTasks.length }}</span>
+                        </div>
+                        <div class="team-kanban-col-body">
+                          <div v-for="task in doneTasks" :key="task.id" class="team-task-card done">
+                            <div class="team-task-title">{{ task.title }}</div>
+                            <div v-if="task.description" class="team-task-desc team-task-desc-clamp" @click.stop="$event.target.classList.toggle('team-task-desc-expanded')">{{ task.description }}</div>
+                            <div v-if="getTaskAgent(task)" class="team-task-assignee">
+                              <span class="team-agent-dot" :style="{ background: getAgentColor(task.assignedTo) }"></span>
+                              {{ getTaskAgent(task).name || task.assignedTo }}
+                            </div>
+                          </div>
+                          <div v-if="doneTasks.length === 0" class="team-kanban-empty">No tasks</div>
+                        </div>
+                      </div>
+                      <div v-if="failedTasks.length > 0" class="team-kanban-col">
+                        <div class="team-kanban-col-header">
+                          <span class="team-kanban-col-dot failed"></span>
+                          Failed
+                          <span class="team-kanban-col-count">{{ failedTasks.length }}</span>
+                        </div>
+                        <div class="team-kanban-col-body">
+                          <div v-for="task in failedTasks" :key="task.id" class="team-task-card failed">
+                            <div class="team-task-title">{{ task.title }}</div>
+                            <div v-if="task.description" class="team-task-desc team-task-desc-clamp" @click.stop="$event.target.classList.toggle('team-task-desc-expanded')">{{ task.description }}</div>
                           </div>
                         </div>
-                        <div v-if="activeTasks.length === 0" class="team-kanban-empty">No tasks</div>
                       </div>
                     </div>
-                    <div class="team-kanban-col">
-                      <div class="team-kanban-col-header">
-                        <span class="team-kanban-col-dot done"></span>
-                        Done
-                        <span class="team-kanban-col-count">{{ doneTasks.length }}</span>
-                      </div>
-                      <div class="team-kanban-col-body">
-                        <div v-for="task in doneTasks" :key="task.id" class="team-task-card done">
-                          <div class="team-task-title">{{ task.title }}</div>
-                          <div v-if="task.description" class="team-task-desc">{{ task.description }}</div>
-                          <div v-if="getTaskAgent(task)" class="team-task-assignee">
-                            <span class="team-agent-dot" :style="{ background: getAgentColor(task.assignedTo) }"></span>
-                            {{ getTaskAgent(task).name || task.assignedTo }}
-                          </div>
+                  </div>
+
+                  <!-- Agent cards (horizontal) -->
+                  <div class="team-agents-bar">
+                    <div class="team-agents-bar-header">Agents</div>
+                    <div class="team-agents-bar-list">
+                      <div
+                        v-for="agent in (displayTeam.agents || [])" :key="agent.id"
+                        class="team-agent-card"
+                        @click="historicalTeam ? viewAgentWithHistory(agent.id) : viewAgent(agent.id)"
+                      >
+                        <div class="team-agent-card-top">
+                          <span :class="['team-agent-dot', { working: agent.status === 'working' || agent.status === 'starting' }]" :style="{ background: getAgentColor(agent.id) }"></span>
+                          <span class="team-agent-card-name">{{ agent.name || agent.id }}</span>
+                          <span :class="['team-agent-card-status', 'team-agent-card-status-' + agent.status]">{{ agent.status }}</span>
                         </div>
-                        <div v-if="doneTasks.length === 0" class="team-kanban-empty">No tasks</div>
+                        <div v-if="getLatestAgentActivity(agent.id)" class="team-agent-card-activity">{{ getLatestAgentActivity(agent.id) }}</div>
                       </div>
-                    </div>
-                    <div v-if="failedTasks.length > 0" class="team-kanban-col">
-                      <div class="team-kanban-col-header">
-                        <span class="team-kanban-col-dot failed"></span>
-                        Failed
-                        <span class="team-kanban-col-count">{{ failedTasks.length }}</span>
-                      </div>
-                      <div class="team-kanban-col-body">
-                        <div v-for="task in failedTasks" :key="task.id" class="team-task-card failed">
-                          <div class="team-task-title">{{ task.title }}</div>
-                          <div v-if="task.description" class="team-task-desc">{{ task.description }}</div>
-                        </div>
+                      <div v-if="!displayTeam.agents || displayTeam.agents.length === 0" class="team-agents-empty">
+                        <span v-if="displayTeam.status === 'planning'">Planning tasks...</span>
+                        <span v-else>No agents</span>
                       </div>
                     </div>
                   </div>
@@ -1042,7 +1165,7 @@ const App = {
                         <span v-if="entry.agentId" class="team-agent-dot" :style="{ background: getAgentColor(entry.agentId) }"></span>
                         <span v-else class="team-agent-dot" style="background: #666;"></span>
                         <span class="team-feed-time">{{ formatTeamTime(entry.timestamp) }}</span>
-                        <span class="team-feed-text">{{ entry.text }}</span>
+                        <span class="team-feed-text">{{ entry.content }}</span>
                       </div>
                     </div>
                   </div>
@@ -1072,17 +1195,35 @@ const App = {
                     <div class="team-summary-header">Summary</div>
                     <div class="team-summary-body markdown-body" v-html="getRenderedContent({ role: 'assistant', content: displayTeam.summary })"></div>
                   </div>
+
+                  <!-- New team launcher after completion -->
+                  <div v-if="!historicalTeam && (displayTeam.status === 'completed' || displayTeam.status === 'failed')" class="team-new-launcher">
+                    <textarea
+                      v-model="teamInstruction"
+                      class="team-new-launcher-input"
+                      placeholder="Launch another team task..."
+                      rows="2"
+                      @keydown.enter.ctrl="launchTeamFromPanel()"
+                    ></textarea>
+                    <div class="team-new-launcher-actions">
+                      <button class="team-create-launch" :disabled="!teamInstruction.trim()" @click="launchTeamFromPanel()">
+                        <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                        New Team
+                      </button>
+                      <button class="team-create-cancel" @click="backToChat()">Back to Chat</button>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Agent detail view -->
                 <div v-else class="team-agent-detail">
-                  <div class="team-agent-detail-header">
+                  <div class="team-agent-detail-header" :style="{ borderBottom: '2px solid ' + getAgentColor(activeAgentView) }">
                     <button class="team-agent-back-btn" @click="viewDashboard()">
                       <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
                       Dashboard
                     </button>
                     <span :class="['team-agent-dot', { working: findAgent(activeAgentView)?.status === 'working' || findAgent(activeAgentView)?.status === 'starting' }]" :style="{ background: getAgentColor(activeAgentView) }"></span>
-                    <span class="team-agent-detail-name">{{ findAgent(activeAgentView)?.name || activeAgentView }}</span>
+                    <span class="team-agent-detail-name" :style="{ color: getAgentColor(activeAgentView) }">{{ findAgent(activeAgentView)?.name || activeAgentView }}</span>
                     <span class="team-agent-detail-status">{{ findAgent(activeAgentView)?.status }}</span>
                   </div>
                   <div class="team-agent-messages">
@@ -1091,8 +1232,18 @@ const App = {
                         No messages yet.
                       </div>
                       <template v-for="(msg, mi) in getAgentMessages(activeAgentView)" :key="msg.id">
+                        <!-- Agent user/prompt message -->
+                        <div v-if="msg.role === 'user' && msg.content" class="team-agent-prompt">
+                          <div class="team-agent-prompt-label">Task Prompt</div>
+                          <div class="team-agent-prompt-body markdown-body" v-html="getRenderedContent(msg)"></div>
+                        </div>
+                        <!-- System notice (e.g. completion message) -->
+                        <div v-else-if="msg.role === 'system'" class="team-agent-empty-msg">
+                          {{ msg.content }}
+                        </div>
                         <!-- Agent assistant text -->
-                        <div v-if="msg.role === 'assistant'" :class="['message', 'message-assistant']">
+                        <div v-else-if="msg.role === 'assistant'" :class="['message', 'message-assistant']">
+                          <div class="team-agent-detail-name-tag" :style="{ color: getAgentColor(activeAgentView) }">{{ findAgent(activeAgentView)?.name || activeAgentView }}</div>
                           <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
                             <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
                           </div>
@@ -1117,28 +1268,6 @@ const App = {
                           </div>
                         </div>
                       </template>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Agent sidebar -->
-                <div class="team-agents-panel">
-                  <div class="team-agents-header">Agents</div>
-                  <div class="team-agents-list">
-                    <div
-                      v-for="agent in (displayTeam.agents || [])" :key="agent.id"
-                      :class="['team-agent-item', { active: activeAgentView === agent.id }]"
-                      @click="historicalTeam ? viewAgentWithHistory(agent.id) : viewAgent(agent.id)"
-                    >
-                      <span :class="['team-agent-dot', { working: agent.status === 'working' || agent.status === 'starting' }]" :style="{ background: getAgentColor(agent.id) }"></span>
-                      <div class="team-agent-info">
-                        <div class="team-agent-name">{{ agent.name || agent.id }}</div>
-                        <div class="team-agent-status">{{ agent.status }}</div>
-                      </div>
-                    </div>
-                    <div v-if="!displayTeam.agents || displayTeam.agents.length === 0" class="team-agents-empty">
-                      <span v-if="displayTeam.status === 'planning'">Planning tasks...</span>
-                      <span v-else>No agents</span>
                     </div>
                   </div>
                 </div>
@@ -1201,6 +1330,29 @@ const App = {
                     <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
                   </div>
                 </template>
+
+                <!-- Agent tool call (team-styled) -->
+                <div v-else-if="msg.role === 'tool' && msg.toolName === 'Agent'" class="tool-line-wrapper team-agent-tool-wrapper">
+                  <div :class="['tool-line', 'team-agent-tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
+                    <span class="team-agent-tool-icon">
+                      <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    </span>
+                    <span class="team-agent-tool-name">Agent</span>
+                    <span class="team-agent-tool-desc">{{ getToolSummary(msg) }}</span>
+                    <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>
+                    <span class="tool-status-icon running-dots" v-else>
+                      <span></span><span></span><span></span>
+                    </span>
+                    <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
+                  </div>
+                  <div v-show="msg.expanded" class="tool-expand team-agent-tool-expand">
+                    <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
+                    <div v-if="msg.toolOutput" class="team-agent-tool-result">
+                      <div class="team-agent-tool-result-label">Agent Result</div>
+                      <div class="team-agent-tool-result-content markdown-body" v-html="getRenderedContent({ role: 'assistant', content: msg.toolOutput })"></div>
+                    </div>
+                  </div>
+                </div>
 
                 <!-- Tool use block (collapsible) -->
                 <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
@@ -1298,11 +1450,6 @@ const App = {
 
           <!-- Input area (shown in both chat and team create mode) -->
           <div class="input-area" v-if="teamMode !== 'team'">
-            <!-- Team mode toggle -->
-            <div class="team-mode-toggle">
-              <button :class="['team-mode-btn', { active: teamMode === 'chat' }]" @click="teamMode = 'chat'">Chat</button>
-              <button :class="['team-mode-btn', { active: teamMode === 'team' }]" @click="teamMode = 'team'">Team</button>
-            </div>
             <input
               type="file"
               ref="fileInputRef"

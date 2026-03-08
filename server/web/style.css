@@ -517,6 +517,15 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.session-team-icon {
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 0.7;
 }
 
 /* Processing indicator: pulsing dot before session title */
@@ -2833,11 +2842,10 @@ body {
 .team-mode-toggle {
   display: flex;
   gap: 2px;
-  margin-bottom: 6px;
   background: var(--bg-tertiary);
   border-radius: 6px;
   padding: 2px;
-  width: fit-content;
+  margin-left: 8px;
 }
 
 .team-mode-btn {
@@ -2866,9 +2874,10 @@ body {
 .team-create-panel {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 2rem;
+  overflow-y: auto;
 }
 
 .team-create-inner {
@@ -2961,6 +2970,127 @@ body {
   border-color: var(--text-secondary);
 }
 
+/* ── Example instructions ── */
+.team-examples-section {
+  margin-top: 20px;
+}
+
+.team-examples-header {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.team-examples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-example-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: all 0.15s;
+  background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+}
+
+.team-example-card:hover {
+  border-color: rgba(59,130,246,0.3);
+  background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(59,130,246,0.02) 100%);
+}
+
+.team-example-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(59,130,246,0.1);
+  color: var(--accent);
+  margin-top: 1px;
+}
+
+.team-example-card:nth-child(2) .team-example-icon {
+  background: rgba(16,185,129,0.1);
+  color: #10B981;
+}
+
+.team-example-card:nth-child(3) .team-example-icon {
+  background: rgba(139,92,246,0.1);
+  color: #8B5CF6;
+}
+
+.team-example-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.team-example-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.team-example-text {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.team-example-try {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 6px 16px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.team-example-try:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Historical teams in create panel ── */
+.team-history-section {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.team-history-section-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.team-history-section .team-history-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
 /* ── Team dashboard ── */
 .team-dashboard {
   flex: 1;
@@ -2972,11 +3102,17 @@ body {
 
 .team-dash-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  gap: 8px;
+}
+
+.team-dash-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .team-dash-header-left {
@@ -2985,9 +3121,39 @@ body {
   gap: 10px;
 }
 
-.team-dash-title {
-  font-size: 1rem;
-  font-weight: 600;
+.team-dash-instruction {
+  position: relative;
+}
+
+.team-dash-instruction-text {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.team-dash-instruction.expanded .team-dash-instruction-text {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+
+.team-dash-instruction-toggle {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 2px 0;
+  margin-top: 2px;
+}
+
+.team-dash-instruction-toggle:hover {
+  text-decoration: underline;
 }
 
 .team-status-badge {
@@ -3061,6 +3227,64 @@ body {
   border-color: var(--text-secondary);
 }
 
+.team-new-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.team-new-btn:hover {
+  background: rgba(59,130,246,0.1);
+}
+
+/* ── Lead status bar ── */
+.team-lead-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.team-lead-bar-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.team-lead-bar-clickable:hover {
+  background: var(--bg-hover);
+}
+
+.team-lead-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: agent-pulse 1.5s ease-in-out infinite;
+}
+
+.team-lead-label {
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+}
+
+.team-lead-text {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Dashboard body ── */
 .team-dash-body {
   flex: 1;
@@ -3079,10 +3303,48 @@ body {
 }
 
 /* ── Kanban board ── */
+.team-kanban-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.team-kanban-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  transition: background 0.15s;
+}
+.team-kanban-section-header:hover {
+  background: var(--bg-tertiary);
+}
+.team-kanban-section-toggle {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+.team-kanban-section-summary {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
 .team-kanban {
   display: flex;
   gap: 12px;
   min-height: 0;
+  flex-shrink: 0;
+  padding: 0 8px 8px;
 }
 
 .team-kanban-col {
@@ -3134,7 +3396,7 @@ body {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
-  max-height: 400px;
+  max-height: 160px;
 }
 
 .team-kanban-empty {
@@ -3178,6 +3440,21 @@ body {
   color: var(--text-secondary);
   margin-top: 4px;
   line-height: 1.3;
+}
+
+.team-task-desc-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+}
+.team-task-desc-clamp:hover {
+  color: var(--text-primary);
+}
+.team-task-desc-expanded {
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 .team-task-assignee {
@@ -3375,18 +3652,15 @@ body {
   padding: 12px;
 }
 
-/* ── Agent sidebar ── */
-.team-agents-panel {
-  width: 200px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
+/* ── Agent bar (horizontal) ── */
+.team-agents-bar {
+  border: 1px solid var(--border);
+  border-radius: 8px;
   background: var(--bg-secondary);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.team-agents-header {
+.team-agents-bar-header {
   padding: 10px 12px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -3394,40 +3668,38 @@ body {
   letter-spacing: 0.03em;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
 }
 
-.team-agents-list {
+.team-agents-bar-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.team-agent-card {
   flex: 1;
-  overflow-y: auto;
-  padding: 6px;
+  min-width: 180px;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
 
-.team-agent-item {
+.team-agent-card:hover {
+  border-color: var(--accent);
+}
+
+.team-agent-card-top {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s;
+  gap: 6px;
 }
 
-.team-agent-item:hover {
-  background: var(--bg-tertiary);
-}
-
-.team-agent-item.active {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--accent);
-}
-
-.team-agent-info {
-  min-width: 0;
-  flex: 1;
-}
-
-.team-agent-name {
+.team-agent-card-name {
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-primary);
@@ -3436,10 +3708,41 @@ body {
   text-overflow: ellipsis;
 }
 
-.team-agent-status {
-  font-size: 0.7rem;
+.team-agent-card-status {
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.team-agent-card-status-starting,
+.team-agent-card-status-working {
+  background: rgba(59,130,246,0.15);
+  color: #3b82f6;
+}
+
+.team-agent-card-status-done {
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
+}
+
+.team-agent-card-status-error {
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+}
+
+.team-agent-card-activity {
+  margin-top: 6px;
+  font-size: 0.75rem;
   color: var(--text-secondary);
-  text-transform: capitalize;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .team-agents-empty {
@@ -3521,6 +3824,126 @@ body {
   padding: 2rem;
   color: var(--text-secondary);
   font-size: 0.85rem;
+}
+
+/* ── Agent prompt card ── */
+.team-agent-prompt {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.team-agent-prompt-label {
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-agent-prompt-body {
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+/* ── Agent detail name tag (above assistant bubbles) ── */
+.team-agent-detail-name-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+  padding-left: 2px;
+}
+
+/* ── New team launcher (after completion) ── */
+.team-new-launcher {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  padding: 12px;
+  flex-shrink: 0;
+}
+.team-new-launcher-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+.team-new-launcher-input:focus {
+  border-color: var(--accent);
+}
+.team-new-launcher-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: flex-end;
+}
+
+/* ── Team Agent tool call styling in main chat ── */
+.team-agent-tool-wrapper {
+  border-left: 3px solid #8B5CF6;
+  border-radius: 6px;
+  margin-left: 4px;
+  padding-left: 0;
+}
+.team-agent-tool-line {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.08), transparent);
+}
+.team-agent-tool-line:hover {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.14), transparent);
+}
+.team-agent-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #8B5CF6;
+}
+.team-agent-tool-name {
+  font-weight: 700;
+  color: #8B5CF6;
+  font-size: 0.82rem;
+}
+.team-agent-tool-desc {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.team-agent-tool-expand {
+  border-top: 1px solid rgba(139, 92, 246, 0.15);
+}
+.team-agent-tool-result {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(139, 92, 246, 0.06);
+  border-radius: 4px;
+  border: 1px solid rgba(139, 92, 246, 0.12);
+}
+.team-agent-tool-result-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #8B5CF6;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.team-agent-tool-result-content {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 /* ══════════════════════════════════════════
