@@ -330,6 +330,8 @@ describe('team.ts state management', () => {
         clearActiveTeam();
         const team2Config: TeamConfig = { instruction: 'Second task' };
         const team2 = createTeamState(team2Config, 'conv-list-2');
+        // Ensure team2 has a strictly later createdAt to avoid same-millisecond flakiness
+        team2.createdAt = team.createdAt + 1000;
         persistTeam(team2);
 
         const list = listTeams();
