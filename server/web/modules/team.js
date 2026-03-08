@@ -134,6 +134,7 @@ export function createTeam(deps) {
   }
 
   function newTeam() {
+    teamMode.value = 'team';
     historicalTeam.value = null;
     activeAgentView.value = null;
     // If completed team is still in teamState, clear it so create panel shows
