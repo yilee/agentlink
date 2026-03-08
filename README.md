@@ -34,6 +34,7 @@ agentlink-client start --daemon
 - **No setup on the browser side.** No extensions, no local server, no port forwarding. One URL.
 - **Session history.** Resume previous conversations. Your Claude session files are read directly.
 - **Real-time streaming.** Tool calls, markdown, code blocks — all rendered live as Claude works.
+- **Multi-agent Teams.** Spawn parallel Claude subagents from the browser. A Lead agent plans, delegates tasks, and synthesizes results — with a live kanban dashboard.
 - **End-to-end encryption.** All WebSocket traffic is encrypted with XSalsa20-Poly1305 (TweetNaCl).
 
 ## Features
@@ -51,6 +52,7 @@ agentlink-client start --daemon
 - Auto-update in daemon mode (`--no-auto-update` to disable)
 - Auto-start on boot (`service install` — systemd/launchd/Windows Startup)
 - In-place upgrade (`agentlink-client upgrade`)
+- Multi-agent Teams mode (Lead + parallel subagents, kanban task board, activity feed, team history)
 - Markdown Preview Tool (`tools/markdown-preview.html` — split-pane live preview with syntax highlighting)
 
 ## How It Works

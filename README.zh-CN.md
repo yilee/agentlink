@@ -34,6 +34,7 @@ agentlink-client start --daemon
 - **零配置浏览器端** —— 不需要浏览器插件、本地服务器或端口转发，一个链接搞定一切。
 - **会话历史** —— 支持恢复之前的对话，直接读取 Claude 本地的会话记录。
 - **实时流式输出** —— 工具调用、Markdown、代码块，Claude 工作时实时渲染。
+- **多 Agent 协作** —— 在浏览器中启动多个 Claude 子 Agent 并行工作。Lead Agent 负责规划、分发任务并汇总结果，实时看板面板同步展示进度。
 - **端到端加密** —— 所有 WebSocket 通信使用 XSalsa20-Poly1305 (TweetNaCl) 加密。
 
 ## 功能一览
@@ -51,6 +52,7 @@ agentlink-client start --daemon
 - 守护进程模式下自动更新（`--no-auto-update` 可关闭）
 - 开机自启（`service install` —— 支持 systemd / launchd / Windows 启动项）
 - 原地升级（`agentlink-client upgrade`）
+- 多 Agent Teams 模式（Lead + 并行子 Agent、看板任务面板、活动动态、团队历史记录）
 - Markdown 实时预览工具（`tools/markdown-preview.html` —— 分栏实时预览，代码语法高亮）
 
 ## 工作原理
