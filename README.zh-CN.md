@@ -51,6 +51,7 @@ agentlink-client start --daemon
 - 守护进程模式下自动更新（`--no-auto-update` 可关闭）
 - 开机自启（`service install` —— 支持 systemd / launchd / Windows 启动项）
 - 原地升级（`agentlink-client upgrade`）
+- Markdown 实时预览工具（`tools/markdown-preview.html` —— 分栏实时预览，代码语法高亮）
 
 ## 工作原理
 

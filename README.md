@@ -51,6 +51,7 @@ agentlink-client start --daemon
 - Auto-update in daemon mode (`--no-auto-update` to disable)
 - Auto-start on boot (`service install` — systemd/launchd/Windows Startup)
 - In-place upgrade (`agentlink-client upgrade`)
+- Markdown Preview Tool (`tools/markdown-preview.html` — split-pane live preview with syntax highlighting)
 
 ## How It Works
 
