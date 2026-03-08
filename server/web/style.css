@@ -3534,6 +3534,9 @@ body {
 /* ── Teams sidebar section (history list in sidebar) ── */
 .sidebar-teams {
   padding: 0.75rem;
+  max-height: 35%;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .team-history-list {
