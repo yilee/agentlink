@@ -37,6 +37,10 @@ export function createSidebar(deps) {
     switchConversation,
   } = deps;
 
+  // Late-binding callback: called when user switches to a normal chat session
+  let _onSwitchToChat = null;
+  function setOnSwitchToChat(fn) { _onSwitchToChat = fn; }
+
   // ── Workdir switching timeout ──
   let _workdirSwitchTimer = null;
   function setWorkdirSwitching() {
@@ -69,6 +73,7 @@ export function createSidebar(deps) {
 
   function resumeSession(session) {
     if (window.innerWidth <= 768) sidebarOpen.value = false;
+    if (_onSwitchToChat) _onSwitchToChat();
 
     // Multi-session: check if we already have a conversation loaded for this claudeSessionId
     if (switchConversation && conversationCache) {
@@ -117,6 +122,7 @@ export function createSidebar(deps) {
 
   function newConversation() {
     if (window.innerWidth <= 768) sidebarOpen.value = false;
+    if (_onSwitchToChat) _onSwitchToChat();
 
     // Multi-session: just switch to a new blank conversation
     if (switchConversation) {
@@ -375,6 +381,7 @@ export function createSidebar(deps) {
 
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
+    setOnSwitchToChat,
     deleteSession, confirmDeleteSession, cancelDeleteSession,
     startRename, confirmRename, cancelRename,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,

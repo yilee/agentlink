@@ -316,6 +316,10 @@ const App = {
       wsSend, scrollToBottom,
     });
     setTeam(team);
+    sidebar.setOnSwitchToChat(() => {
+      team.teamMode.value = 'chat';
+      team.historicalTeam.value = null;
+    });
 
     // File browser module
     const fileBrowser = createFileBrowser({
