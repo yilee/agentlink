@@ -861,7 +861,7 @@ const App = {
           </div>
 
           <!-- Teams section -->
-          <div v-if="teamsList.length > 0" class="sidebar-section sidebar-teams">
+          <div class="sidebar-section sidebar-teams">
             <div class="sidebar-section-header">
               <span>Teams History</span>
             </div>
