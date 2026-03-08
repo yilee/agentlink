@@ -269,10 +269,10 @@ export function registerSubagent(
   if (input.description) {
     const colonIdx = input.description.indexOf(':');
     if (colonIdx > 0 && colonIdx <= 30) {
+      // Use role prefix from description (e.g. "Designer: review design doc" → "Designer")
       displayName = input.description.slice(0, colonIdx).trim();
-    } else if (input.description.length <= 30) {
-      displayName = input.description.trim();
     }
+    // Otherwise keep input.name as-is — don't override with raw description
   }
   const color = getNextAgentColor(team);
 
