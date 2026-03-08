@@ -671,6 +671,23 @@ const App = {
           team.requestAgentHistory(team.historicalTeam.value.teamId, agentId);
         }
       },
+      feedAgentName(entry) {
+        if (!entry.agentId) return null;
+        const agent = team.findAgent(entry.agentId);
+        if (!agent || !agent.name) return null;
+        // Verify the content actually starts with this agent name
+        if (entry.content && entry.content.startsWith(agent.name)) {
+          return agent.name;
+        }
+        return null;
+      },
+      feedContentRest(entry) {
+        const name = this.feedAgentName(entry);
+        if (name && entry.content && entry.content.startsWith(name)) {
+          return entry.content.slice(name.length);
+        }
+        return entry.content || '';
+      },
       getLatestAgentActivity(agentId) {
         // Find the latest feed entry for this agent
         const t = team.displayTeam.value;
@@ -678,6 +695,11 @@ const App = {
         for (let i = t.feed.length - 1; i >= 0; i--) {
           const entry = t.feed[i];
           if (entry.agentId === agentId && entry.type === 'tool_call') {
+            // Strip agent name prefix since it's already shown on the card
+            const agent = team.findAgent(agentId);
+            if (agent && agent.name && entry.content.startsWith(agent.name)) {
+              return entry.content.slice(agent.name.length).trimStart();
+            }
             return entry.content;
           }
         }
@@ -1239,7 +1261,7 @@ const App = {
                         <span v-if="entry.agentId" class="team-agent-dot" :style="{ background: getAgentColor(entry.agentId) }"></span>
                         <span v-else class="team-agent-dot" style="background: #666;"></span>
                         <span class="team-feed-time">{{ formatTeamTime(entry.timestamp) }}</span>
-                        <span class="team-feed-text">{{ entry.content }}</span>
+                        <span class="team-feed-text"><span v-if="feedAgentName(entry)" class="team-feed-agent-name" :style="{ color: getAgentColor(entry.agentId) }">{{ feedAgentName(entry) }}</span>{{ feedContentRest(entry) }}</span>
                       </div>
                     </div>
                   </div>
