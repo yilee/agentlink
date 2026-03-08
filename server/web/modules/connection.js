@@ -38,6 +38,10 @@ export function createConnection(deps) {
   let filePreview = null;
   function setFilePreview(fp) { filePreview = fp; }
 
+  // Team module — set after creation to resolve circular dependency
+  let team = null;
+  function setTeam(t) { team = t; }
+
   let ws = null;
   let sessionKey = null;
   let reconnectAttempts = 0;
@@ -105,7 +109,7 @@ export function createConnection(deps) {
               id: ++cache.messageIdCounter, role: 'tool',
               toolId: h.toolId || '', toolName: h.toolName || 'unknown',
               toolInput: h.toolInput || '', hasResult: true,
-              expanded: (h.toolName === 'Edit' || h.toolName === 'TodoWrite'),
+              expanded: (h.toolName === 'Edit' || h.toolName === 'TodoWrite' || h.toolName === 'Agent'),
               timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
             });
           }
@@ -177,7 +181,7 @@ export function createConnection(deps) {
             id: ++cache.messageIdCounter, role: 'tool',
             toolId: tool.id, toolName: tool.name || 'unknown',
             toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
-            hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite'),
+            hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite' || tool.name === 'Agent'),
             timestamp: new Date(),
           };
           msgs.push(toolMsg);
@@ -383,7 +387,7 @@ export function createConnection(deps) {
           id: streaming.nextId(), role: 'tool',
           toolId: tool.id, toolName: tool.name || 'unknown',
           toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
-          hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite'), timestamp: new Date(),
+          hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite' || tool.name === 'Agent'), timestamp: new Date(),
         };
         messages.value.push(toolMsg);
         if (tool.id) toolMsgMap.set(tool.id, toolMsg);
@@ -473,6 +477,16 @@ export function createConnection(deps) {
         msg = parsed;
       }
 
+      // ── Team messages: route before normal conversation routing ──
+      if (team && (msg.type?.startsWith('team_') || msg.type === 'teams_list' || (msg.type === 'claude_output' && msg.teamId))) {
+        if (msg.type === 'claude_output' && msg.teamId) {
+          team.handleTeamAgentOutput(msg);
+        } else {
+          team.handleTeamMessage(msg);
+        }
+        return;
+      }
+
       // ── Multi-session: route messages to background conversations ──
       // Messages with a conversationId that doesn't match the current foreground
       // conversation are routed to their cached background state.
@@ -510,6 +524,7 @@ export function createConnection(deps) {
             wsSend({ type: 'change_workdir', workDir: savedDir });
           }
           sidebar.requestSessionList();
+          if (team) team.requestTeamsList();
           startPing();
           wsSend({ type: 'query_active_conversations' });
         } else {
@@ -553,6 +568,7 @@ export function createConnection(deps) {
           sidebar.addToWorkdirHistory(msg.agent.workDir);
         }
         sidebar.requestSessionList();
+        if (team) team.requestTeamsList();
         startPing();
         wsSend({ type: 'query_active_conversations' });
       } else if (msg.type === 'active_conversations') {
@@ -606,6 +622,14 @@ export function createConnection(deps) {
           if (processingConversations) {
             processingConversations.value[convId] = true;
           }
+        }
+
+        // Restore active team state on reconnect
+        if (team && msg.activeTeam) {
+          team.handleActiveTeamRestore(msg.activeTeam);
+        } else if (team && !msg.activeTeam && msg.lastCompletedTeamId) {
+          // Team completed before page refresh — auto-load as historical view
+          team.viewHistoricalTeam(msg.lastCompletedTeamId);
         }
       } else if (msg.type === 'error') {
         streaming.flushReveal();
@@ -755,7 +779,7 @@ export function createConnection(deps) {
                 id: streaming.nextId(), role: 'tool',
                 toolId: h.toolId || '', toolName: h.toolName || 'unknown',
                 toolInput: h.toolInput || '', hasResult: true,
-                expanded: (h.toolName === 'Edit' || h.toolName === 'TodoWrite'), timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+                expanded: (h.toolName === 'Edit' || h.toolName === 'TodoWrite' || h.toolName === 'Agent'), timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
               });
             }
           }
@@ -880,5 +904,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }

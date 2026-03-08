@@ -15,7 +15,7 @@
  * and inspecting the conversations Map.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   handleChat,
   abort,
@@ -26,6 +26,8 @@ import {
   getIsCompacting,
   clearSessionId,
   setSendFn,
+  setOutputObserver,
+  clearOutputObserver,
   MAX_CONVERSATIONS,
 } from '../../agent/src/claude.js';
 
@@ -321,6 +323,76 @@ describe('claude.ts multi-session', () => {
 
       // Should be a new child process
       expect(secondChild).not.toBe(firstChild);
+    });
+  });
+
+  describe('output observer', () => {
+    afterEach(() => {
+      clearOutputObserver();
+    });
+
+    it('observer receives all parsed JSON messages from stdout', async () => {
+      const observed: Array<{ convId: string; msg: Record<string, unknown> }> = [];
+      setOutputObserver((convId, msg) => {
+        observed.push({ convId, msg });
+      });
+
+      handleChat('obs-conv', 'hello', '/tmp');
+      const child = getConversation('obs-conv')?.child as any;
+
+      // Write JSON lines to mock stdout
+      child.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'test-session' }) + '\n');
+      child.stdout.write(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'hi' }] } }) + '\n');
+
+      // Allow the readline async loop to process
+      await new Promise(r => setTimeout(r, 50));
+
+      expect(observed.length).toBe(2);
+      expect(observed[0].convId).toBe('obs-conv');
+      expect(observed[0].msg.type).toBe('system');
+      expect(observed[1].msg.type).toBe('assistant');
+    });
+
+    it('observer returning true suppresses the message from normal forwarding', async () => {
+      setOutputObserver((_convId, msg) => {
+        // Suppress assistant messages
+        return msg.type === 'assistant';
+      });
+
+      handleChat('obs-suppress', 'hello', '/tmp');
+      const child = getConversation('obs-suppress')?.child as any;
+      sentMessages = [];
+
+      // Write a system message (not suppressed) and an assistant message (suppressed)
+      child.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1' }) + '\n');
+      child.stdout.write(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: 'hello' }] } }) + '\n');
+
+      await new Promise(r => setTimeout(r, 50));
+
+      // system init produces a session_started message
+      const sessionStarted = sentMessages.find(m => m.type === 'session_started');
+      expect(sessionStarted).toBeDefined();
+
+      // assistant message should be suppressed — no claude_output with delta
+      const claudeOutput = sentMessages.find(m => m.type === 'claude_output');
+      expect(claudeOutput).toBeUndefined();
+    });
+
+    it('clearOutputObserver removes the observer', async () => {
+      const observed: unknown[] = [];
+      setOutputObserver((_convId, msg) => {
+        observed.push(msg);
+      });
+      clearOutputObserver();
+
+      handleChat('obs-clear', 'hello', '/tmp');
+      const child = getConversation('obs-clear')?.child as any;
+
+      child.stdout.write(JSON.stringify({ type: 'system', subtype: 'init' }) + '\n');
+      await new Promise(r => setTimeout(r, 50));
+
+      // Observer was cleared, should not receive any messages
+      expect(observed.length).toBe(0);
     });
   });
 });

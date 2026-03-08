@@ -88,6 +88,38 @@ const conversations = new Map<string, ConversationState>();
 let sendFn: SendFn = () => {};
 const pendingControlRequests = new Map<string, PendingControlRequest>();
 
+// ── Output observer ────────────────────────────────────────────────────────
+// Optional callback invoked for every parsed JSON line from Claude stdout.
+// Receives (conversationId, rawMessage). If it returns true, the message is
+// suppressed from normal forwarding to the web client.
+
+type OutputObserverFn = (conversationId: string, msg: ClaudeMessage) => boolean | void;
+let outputObserver: OutputObserverFn | null = null;
+
+export function setOutputObserver(fn: OutputObserverFn): void {
+  outputObserver = fn;
+}
+
+export function clearOutputObserver(): void {
+  outputObserver = null;
+}
+
+// ── Close observer ────────────────────────────────────────────────────────
+// Optional callback invoked when a Claude process exits. Receives
+// (conversationId, exitCode, resultReceived). Allows the team module to
+// detect Lead crashes (process exited without a result message).
+
+type CloseObserverFn = (conversationId: string, exitCode: number | null, resultReceived: boolean) => void;
+let closeObserver: CloseObserverFn | null = null;
+
+export function setCloseObserver(fn: CloseObserverFn): void {
+  closeObserver = fn;
+}
+
+export function clearCloseObserver(): void {
+  closeObserver = null;
+}
+
 export function setSendFn(fn: SendFn): void {
   sendFn = fn;
 }
@@ -172,16 +204,23 @@ export function clearSessionId(conversationId?: string): void {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
+/** Options for handleChat() */
+export interface HandleChatOptions {
+  resumeSessionId?: string;
+  extraArgs?: string[];
+}
+
 /**
  * Handle a chat message from the web client.
  * Lazily starts the Claude process on the first message.
  * If resumeSessionId is provided, resumes that Claude session.
+ * If extraArgs is provided, they are appended to the Claude CLI args on spawn.
  */
 export function handleChat(
   conversationId: string | undefined,
   prompt: string,
   workDir: string,
-  resumeSessionId?: string,
+  options?: HandleChatOptions,
   files?: ChatFile[],
 ): void {
   const convId = conversationId || DEFAULT_CONVERSATION_ID;
@@ -189,8 +228,8 @@ export function handleChat(
 
   if (!existing || !existing.inputStream) {
     // If the process exited but we still know the session ID, resume it
-    const sessionToResume = resumeSessionId || existing?.claudeSessionId || existing?.lastClaudeSessionId || undefined;
-    startQuery(convId, workDir, sessionToResume);
+    const sessionToResume = options?.resumeSessionId || existing?.claudeSessionId || existing?.lastClaudeSessionId || undefined;
+    startQuery(convId, workDir, sessionToResume, options?.extraArgs);
   }
 
   const state = conversations.get(convId)!;
@@ -338,7 +377,7 @@ function processFilesForClaude(files: ChatFile[], workDir: string, prompt: strin
   return content;
 }
 
-function startQuery(conversationId: string, workDir: string, resumeSessionId?: string): void {
+function startQuery(conversationId: string, workDir: string, resumeSessionId?: string, extraArgs?: string[]): void {
   // Tear down previous process for THIS conversation only (not others)
   const existing = conversations.get(conversationId);
   if (existing) {
@@ -386,6 +425,11 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
   if (resumeSessionId) {
     args.push('--resume', resumeSessionId);
     console.log(`[Claude:${conversationId.slice(0, 8)}] Resuming session: ${resumeSessionId}`);
+  }
+
+  if (extraArgs && extraArgs.length > 0) {
+    args.push(...extraArgs);
+    console.log(`[Claude:${conversationId.slice(0, 8)}] Extra args: ${extraArgs.join(' ')}`);
   }
 
   const { command, prefixArgs, spawnOpts } = resolveClaudeCommand();
@@ -478,6 +522,12 @@ async function processOutput(
         if (!line.trim()) continue;
         try {
           const msg: ClaudeMessage = JSON.parse(line);
+
+          // Notify output observer (if set) before any processing.
+          // If observer returns true, suppress this message from normal handling.
+          if (outputObserver && outputObserver(state.conversationId, msg)) {
+            continue;
+          }
 
           // Capture session ID from system init
           if (msg.type === 'system' && msg.session_id) {
@@ -692,6 +742,11 @@ async function processOutput(
       sendWithConvId({ type: 'turn_completed' });
     }
     state.turnActive = false;
+
+    // Notify close observer (used by team module to detect Lead crash)
+    if (closeObserver) {
+      closeObserver(state.conversationId, child.exitCode, resultHandled);
+    }
 
     // Only clean up if this conversation is still in the map with the same state
     if (conversations.get(state.conversationId) === state) {

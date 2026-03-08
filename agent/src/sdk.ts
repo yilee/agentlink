@@ -87,6 +87,8 @@ export function getDefaultClaudeCodePath(): string {
 
 export function getCleanEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
+  // Remove CLAUDECODE to allow spawning Claude CLI from within a Claude Code session
+  delete env.CLAUDECODE;
   if (isWindows()) {
     if (!env.COMSPEC) env.COMSPEC = 'C:\\Windows\\system32\\cmd.exe';
     if (!env.SystemRoot) env.SystemRoot = 'C:\\Windows';

@@ -69,6 +69,8 @@ export function getToolSummary(msg) {
       return `${done}/${obj.todos.length} done`;
     }
     if (name === 'Task' && obj.description) return obj.description;
+    if (name === 'Agent' && obj.description) return obj.description;
+    if (name === 'Agent' && obj.prompt) return obj.prompt.length > 80 ? obj.prompt.slice(0, 80) + '...' : obj.prompt;
     if (name === 'WebSearch' && obj.query) return obj.query;
     if (name === 'WebFetch' && obj.url) return obj.url.length > 60 ? obj.url.slice(0, 60) + '...' : obj.url;
   } catch {}
@@ -135,13 +137,12 @@ export function getFormattedToolInput(msg) {
       return html;
     }
 
-    if (name === 'Task') {
+    if (name === 'Task' || name === 'Agent') {
       let html = '';
       if (obj.description) html += '<div class="task-field"><span class="tool-input-meta">Description</span> ' + esc(obj.description) + '</div>';
       if (obj.subagent_type) html += '<div class="task-field"><span class="tool-input-meta">Agent</span> <code class="tool-input-cmd">' + esc(obj.subagent_type) + '</code></div>';
       if (obj.prompt) {
-        const short = obj.prompt.length > 200 ? obj.prompt.slice(0, 200) + '...' : obj.prompt;
-        html += '<div class="task-field"><span class="tool-input-meta">Prompt</span></div><div class="task-prompt">' + esc(short) + '</div>';
+        html += '<div class="task-field"><span class="tool-input-meta">Prompt</span></div><div class="task-prompt">' + esc(obj.prompt) + '</div>';
       }
       if (html) return html;
     }

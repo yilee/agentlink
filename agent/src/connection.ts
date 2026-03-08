@@ -10,9 +10,10 @@ import { readFileForPreview } from './file-readers.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
+import { setTeamSendFn, setTeamClaudeFns, createTeam, dissolveTeam, getActiveTeam, getLastCompletedTeamId, loadTeam, listTeams, serializeTeam, type TeamConfig } from './team.js';
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 30_000;
@@ -56,6 +57,17 @@ export function connect(config: AgentConfig): Promise<string> {
 
   // Wire up the Claude module to send messages through our WebSocket
   setSendFn(send);
+
+  // Wire up the Team module with send and claude dependencies
+  setTeamSendFn(send);
+  setTeamClaudeFns({
+    handleChat: claudeHandleChat,
+    cancelExecution: claudeCancelExecution,
+    setOutputObserver,
+    clearOutputObserver,
+    setCloseObserver,
+    clearCloseObserver,
+  });
 
   return new Promise((resolve, reject) => {
     doConnect(config, (sessionId) => resolve(sessionId), (err) => reject(err));
@@ -227,7 +239,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
         existingConv?.workDir || state.workDir,
-        (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
+        { resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId },
         (msg as unknown as { files?: ChatFile[] }).files,
       );
       break;
@@ -313,8 +325,66 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
           });
         }
       }
+      const activeTeamState = getActiveTeam();
       console.log(`[AgentLink] → active_conversations (${active.length} active)`);
-      send({ type: 'active_conversations', conversations: active });
+      send({
+        type: 'active_conversations',
+        conversations: active,
+        activeTeam: activeTeamState ? serializeTeam(activeTeamState) : null,
+        lastCompletedTeamId: !activeTeamState ? getLastCompletedTeamId() : null,
+      });
+      break;
+    }
+    case 'create_team': {
+      const m = msg as unknown as { instruction: string; template?: string };
+      try {
+        createTeam({ instruction: m.instruction, template: m.template }, state.workDir);
+      } catch (err) {
+        send({ type: 'error', message: (err as Error).message });
+      }
+      break;
+    }
+    case 'dissolve_team':
+      dissolveTeam();
+      break;
+    case 'list_teams':
+      send({ type: 'teams_list', teams: listTeams() });
+      break;
+    case 'get_team': {
+      const m = msg as unknown as { teamId: string };
+      const active = getActiveTeam();
+      if (active && active.teamId === m.teamId) {
+        send({ type: 'team_detail', team: serializeTeam(active) });
+      } else {
+        const team = loadTeam(m.teamId);
+        if (team) {
+          send({ type: 'team_detail', team: serializeTeam(team) });
+        } else {
+          send({ type: 'error', message: `Team not found: ${m.teamId}` });
+        }
+      }
+      break;
+    }
+    case 'get_team_agent_history': {
+      const m = msg as unknown as { teamId: string; agentId: string };
+      const active = getActiveTeam();
+      if (active && active.teamId === m.teamId) {
+        const agent = active.agents.get(m.agentId);
+        if (agent) {
+          send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
+        } else {
+          send({ type: 'error', message: `Agent not found: ${m.agentId}` });
+        }
+      } else {
+        // Historical team — load from disk (messages are persisted)
+        const team = loadTeam(m.teamId);
+        if (team && team.agents.has(m.agentId)) {
+          const agent = team.agents.get(m.agentId)!;
+          send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
+        } else {
+          send({ type: 'error', message: `Agent not found: ${m.agentId}` });
+        }
+      }
       break;
     }
     case 'ping':
