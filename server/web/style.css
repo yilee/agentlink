@@ -566,6 +566,10 @@ body {
   visibility: visible;
 }
 
+.team-history-item:hover .session-actions {
+  visibility: visible;
+}
+
 .session-delete-btn {
   display: flex;
   align-items: center;

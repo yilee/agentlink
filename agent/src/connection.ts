@@ -13,7 +13,7 @@ const pkg = require('../package.json');
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
-import { setTeamSendFn, setTeamClaudeFns, createTeam, dissolveTeam, getActiveTeam, getLastCompletedTeamId, loadTeam, listTeams, serializeTeam, type TeamConfig } from './team.js';
+import { setTeamSendFn, setTeamClaudeFns, createTeam, dissolveTeam, getActiveTeam, getLastCompletedTeamId, loadTeam, listTeams, deleteTeam, renameTeam, serializeTeam, type TeamConfig } from './team.js';
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 30_000;
@@ -384,6 +384,36 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         } else {
           send({ type: 'error', message: `Agent not found: ${m.agentId}` });
         }
+      }
+      break;
+    }
+    case 'delete_team': {
+      const m = msg as unknown as { teamId: string };
+      const active = getActiveTeam();
+      if (active && active.teamId === m.teamId) {
+        send({ type: 'error', message: 'Cannot delete an active team.' });
+        break;
+      }
+      const deleted = deleteTeam(m.teamId);
+      if (deleted) {
+        send({ type: 'team_deleted', teamId: m.teamId });
+      } else {
+        send({ type: 'error', message: 'Team not found or could not be deleted.' });
+      }
+      break;
+    }
+    case 'rename_team': {
+      const m = msg as unknown as { teamId: string; newTitle: string };
+      const active = getActiveTeam();
+      // If renaming the active team, update in-memory state too
+      if (active && active.teamId === m.teamId) {
+        active.title = m.newTitle;
+      }
+      const renamed = renameTeam(m.teamId, m.newTitle);
+      if (renamed) {
+        send({ type: 'team_renamed', teamId: m.teamId, newTitle: m.newTitle });
+      } else {
+        send({ type: 'error', message: 'Team not found or could not be renamed.' });
       }
       break;
     }
