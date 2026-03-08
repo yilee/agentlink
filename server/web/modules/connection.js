@@ -627,9 +627,6 @@ export function createConnection(deps) {
         // Restore active team state on reconnect
         if (team && msg.activeTeam) {
           team.handleActiveTeamRestore(msg.activeTeam);
-        } else if (team && !msg.activeTeam && msg.lastCompletedTeamId) {
-          // Team completed before page refresh — auto-load as historical view
-          team.viewHistoricalTeam(msg.lastCompletedTeamId);
         }
       } else if (msg.type === 'error') {
         streaming.flushReveal();

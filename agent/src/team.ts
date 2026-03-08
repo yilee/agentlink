@@ -141,7 +141,6 @@ type SetCloseObserverFn = (fn: (conversationId: string, exitCode: number | null,
 type ClearCloseObserverFn = () => void;
 
 let activeTeam: TeamState | null = null;
-let lastCompletedTeamId: string | null = null;
 let sendFn: SendFn = () => {};
 let handleChatFn: HandleChatFn | null = null;
 let cancelExecutionFn: CancelExecutionFn | null = null;
@@ -181,10 +180,6 @@ export function setTeamClaudeFns(fns: {
 
 export function getActiveTeam(): TeamState | null {
   return activeTeam;
-}
-
-export function getLastCompletedTeamId(): string | null {
-  return lastCompletedTeamId;
 }
 
 /**
@@ -240,9 +235,6 @@ export function createTeamState(config: TeamConfig, conversationId: string): Tea
  * Clear the active team (used on dissolve/complete).
  */
 export function clearActiveTeam(): void {
-  if (activeTeam) {
-    lastCompletedTeamId = activeTeam.teamId;
-  }
   activeTeam = null;
 }
 
