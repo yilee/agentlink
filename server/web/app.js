@@ -78,6 +78,13 @@ const App = {
     const renamingSessionId = ref(null);
     const renameText = ref('');
 
+    // Team rename/delete state
+    const renamingTeamId = ref(null);
+    const renameTeamText = ref('');
+    const deleteTeamConfirmOpen = ref(false);
+    const deleteTeamConfirmTitle = ref('');
+    const pendingDeleteTeamId = ref(null);
+
     // Working directory history
     const workdirHistory = ref([]);
 
@@ -309,6 +316,10 @@ const App = {
       wsSend, scrollToBottom,
     });
     setTeam(team);
+    sidebar.setOnSwitchToChat(() => {
+      team.teamMode.value = 'chat';
+      team.historicalTeam.value = null;
+    });
 
     // File browser module
     const fileBrowser = createFileBrowser({
@@ -533,6 +544,40 @@ const App = {
       startRename: sidebar.startRename,
       confirmRename: sidebar.confirmRename,
       cancelRename: sidebar.cancelRename,
+      // Team rename/delete
+      renamingTeamId, renameTeamText,
+      deleteTeamConfirmOpen, deleteTeamConfirmTitle, pendingDeleteTeamId,
+      startTeamRename(t) {
+        renamingTeamId.value = t.teamId;
+        renameTeamText.value = t.title || '';
+      },
+      confirmTeamRename() {
+        const tid = renamingTeamId.value;
+        const title = renameTeamText.value.trim();
+        if (!tid || !title) { renamingTeamId.value = null; renameTeamText.value = ''; return; }
+        team.renameTeamById(tid, title);
+        renamingTeamId.value = null;
+        renameTeamText.value = '';
+      },
+      cancelTeamRename() {
+        renamingTeamId.value = null;
+        renameTeamText.value = '';
+      },
+      requestDeleteTeam(t) {
+        pendingDeleteTeamId.value = t.teamId;
+        deleteTeamConfirmTitle.value = t.title || t.teamId.slice(0, 8);
+        deleteTeamConfirmOpen.value = true;
+      },
+      confirmDeleteTeam() {
+        if (!pendingDeleteTeamId.value) return;
+        team.deleteTeamById(pendingDeleteTeamId.value);
+        deleteTeamConfirmOpen.value = false;
+        pendingDeleteTeamId.value = null;
+      },
+      cancelDeleteTeam() {
+        deleteTeamConfirmOpen.value = false;
+        pendingDeleteTeamId.value = null;
+      },
       // Working directory history
       filteredWorkdirHistory: sidebar.filteredWorkdirHistory,
       switchToWorkdir: sidebar.switchToWorkdir,
@@ -592,6 +637,8 @@ const App = {
       viewDashboard: team.viewDashboard,
       viewHistoricalTeam: team.viewHistoricalTeam,
       requestTeamsList: team.requestTeamsList,
+      deleteTeamById: team.deleteTeamById,
+      renameTeamById: team.renameTeamById,
       getAgentColor: team.getAgentColor,
       findAgent: team.findAgent,
       getAgentMessages: team.getAgentMessages,
@@ -822,16 +869,36 @@ const App = {
               <div
                 v-for="t in teamsList" :key="t.teamId"
                 :class="['team-history-item', { active: displayTeam && displayTeam.teamId === t.teamId }]"
-                @click="viewHistoricalTeam(t.teamId)"
+                @click="renamingTeamId !== t.teamId && viewHistoricalTeam(t.teamId)"
                 :title="t.title"
               >
                 <svg class="team-history-icon" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                 <div class="team-history-info">
-                  <div class="team-history-title">{{ t.title || 'Untitled team' }}</div>
-                  <div class="team-history-meta">
+                  <div v-if="renamingTeamId === t.teamId" class="session-rename-row">
+                    <input
+                      class="session-rename-input"
+                      v-model="renameTeamText"
+                      @click.stop
+                      @keydown.enter.stop="confirmTeamRename"
+                      @keydown.escape.stop="cancelTeamRename"
+                      @vue:mounted="$event.el.focus()"
+                    />
+                    <button class="session-rename-ok" @click.stop="confirmTeamRename" title="Confirm">&#10003;</button>
+                    <button class="session-rename-cancel" @click.stop="cancelTeamRename" title="Cancel">&times;</button>
+                  </div>
+                  <div v-else class="team-history-title">{{ t.title || 'Untitled team' }}</div>
+                  <div v-if="renamingTeamId !== t.teamId" class="team-history-meta">
                     <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + t.status]">{{ t.status }}</span>
                     <span v-if="t.taskCount" class="team-history-tasks">{{ t.taskCount }} tasks</span>
                     <span v-if="t.totalCost" class="team-history-tasks">{{'$' + t.totalCost.toFixed(2) }}</span>
+                    <span class="session-actions">
+                      <button class="session-rename-btn" @click.stop="startTeamRename(t)" title="Rename team">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                      </button>
+                      <button class="session-delete-btn" @click.stop="requestDeleteTeam(t)" title="Delete team">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                      </button>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1618,6 +1685,22 @@ const App = {
           <div class="delete-confirm-footer">
             <button class="folder-picker-cancel" @click="cancelDeleteSession">Cancel</button>
             <button class="delete-confirm-btn" @click="confirmDeleteSession">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete Team Confirmation Dialog -->
+      <div class="folder-picker-overlay" v-if="deleteTeamConfirmOpen" @click.self="cancelDeleteTeam">
+        <div class="delete-confirm-dialog">
+          <div class="delete-confirm-header">Delete Team</div>
+          <div class="delete-confirm-body">
+            <p>Are you sure you want to delete this team?</p>
+            <p class="delete-confirm-title">{{ deleteTeamConfirmTitle }}</p>
+            <p class="delete-confirm-warning">This action cannot be undone.</p>
+          </div>
+          <div class="delete-confirm-footer">
+            <button class="folder-picker-cancel" @click="cancelDeleteTeam">Cancel</button>
+            <button class="delete-confirm-btn" @click="confirmDeleteTeam">Delete</button>
           </div>
         </div>
       </div>

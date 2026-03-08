@@ -96,6 +96,14 @@ export function createTeam(deps) {
     wsSend({ type: 'list_teams' });
   }
 
+  function deleteTeamById(teamId) {
+    wsSend({ type: 'delete_team', teamId });
+  }
+
+  function renameTeamById(teamId, newTitle) {
+    wsSend({ type: 'rename_team', teamId, newTitle });
+  }
+
   function requestAgentHistory(teamId, agentId) {
     wsSend({ type: 'get_team_agent_history', teamId, agentId });
   }
@@ -220,6 +228,28 @@ export function createTeam(deps) {
         teamsList.value = msg.teams || [];
         return true;
 
+      case 'team_deleted':
+        teamsList.value = teamsList.value.filter(t => t.teamId !== msg.teamId);
+        // If viewing the deleted team, go back
+        if (historicalTeam.value && historicalTeam.value.teamId === msg.teamId) {
+          historicalTeam.value = null;
+        }
+        return true;
+
+      case 'team_renamed': {
+        const item = teamsList.value.find(t => t.teamId === msg.teamId);
+        if (item) item.title = msg.newTitle;
+        // Update historical view if showing this team
+        if (historicalTeam.value && historicalTeam.value.teamId === msg.teamId) {
+          historicalTeam.value.title = msg.newTitle;
+        }
+        // Update active team if it's the same
+        if (teamState.value && teamState.value.teamId === msg.teamId) {
+          teamState.value.title = msg.newTitle;
+        }
+        return true;
+      }
+
       case 'team_detail':
         historicalTeam.value = msg.team;
         teamMode.value = 'team';
@@ -334,7 +364,8 @@ export function createTeam(deps) {
     pendingTasks, activeTasks, doneTasks, failedTasks,
     // Methods
     launchTeam, dissolveTeam, viewAgent, viewDashboard,
-    viewHistoricalTeam, requestTeamsList, requestAgentHistory,
+    viewHistoricalTeam, requestTeamsList, deleteTeamById, renameTeamById,
+    requestAgentHistory,
     getAgentColor, findAgent, getAgentMessages, backToChat, newTeam,
     // Message handling
     handleTeamMessage, handleTeamAgentOutput, handleActiveTeamRestore,

@@ -603,6 +603,21 @@ export function deleteTeam(teamId: string): boolean {
   }
 }
 
+export function renameTeam(teamId: string, newTitle: string): boolean {
+  const filePath = join(TEAMS_DIR, `${teamId}.json`);
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    const data = JSON.parse(raw) as TeamStateSerialized;
+    data.title = newTitle;
+    const tmpPath = filePath + '.tmp';
+    writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+    renameSync(tmpPath, filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ── Template definitions ────────────────────────────────────────────────
 
 interface AgentDef {
