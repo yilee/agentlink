@@ -3722,7 +3722,6 @@ body {
 .team-history-item {
   display: flex;
   align-items: center;
-  gap: 8px;
   padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
@@ -3737,11 +3736,6 @@ body {
 .team-history-item.active {
   background: var(--bg-tertiary);
   border-left-color: var(--accent);
-}
-
-.team-history-icon {
-  flex-shrink: 0;
-  color: var(--text-secondary);
 }
 
 .team-history-info {
