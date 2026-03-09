@@ -138,6 +138,7 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
+  flex-shrink: 0;
   background: none;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -4175,6 +4176,19 @@ body {
 
   .agent-label {
     display: none;
+  }
+
+  .latency {
+    display: none;
+  }
+
+  .top-bar-info {
+    gap: 0.4rem;
+  }
+
+  .team-mode-btn {
+    padding: 4px 10px;
+    font-size: 0.7rem;
   }
 
   /* Message area */
