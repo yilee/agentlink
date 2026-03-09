@@ -106,7 +106,7 @@ export function getActiveTeam(): TeamState | null {
  * Create a new team. Returns the TeamState.
  * Does NOT start the Lead process — the caller (team lifecycle functions) does that.
  */
-export function createTeamState(config: TeamConfig, conversationId: string): TeamState {
+export function createTeamState(config: TeamConfig, conversationId: string, workDir: string): TeamState {
   if (activeTeam) {
     throw new Error('A team is already active. Dissolve it before creating a new one.');
   }
@@ -120,6 +120,7 @@ export function createTeamState(config: TeamConfig, conversationId: string): Tea
     teamId,
     title,
     config,
+    workDir,
     conversationId,
     claudeSessionId: null,
     agents: new Map(),
@@ -721,7 +722,7 @@ export function createTeam(config: TeamConfig, workDir: string): TeamState {
   }
 
   const conversationId = `team-${randomUUID().slice(0, 8)}`;
-  const team = createTeamState(config, conversationId);
+  const team = createTeamState(config, conversationId, workDir);
 
   // Build agents definition for --agents flag
   const agentsDef = buildAgentsDef(config.template);

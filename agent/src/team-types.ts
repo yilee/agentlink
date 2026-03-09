@@ -28,6 +28,7 @@ export interface TeamState {
   teamId: string;
   title: string;                 // derived from instruction
   config: TeamConfig;
+  workDir: string;               // working directory when the team was created
   conversationId: string;        // single conversation in claude.ts (Lead process)
   claudeSessionId: string | null;// Lead's session ID (for history + subagent JSONL)
   agents: Map<string, AgentTeammate>;
@@ -74,6 +75,7 @@ export interface TeamStateSerialized {
   teamId: string;
   title: string;
   config: TeamConfig;
+  workDir?: string;              // working directory (optional for backward compat with old files)
   conversationId: string;
   claudeSessionId: string | null;
   agents: Array<{
@@ -106,6 +108,7 @@ export interface TeamSummaryInfo {
   agentCount: number;
   taskCount: number;
   totalCost: number;
+  workDir?: string;
   createdAt: number;
 }
 

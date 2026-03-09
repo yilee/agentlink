@@ -344,7 +344,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       dissolveTeam();
       break;
     case 'list_teams':
-      send({ type: 'teams_list', teams: listTeams() });
+      send({ type: 'teams_list', teams: listTeams(state.workDir) });
       break;
     case 'get_team': {
       const m = msg as unknown as { teamId: string };

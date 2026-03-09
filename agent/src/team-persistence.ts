@@ -22,6 +22,7 @@ export function serializeTeam(team: TeamState, includeMessages = false): TeamSta
     teamId: team.teamId,
     title: team.title,
     config: team.config,
+    workDir: team.workDir,
     conversationId: team.conversationId,
     claudeSessionId: team.claudeSessionId,
     agents: [...team.agents.entries()].map(([, agent]) => ({
@@ -71,6 +72,7 @@ export function deserializeTeam(data: TeamStateSerialized): TeamState {
     teamId: data.teamId,
     title: data.title,
     config: data.config,
+    workDir: data.workDir || '',
     conversationId: data.conversationId,
     claudeSessionId: data.claudeSessionId,
     agents,
@@ -146,7 +148,7 @@ export function loadTeam(teamId: string): TeamState | null {
 /**
  * List all persisted teams, sorted by createdAt descending (newest first).
  */
-export function listTeams(): TeamSummaryInfo[] {
+export function listTeams(workDir?: string): TeamSummaryInfo[] {
   ensureTeamsDir();
 
   const files = readdirSync(TEAMS_DIR).filter(f => f.endsWith('.json'));
@@ -156,6 +158,8 @@ export function listTeams(): TeamSummaryInfo[] {
     try {
       const raw = readFileSync(join(TEAMS_DIR, file), 'utf-8');
       const data = JSON.parse(raw) as TeamStateSerialized;
+      // Filter by workDir if specified; old teams without workDir always show
+      if (workDir && data.workDir && data.workDir !== workDir) continue;
       teams.push({
         teamId: data.teamId,
         title: data.title,
@@ -164,6 +168,7 @@ export function listTeams(): TeamSummaryInfo[] {
         agentCount: data.agents.length,
         taskCount: data.tasks.length,
         totalCost: data.totalCost,
+        workDir: data.workDir,
         createdAt: data.createdAt,
       });
     } catch {

@@ -60,7 +60,7 @@ describe('team.ts state management', () => {
 
   beforeEach(() => {
     clearActiveTeam();
-    team = createTeamState(config, 'conv-team-1');
+    team = createTeamState(config, 'conv-team-1', '/test/workdir');
   });
 
   describe('createTeamState', () => {
@@ -83,7 +83,7 @@ describe('team.ts state management', () => {
       const longConfig: TeamConfig = {
         instruction: 'A'.repeat(100),
       };
-      const t = createTeamState(longConfig, 'conv-2');
+      const t = createTeamState(longConfig, 'conv-2', '/test/workdir');
       expect(t.title).toHaveLength(60);
       expect(t.title.endsWith('...')).toBe(true);
     });
@@ -93,7 +93,7 @@ describe('team.ts state management', () => {
     });
 
     it('throws if team already active', () => {
-      expect(() => createTeamState(config, 'conv-3')).toThrow('already active');
+      expect(() => createTeamState(config, 'conv-3', '/test/workdir')).toThrow('already active');
     });
   });
 
@@ -330,7 +330,7 @@ describe('team.ts state management', () => {
 
         clearActiveTeam();
         const team2Config: TeamConfig = { instruction: 'Second task' };
-        const team2 = createTeamState(team2Config, 'conv-list-2');
+        const team2 = createTeamState(team2Config, 'conv-list-2', '/test/workdir');
         // Ensure team2 has a strictly later createdAt to avoid same-millisecond flakiness
         team2.createdAt = team.createdAt + 1000;
         persistTeam(team2);
