@@ -80,7 +80,7 @@ interface PendingControlRequest {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const DEFAULT_CONVERSATION_ID = 'default';
-export const MAX_CONVERSATIONS = 5;
+export const MAX_CONVERSATIONS = 15;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
