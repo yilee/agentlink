@@ -118,6 +118,8 @@ const App = {
     const sidebarView = ref('sessions');       // 'sessions' | 'files' | 'preview' (mobile only)
     const isMobile = ref(window.innerWidth <= 768);
     const workdirMenuOpen = ref(false);
+    const teamsCollapsed = ref(false);
+    const chatsCollapsed = ref(false);
 
     // Team creation state
     const teamInstruction = ref('');
@@ -561,6 +563,7 @@ const App = {
       // File preview
       previewPanelOpen, previewPanelWidth, previewFile, previewLoading, previewMarkdownRendered, filePreview,
       workdirMenuOpen,
+      teamsCollapsed, chatsCollapsed,
       toggleWorkdirMenu() { workdirMenuOpen.value = !workdirMenuOpen.value; },
       workdirMenuBrowse() {
         workdirMenuOpen.value = false;
@@ -843,10 +846,14 @@ const App = {
 
           <!-- Teams section -->
           <div class="sidebar-section sidebar-teams">
-            <div class="sidebar-section-header">
+            <div class="sidebar-section-header" @click="teamsCollapsed = !teamsCollapsed" style="cursor: pointer;">
               <span>Teams History</span>
+              <button class="sidebar-collapse-btn" :title="teamsCollapsed ? 'Expand' : 'Collapse'">
+                <svg :class="{ collapsed: teamsCollapsed }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+              </button>
             </div>
 
+            <div v-show="!teamsCollapsed">
             <button class="new-conversation-btn" @click="newTeam" :disabled="isTeamActive">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               New team
@@ -890,16 +897,23 @@ const App = {
                 </div>
               </div>
             </div>
+            </div>
           </div>
 
           <div class="sidebar-section sidebar-sessions">
-            <div class="sidebar-section-header">
+            <div class="sidebar-section-header" @click="chatsCollapsed = !chatsCollapsed" style="cursor: pointer;">
               <span>Chat History</span>
-              <button class="sidebar-refresh-btn" @click="requestSessionList" title="Refresh" :disabled="loadingSessions">
-                <svg :class="{ spinning: loadingSessions }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-              </button>
+              <span class="sidebar-section-header-actions">
+                <button class="sidebar-refresh-btn" @click.stop="requestSessionList" title="Refresh" :disabled="loadingSessions">
+                  <svg :class="{ spinning: loadingSessions }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </button>
+                <button class="sidebar-collapse-btn" :title="chatsCollapsed ? 'Expand' : 'Collapse'">
+                  <svg :class="{ collapsed: chatsCollapsed }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+                </button>
+              </span>
             </div>
 
+            <div v-show="!chatsCollapsed">
             <button class="new-conversation-btn" @click="newConversation">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
               New conversation
@@ -959,6 +973,7 @@ const App = {
                   </div>
                 </div>
               </div>
+            </div>
             </div>
           </div>
 
