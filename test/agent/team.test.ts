@@ -413,8 +413,8 @@ describe('team.ts state management', () => {
 
     it('returns debug agents for debug template', () => {
       const agents = buildAgentsDef('debug');
-      expect(Object.keys(agents)).toContain('hypothesis-a');
-      expect(Object.keys(agents)).toContain('hypothesis-b');
+      expect(Object.keys(agents)).toContain('investigator-1');
+      expect(Object.keys(agents)).toContain('investigator-2');
     });
 
     it('falls back to custom for unknown template', () => {
@@ -451,7 +451,7 @@ describe('team.ts state management', () => {
     it('uses custom instructions for unknown template', () => {
       const agents = buildAgentsDef('custom');
       const prompt = buildLeadPrompt({ instruction: 'do stuff', template: 'custom' }, agents);
-      expect(prompt).toContain('development task');
+      expect(prompt).toContain('multi-agent task');
     });
   });
 

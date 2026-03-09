@@ -132,17 +132,26 @@ const App = {
       {
         icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>',
         title: 'Full-stack App',
+        template: 'full-stack',
         text: 'Build a single-page calculator app: one agent creates the HTML/CSS UI, one implements the JavaScript logic, and one writes tests.',
       },
       {
+        icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>',
+        title: 'Research',
+        template: 'research',
+        text: 'Research this project\'s architecture: one agent analyzes the backend structure, one maps the frontend components, and one reviews the build and deployment pipeline. Produce a unified architecture report.',
+      },
+      {
         icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
-        title: 'Code Review',
-        text: 'Review this project for code quality, security vulnerabilities, and test coverage. Generate a prioritized report for each area.',
+        title: '代码审查',
+        template: 'code-review',
+        text: '审查当前项目的代码质量、安全漏洞和测试覆盖率，按严重程度生成分级报告，并给出修复建议。',
       },
       {
         icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>',
-        title: 'Doc + Dev + Test',
-        text: '创建一个 Markdown 转 HTML 的在线预览工具：一个 Agent 编写 Design文档（左右分栏，左侧输入 Markdown，右侧实时预览），一个基于设计文档实现核心功能，一个等实现完的设计测试并执行同时给出测试结果。',
+        title: '技术文档',
+        template: 'content',
+        text: '为当前项目编写一份完整的技术文档：先调研项目结构和核心模块，然后撰写包含架构概览、API 参考和使用指南的文档，最后校审确保准确性和可读性。',
       },
     ];
     const kanbanExpanded = ref(false);
@@ -1139,7 +1148,7 @@ const App = {
                         <div class="team-example-title">{{ ex.title }}</div>
                         <div class="team-example-text">{{ ex.text }}</div>
                       </div>
-                      <button class="team-example-try" @click="teamInstruction = ex.text">Try it</button>
+                      <button class="team-example-try" @click="onTemplateChange(ex.template); teamInstruction = ex.text">Try it</button>
                     </div>
                   </div>
                 </div>
