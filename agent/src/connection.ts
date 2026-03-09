@@ -370,20 +370,30 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const m = msg as unknown as { teamId: string; agentId: string };
       const active = getActiveTeam();
       if (active && active.teamId === m.teamId) {
-        const agent = active.agents.get(m.agentId);
-        if (agent) {
-          send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
+        if (m.agentId === 'lead') {
+          send({ type: 'team_agent_history', teamId: m.teamId, agentId: 'lead', messages: active.leadMessages || [] });
         } else {
-          send({ type: 'error', message: `Agent not found: ${m.agentId}` });
+          const agent = active.agents.get(m.agentId);
+          if (agent) {
+            send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
+          } else {
+            send({ type: 'error', message: `Agent not found: ${m.agentId}` });
+          }
         }
       } else {
         // Historical team — load from disk (messages are persisted)
         const team = loadTeam(m.teamId);
-        if (team && team.agents.has(m.agentId)) {
-          const agent = team.agents.get(m.agentId)!;
-          send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
+        if (team) {
+          if (m.agentId === 'lead') {
+            send({ type: 'team_agent_history', teamId: m.teamId, agentId: 'lead', messages: team.leadMessages || [] });
+          } else if (team.agents.has(m.agentId)) {
+            const agent = team.agents.get(m.agentId)!;
+            send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
+          } else {
+            send({ type: 'error', message: `Agent not found: ${m.agentId}` });
+          }
         } else {
-          send({ type: 'error', message: `Agent not found: ${m.agentId}` });
+          send({ type: 'error', message: `Team not found: ${m.teamId}` });
         }
       }
       break;

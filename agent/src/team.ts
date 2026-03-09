@@ -129,6 +129,7 @@ export function createTeamState(config: TeamConfig, conversationId: string, work
     feed: [],
     status: 'planning',
     leadStatus: 'Reading the codebase and crafting a plan...',
+    leadMessages: [],
     summary: null,
     totalCost: 0,
     durationMs: 0,
@@ -266,6 +267,22 @@ export function addAgentMessage(
   };
   agent.messages.push(msg);
   return msg;
+}
+
+/**
+ * Append a message to the lead's message history.
+ */
+function addLeadMessage(
+  team: TeamState,
+  role: 'assistant' | 'tool' | 'user',
+  fields: Partial<Omit<TeamAgentMessage, 'id' | 'role' | 'timestamp'>>,
+): void {
+  team.leadMessages.push({
+    id: ++agentMessageIdCounter,
+    role,
+    ...fields,
+    timestamp: Date.now(),
+  });
 }
 
 /**
@@ -442,6 +459,7 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
             agentRole: 'lead',
             data: { type: 'content_block_delta', delta: leadText },
           });
+          addLeadMessage(team, 'assistant', { content: leadText });
         }
         const toolBlocks = content.filter(b => b.type === 'tool_use');
         if (toolBlocks.length > 0) {
@@ -451,6 +469,13 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
             agentRole: 'lead',
             data: { type: 'tool_use', tools: toolBlocks },
           });
+          for (const block of toolBlocks) {
+            addLeadMessage(team, 'tool', {
+              toolId: block.id as string,
+              toolName: block.name as string,
+              toolInput: typeof block.input === 'string' ? block.input : JSON.stringify(block.input),
+            });
+          }
         }
       }
 
@@ -527,6 +552,31 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
             return true; // suppress from normal forwarding
           }
         }
+      }
+
+      // Lead's own tool results (Read, Grep, etc.) — accumulate for history
+      const leadToolResults = message.content.filter(
+        (b: Record<string, unknown>) => b.type === 'tool_result' && b.tool_use_id && !findAgentByToolUseId(team, b.tool_use_id as string),
+      );
+      if (leadToolResults.length > 0) {
+        for (const block of leadToolResults) {
+          const toolMsg = team.leadMessages.find(
+            m => m.role === 'tool' && m.toolId === block.tool_use_id && !m.hasResult,
+          );
+          if (toolMsg) {
+            toolMsg.toolOutput = typeof block.content === 'string'
+              ? block.content : JSON.stringify(block.content);
+            toolMsg.hasResult = true;
+          }
+        }
+        // Forward with team context for live streaming
+        sendFn({
+          type: 'claude_output',
+          teamId: team.teamId,
+          agentRole: 'lead',
+          data: { type: 'user', tool_use_result: leadToolResults.map(b => ({ tool_use_id: b.tool_use_id, content: b.content })) },
+        });
+        return true; // suppress from normal forwarding — we've forwarded with team context
       }
     }
   }
