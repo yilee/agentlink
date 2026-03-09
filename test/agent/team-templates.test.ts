@@ -22,7 +22,7 @@ describe('team-templates', () => {
 
     it('returns debug agents for debug template', () => {
       const agents = buildAgentsDef('debug');
-      expect(Object.keys(agents)).toEqual(['hypothesis-a', 'hypothesis-b', 'hypothesis-c']);
+      expect(Object.keys(agents)).toEqual(['investigator-1', 'investigator-2', 'investigator-3']);
     });
 
     it('returns custom agents for custom template', () => {
@@ -79,14 +79,14 @@ describe('team-templates', () => {
       const agents = buildAgentsDef('custom');
       const prompt = buildLeadPrompt(config, agents);
       // Should use custom template instructions
-      expect(prompt).toContain('team lead coordinating a development task');
+      expect(prompt).toContain('team lead coordinating a multi-agent task');
     });
 
     it('includes agent descriptions in the listing', () => {
       const config: TeamConfig = { instruction: 'test', template: 'debug' };
       const agents = buildAgentsDef('debug');
       const prompt = buildLeadPrompt(config, agents);
-      expect(prompt).toContain('Debug investigator exploring the first hypothesis');
+      expect(prompt).toContain('Debug investigator for hypothesis 1');
     });
   });
 });

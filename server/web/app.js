@@ -19,6 +19,7 @@ import { createConnection } from './modules/connection.js';
 import { createFileBrowser } from './modules/fileBrowser.js';
 import { createFilePreview } from './modules/filePreview.js';
 import { createTeam } from './modules/team.js';
+import { TEMPLATES, TEMPLATE_KEYS, buildFullLeadPrompt } from './modules/teamTemplates.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 
 // ── App ─────────────────────────────────────────────────────────────────────
@@ -124,21 +125,33 @@ const App = {
 
     // Team creation state
     const teamInstruction = ref('');
+    const selectedTemplate = ref('custom');
+    const editedLeadPrompt = ref(TEMPLATES.custom.leadPrompt);
+    const leadPromptExpanded = ref(false);
     const teamExamples = [
       {
         icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>',
         title: 'Full-stack App',
+        template: 'full-stack',
         text: 'Build a single-page calculator app: one agent creates the HTML/CSS UI, one implements the JavaScript logic, and one writes tests.',
       },
       {
+        icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>',
+        title: 'Research',
+        template: 'research',
+        text: 'Research this project\'s architecture: one agent analyzes the backend structure, one maps the frontend components, and one reviews the build and deployment pipeline. Produce a unified architecture report.',
+      },
+      {
         icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
-        title: 'Code Review',
-        text: 'Review this project for code quality, security vulnerabilities, and test coverage. Generate a prioritized report for each area.',
+        title: '代码审查',
+        template: 'code-review',
+        text: '审查当前项目的代码质量、安全漏洞和测试覆盖率，按严重程度生成分级报告，并给出修复建议。',
       },
       {
         icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>',
-        title: 'Doc + Dev + Test',
-        text: '创建一个 Markdown 转 HTML 的在线预览工具：一个 Agent 编写 Design文档（左右分栏，左侧输入 Markdown，右侧实时预览），一个基于设计文档实现核心功能，一个等实现完的设计测试并执行同时给出测试结果。',
+        title: '技术文档',
+        template: 'content',
+        text: '为当前项目编写一份完整的技术文档：先调研项目结构和核心模块，然后撰写包含架构概览、API 参考和使用指南的文档，最后校审确保准确性和可读性。',
       },
     ];
     const kanbanExpanded = ref(false);
@@ -615,11 +628,35 @@ const App = {
       teamExamples,
       kanbanExpanded,
       instructionExpanded,
+      selectedTemplate,
+      editedLeadPrompt,
+      leadPromptExpanded,
+      TEMPLATES,
+      TEMPLATE_KEYS,
+      onTemplateChange(key) {
+        selectedTemplate.value = key;
+        editedLeadPrompt.value = TEMPLATES[key].leadPrompt;
+      },
+      resetLeadPrompt() {
+        editedLeadPrompt.value = TEMPLATES[selectedTemplate.value].leadPrompt;
+      },
+      leadPromptPreview() {
+        const text = editedLeadPrompt.value || '';
+        return text.length > 80 ? text.slice(0, 80) + '...' : text;
+      },
       launchTeamFromPanel() {
         const inst = teamInstruction.value.trim();
         if (!inst) return;
-        team.launchTeam(inst, 'custom');
+        const tplKey = selectedTemplate.value;
+        const tpl = TEMPLATES[tplKey];
+        const agents = tpl.agents;
+        const leadPrompt = buildFullLeadPrompt(editedLeadPrompt.value, agents, inst);
+        team.launchTeam(inst, leadPrompt, agents);
         teamInstruction.value = '';
+        // Reset template state for next time
+        selectedTemplate.value = 'custom';
+        editedLeadPrompt.value = TEMPLATES.custom.leadPrompt;
+        leadPromptExpanded.value = false;
       },
       formatTeamTime(ts) {
         if (!ts) return '';
@@ -1052,13 +1089,47 @@ const App = {
                   <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" opacity="0.5" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                   <h2>Launch Agent Team</h2>
                 </div>
-                <p class="team-create-desc">Describe your task and a lead agent will plan and delegate work across multiple parallel agents.</p>
-                <textarea
-                  v-model="teamInstruction"
-                  class="team-create-textarea"
-                  placeholder="Describe the task for the team... e.g. 'Review the authentication module for security issues and fix any vulnerabilities found.'"
-                  rows="4"
-                ></textarea>
+                <p class="team-create-desc">Select a template, review the lead prompt, and describe your task.</p>
+
+                <!-- Template selector -->
+                <div class="team-tpl-section">
+                  <label class="team-tpl-label">Template</label>
+                  <select class="team-tpl-select" :value="selectedTemplate" @change="onTemplateChange($event.target.value)">
+                    <option v-for="key in TEMPLATE_KEYS" :key="key" :value="key">{{ TEMPLATES[key].label }}</option>
+                  </select>
+                  <span class="team-tpl-desc">{{ TEMPLATES[selectedTemplate].description }}</span>
+                </div>
+
+                <!-- Collapsible lead prompt -->
+                <div class="team-lead-prompt-section">
+                  <div class="team-lead-prompt-header" @click="leadPromptExpanded = !leadPromptExpanded">
+                    <svg class="team-lead-prompt-arrow" :class="{ expanded: leadPromptExpanded }" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+                    <span class="team-lead-prompt-title">Lead Prompt</span>
+                    <span v-if="!leadPromptExpanded" class="team-lead-prompt-preview">{{ leadPromptPreview() }}</span>
+                  </div>
+                  <div v-if="leadPromptExpanded" class="team-lead-prompt-body">
+                    <textarea
+                      v-model="editedLeadPrompt"
+                      class="team-lead-prompt-textarea"
+                      rows="10"
+                    ></textarea>
+                    <div class="team-lead-prompt-actions">
+                      <button class="team-lead-prompt-reset" @click="resetLeadPrompt()" title="Reset to template default">Reset</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Task description -->
+                <div class="team-tpl-section">
+                  <label class="team-tpl-label">Task Description</label>
+                  <textarea
+                    v-model="teamInstruction"
+                    class="team-create-textarea"
+                    placeholder="Describe the task for the team... e.g. 'Review the authentication module for security issues and fix any vulnerabilities found.'"
+                    rows="4"
+                  ></textarea>
+                </div>
+
                 <div class="team-create-actions">
                   <button class="team-create-launch" :disabled="!teamInstruction.trim()" @click="launchTeamFromPanel()">
                     <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -1077,7 +1148,7 @@ const App = {
                         <div class="team-example-title">{{ ex.title }}</div>
                         <div class="team-example-text">{{ ex.text }}</div>
                       </div>
-                      <button class="team-example-try" @click="teamInstruction = ex.text">Try it</button>
+                      <button class="team-example-try" @click="onTemplateChange(ex.template); teamInstruction = ex.text">Try it</button>
                     </div>
                   </div>
                 </div>

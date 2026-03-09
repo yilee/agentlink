@@ -2,7 +2,9 @@
 
 export interface TeamConfig {
   instruction: string;           // high-level task description from user
-  template?: string;             // 'code-review' | 'full-stack' | 'debug' | 'custom'
+  template?: string;             // 'code-review' | 'full-stack' | 'debug' | 'custom' (kept for backward compat in persisted data)
+  leadPrompt?: string;           // full lead prompt (sent from web UI)
+  agents?: AgentsDefMap;         // agent definitions (sent from web UI)
 }
 
 export interface AgentRole {
