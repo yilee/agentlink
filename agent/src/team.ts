@@ -8,137 +8,59 @@
  */
 
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, renameSync, unlinkSync } from 'fs';
-import { join } from 'path';
-import { CONFIG_DIR } from './config.js';
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// Re-export types from sub-modules so existing imports continue to work
+export type {
+  TeamConfig,
+  AgentRole,
+  TaskItem,
+  TeamState,
+  AgentTeammate,
+  TeamAgentMessage,
+  TeamFeedEntry,
+  TeamStateSerialized,
+  TeamSummaryInfo,
+  AgentDef,
+  AgentsDefMap,
+} from './team-types.js';
 
-export interface TeamConfig {
-  instruction: string;           // high-level task description from user
-  template?: string;             // 'code-review' | 'full-stack' | 'debug' | 'custom'
-}
+export { buildAgentsDef, buildLeadPrompt } from './team-templates.js';
+export { getNextAgentColor, classifyRole, pickCharacter, deriveAgentDisplayName, deriveTaskTitle } from './team-naming.js';
+export {
+  serializeTeam,
+  deserializeTeam,
+  persistTeam,
+  persistTeamDebounced,
+  loadTeam,
+  listTeams,
+  deleteTeam,
+  renameTeam,
+} from './team-persistence.js';
 
-export interface AgentRole {
-  id: string;                    // e.g., "security", "quality", "tester"
-  name: string;                  // display name
-  color: string;                 // hex color for UI identification
-}
+import type {
+  TeamConfig,
+  TeamState,
+  AgentTeammate,
+  TeamAgentMessage,
+  TeamFeedEntry,
+  SendFn,
+  HandleChatFn,
+  CancelExecutionFn,
+  SetOutputObserverFn,
+  ClearOutputObserverFn,
+  SetCloseObserverFn,
+  ClearCloseObserverFn,
+} from './team-types.js';
 
-export interface TaskItem {
-  id: string;
-  title: string;
-  description: string;
-  status: 'pending' | 'active' | 'done' | 'failed';
-  assignee: string | null;       // agentRole.id
-  toolUseId: string | null;      // parent_tool_use_id linking to Agent tool call
-  agentTaskId: string | null;    // task_id from system.task_started
-  dependencies: string[];        // task IDs that must complete first
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface TeamState {
-  teamId: string;
-  title: string;                 // derived from instruction
-  config: TeamConfig;
-  conversationId: string;        // single conversation in claude.ts (Lead process)
-  claudeSessionId: string | null;// Lead's session ID (for history + subagent JSONL)
-  agents: Map<string, AgentTeammate>;
-  tasks: TaskItem[];
-  feed: TeamFeedEntry[];
-  status: 'planning' | 'running' | 'summarizing' | 'completed' | 'failed';
-  leadStatus: string;            // human-readable lead activity description
-  summary: string | null;        // Lead's final summary
-  totalCost: number;
-  durationMs: number;
-  createdAt: number;
-}
-
-export interface AgentTeammate {
-  role: AgentRole;
-  toolUseId: string | null;      // the Agent tool_use_id that spawned this subagent
-  agentTaskId: string | null;    // task_id from system.task_started
-  status: 'starting' | 'working' | 'done' | 'error';
-  currentTaskId: string | null;  // which TaskItem this agent is working on
-  messages: TeamAgentMessage[];  // accumulated messages for agent detail view
-}
-
-export interface TeamAgentMessage {
-  id: number;
-  role: 'assistant' | 'tool' | 'user';
-  content?: string;
-  toolName?: string;
-  toolInput?: string;
-  toolOutput?: string;
-  hasResult?: boolean;
-  timestamp: number;
-}
-
-export interface TeamFeedEntry {
-  timestamp: number;
-  agentId: string;
-  type: 'task_started' | 'task_completed' | 'task_failed' | 'tool_call' | 'status_change' | 'lead_activity';
-  content: string;               // human-readable summary
-}
-
-// ── Serialization types (for persistence — Map → array) ────────────────
-
-export interface TeamStateSerialized {
-  teamId: string;
-  title: string;
-  config: TeamConfig;
-  conversationId: string;
-  claudeSessionId: string | null;
-  agents: Array<{
-    id: string;
-    name: string;
-    color: string;
-    toolUseId: string | null;
-    agentTaskId: string | null;
-    status: string;
-    currentTaskId: string | null;
-    messages?: TeamAgentMessage[];
-  }>;
-  tasks: TaskItem[];
-  feed: TeamFeedEntry[];
-  status: string;
-  leadStatus: string;
-  summary: string | null;
-  totalCost: number;
-  durationMs: number;
-  createdAt: number;
-}
-
-// ── Color palette for auto-assigning agent colors ──────────────────────
-
-const AGENT_COLORS = [
-  '#EF4444', // red (Lead)
-  '#EAB308', // yellow
-  '#3B82F6', // blue
-  '#10B981', // emerald
-  '#8B5CF6', // violet
-  '#F97316', // orange
-  '#EC4899', // pink
-  '#06B6D4', // cyan
-  '#84CC16', // lime
-  '#6366F1', // indigo
-];
+import { getNextAgentColor, deriveAgentDisplayName, deriveTaskTitle } from './team-naming.js';
+import { buildAgentsDef, buildLeadPrompt } from './team-templates.js';
+import {
+  serializeTeam,
+  persistTeam,
+  flushPendingPersists as _flushPendingPersists,
+} from './team-persistence.js';
 
 // ── Module state ───────────────────────────────────────────────────────
-
-type SendFn = (msg: Record<string, unknown>) => void;
-type HandleChatFn = (
-  conversationId: string | undefined,
-  prompt: string,
-  workDir: string,
-  options?: { resumeSessionId?: string; extraArgs?: string[] },
-) => void;
-type CancelExecutionFn = (conversationId?: string) => void;
-type SetOutputObserverFn = (fn: (conversationId: string, msg: Record<string, unknown>) => boolean | void) => void;
-type ClearOutputObserverFn = () => void;
-type SetCloseObserverFn = (fn: (conversationId: string, exitCode: number | null, resultReceived: boolean) => void) => void;
-type ClearCloseObserverFn = () => void;
 
 let activeTeam: TeamState | null = null;
 let sendFn: SendFn = () => {};
@@ -149,8 +71,6 @@ let clearOutputObserverFn: ClearOutputObserverFn | null = null;
 let setCloseObserverFn: SetCloseObserverFn | null = null;
 let clearCloseObserverFn: ClearCloseObserverFn | null = null;
 let agentMessageIdCounter = 0;
-
-const TEAMS_DIR = join(CONFIG_DIR, 'teams');
 
 // ── Public API ─────────────────────────────────────────────────────────
 
@@ -215,7 +135,7 @@ export function createTeamState(config: TeamConfig, conversationId: string): Tea
 
   // Register Lead as the first agent
   team.agents.set('lead', {
-    role: { id: 'lead', name: 'Lead', color: AGENT_COLORS[0] },
+    role: { id: 'lead', name: 'Lead', color: getNextAgentColor(team) },
     toolUseId: null,
     agentTaskId: null,
     status: 'working',
@@ -236,110 +156,6 @@ export function createTeamState(config: TeamConfig, conversationId: string): Tea
  */
 export function clearActiveTeam(): void {
   activeTeam = null;
-}
-
-/**
- * Get the next color for an agent (based on current count).
- */
-export function getNextAgentColor(team: TeamState): string {
-  const idx = team.agents.size % AGENT_COLORS.length;
-  return AGENT_COLORS[idx];
-}
-
-/**
- * Fictional character pools grouped by role archetype.
- * Each subagent gets a character name that fits its role.
- */
-const CHARACTER_POOLS: Record<string, string[]> = {
-  builder:   ['Tony Stark', 'Neo', 'Hiro Hamada', 'Rocket', 'Q'],
-  designer:  ['Elsa', 'Remy', 'Edna Mode', 'Violet', 'WALL-E'],
-  tester:    ['Sherlock', 'L', 'Conan', 'Poirot', 'Columbo'],
-  writer:    ['Hermione', 'Gandalf', 'Dumbledore', 'Yoda', 'Jarvis'],
-  reviewer:  ['Spock', 'Baymax', 'Alfred', 'Morpheus', 'Obi-Wan'],
-  debugger:  ['MacGyver', 'Strange', 'Lelouch', 'House', 'Lupin'],
-  analyst:   ['Data', 'Cortana', 'Oracle', 'Vision', 'Friday'],
-  ops:       ['Scotty', 'R2-D2', 'BB-8', 'C-3PO', 'HAL'],
-  general:   ['Aragorn', 'Leia', 'Zoro', 'Totoro', 'Pikachu'],
-};
-
-/** Track which characters have been used in this team to avoid duplicates. */
-function pickCharacter(team: TeamState, category: string): string {
-  const pool = CHARACTER_POOLS[category] || CHARACTER_POOLS.general;
-  const usedNames = new Set([...team.agents.values()].map(a => a.role.name));
-  // Find an unused character from the pool
-  for (const name of pool) {
-    if (!usedNames.has(name)) return name;
-  }
-  // Fallback: try other pools
-  for (const names of Object.values(CHARACTER_POOLS)) {
-    for (const name of names) {
-      if (!usedNames.has(name)) return name;
-    }
-  }
-  return `Agent ${team.agents.size}`;
-}
-
-/**
- * Classify a subagent's role from its tool input into a character category.
- */
-function classifyRole(input: { name?: string; description?: string; prompt?: string }): string {
-  const text = [input.name, input.description, input.prompt].filter(Boolean).join(' ').toLowerCase();
-
-  if (/\b(test|testing|qa|verify|validation|spec)\b/.test(text)) return 'tester';
-  if (/\b(review|audit|check|inspect|security|lint)\b/.test(text)) return 'reviewer';
-  if (/\b(debug|fix|bug|patch|troubleshoot|diagnose)\b/.test(text)) return 'debugger';
-  if (/\b(design|ui|ux|layout|style|css|visual|mockup)\b/.test(text)) return 'designer';
-  if (/\b(writ|doc|readme|comment|markdown|copy)\b/.test(text)) return 'writer';
-  if (/\b(analy|research|investigat|explor|study|benchmark)\b/.test(text)) return 'analyst';
-  if (/\b(deploy|ci|cd|devops|infra|docker|k8s|config|setup|install|pipeline)\b/.test(text)) return 'ops';
-  if (/\b(build|implement|creat|develop|code|program|engineer|construct|make|add)\b/.test(text)) return 'builder';
-  return 'general';
-}
-
-/**
- * Derive a fictional character name for a subagent based on its role.
- */
-function deriveAgentDisplayName(
-  team: TeamState,
-  input: { name?: string; description?: string; prompt?: string },
-): string {
-  const category = classifyRole(input);
-  return pickCharacter(team, category);
-}
-
-/**
- * Derive a human-readable task title from the Agent tool input.
- * Used on the Kanban board to describe what the agent is working on.
- */
-function deriveTaskTitle(input: { name?: string; description?: string; prompt?: string }): string {
-  // Short description → use directly
-  if (input.description && input.description.length <= 80) {
-    return input.description;
-  }
-
-  // Colon-prefixed description → use the full thing if ≤ 80, otherwise prefix
-  if (input.description) {
-    if (input.description.length <= 80) return input.description;
-    const colonIdx = input.description.indexOf(':');
-    if (colonIdx > 0 && colonIdx <= 40) {
-      return input.description.slice(0, colonIdx).trim();
-    }
-    return input.description.slice(0, 77) + '...';
-  }
-
-  // Descriptive input.name (not a generic ID)
-  if (input.name && !/^(worker|agent|hypothesis)-\d+$/i.test(input.name)) {
-    return input.name;
-  }
-
-  // Extract from prompt
-  if (input.prompt) {
-    const first = input.prompt.split('\n')[0].trim();
-    if (first.length <= 80) return first;
-    return first.slice(0, 77) + '...';
-  }
-
-  return input.name || 'Task';
 }
 
 /**
@@ -367,11 +183,11 @@ export function registerSubagent(
   team.agents.set(agentId, teammate);
 
   // Auto-create a task for this agent
-  const task: TaskItem = {
+  const task = {
     id: `task-${randomUUID().slice(0, 8)}`,
     title: taskTitle,
     description: input.prompt || input.description || '',
-    status: 'pending',
+    status: 'pending' as const,
     assignee: agentId,
     toolUseId,
     agentTaskId: null,
@@ -475,7 +291,7 @@ export function addFeedEntry(
 /**
  * Mark a task as done/failed.
  */
-export function updateTaskStatus(team: TeamState, taskId: string, status: 'done' | 'failed'): TaskItem | null {
+export function updateTaskStatus(team: TeamState, taskId: string, status: 'done' | 'failed'): import('./team-types.js').TaskItem | null {
   const task = team.tasks.find(t => t.id === taskId);
   if (task) {
     task.status = status;
@@ -494,370 +310,84 @@ export function allSubagentsDone(team: TeamState): boolean {
 }
 
 /**
- * Serialize TeamState for persistence/transmission (Map → array).
+ * Wrapper for flushPendingPersists that passes activeTeam.
  */
-export function serializeTeam(team: TeamState, includeMessages = false): TeamStateSerialized {
-  return {
+export function flushPendingPersists(): void {
+  _flushPendingPersists(activeTeam);
+}
+
+// ── Shared helpers (deduplicated) ────────────────────────────────────────
+
+/**
+ * Emit agent status + task update + feed entry to web client.
+ * Consolidates the 3-message broadcast pattern used in multiple places.
+ */
+function emitAgentUpdate(
+  team: TeamState,
+  agent: AgentTeammate,
+  feedType: TeamFeedEntry['type'],
+  feedMessage: string,
+): void {
+  sendFn({
+    type: 'team_agent_status',
     teamId: team.teamId,
-    title: team.title,
-    config: team.config,
-    conversationId: team.conversationId,
-    claudeSessionId: team.claudeSessionId,
-    agents: [...team.agents.entries()].map(([, agent]) => ({
+    agent: {
       id: agent.role.id,
       name: agent.role.name,
       color: agent.role.color,
-      toolUseId: agent.toolUseId,
-      agentTaskId: agent.agentTaskId,
       status: agent.status,
-      currentTaskId: agent.currentTaskId,
-      ...(includeMessages ? { messages: agent.messages } : {}),
-    })),
-    tasks: team.tasks,
-    feed: team.feed,
-    status: team.status,
-    leadStatus: team.leadStatus,
-    summary: team.summary,
-    totalCost: team.totalCost,
-    durationMs: team.durationMs,
-    createdAt: team.createdAt,
-  };
-}
+      taskId: agent.currentTaskId,
+    },
+  });
 
-// ── Persistence ──────────────────────────────────────────────────────────
-
-function ensureTeamsDir(): void {
-  if (!existsSync(TEAMS_DIR)) {
-    mkdirSync(TEAMS_DIR, { recursive: true });
-  }
-}
-
-/**
- * Deserialize a TeamStateSerialized back into a live TeamState.
- */
-function deserializeTeam(data: TeamStateSerialized): TeamState {
-  const agents = new Map<string, AgentTeammate>();
-  for (const a of data.agents) {
-    agents.set(a.id, {
-      role: { id: a.id, name: a.name, color: a.color },
-      toolUseId: a.toolUseId,
-      agentTaskId: a.agentTaskId,
-      status: a.status as AgentTeammate['status'],
-      currentTaskId: a.currentTaskId,
-      messages: a.messages || [],
+  const task = team.tasks.find(t => t.assignee === agent.role.id);
+  if (task) {
+    sendFn({
+      type: 'team_task_update',
+      teamId: team.teamId,
+      task,
     });
   }
 
-  return {
-    teamId: data.teamId,
-    title: data.title,
-    config: data.config,
-    conversationId: data.conversationId,
-    claudeSessionId: data.claudeSessionId,
-    agents,
-    tasks: data.tasks,
-    feed: data.feed,
-    status: data.status as TeamState['status'],
-    leadStatus: data.leadStatus || '',
-    summary: data.summary,
-    totalCost: data.totalCost,
-    durationMs: data.durationMs,
-    createdAt: data.createdAt,
-  };
+  addFeedEntry(team, agent.role.id, feedType, feedMessage);
+  sendFn({
+    type: 'team_feed',
+    teamId: team.teamId,
+    entry: team.feed[team.feed.length - 1],
+  });
 }
 
 /**
- * Persist team state to disk (atomic write: tmp → rename).
+ * Mark all active agents and tasks to a final status.
+ * Used by both dissolveTeam and completeTeam.
  */
-export function persistTeam(team: TeamState): void {
-  ensureTeamsDir();
-  const serialized = serializeTeam(team, true);
-  const filePath = join(TEAMS_DIR, `${team.teamId}.json`);
-  const tmpPath = filePath + '.tmp';
+function finalizeAgentsAndTasks(
+  team: TeamState,
+  agentStatus: 'done' | 'error',
+  taskStatus: 'done' | 'failed',
+): void {
+  for (const agent of team.agents.values()) {
+    if (agentStatus === 'done') {
+      if (agent.status !== 'error') agent.status = 'done';
+    } else {
+      if (agent.status === 'starting' || agent.status === 'working') agent.status = 'error';
+    }
+  }
 
-  writeFileSync(tmpPath, JSON.stringify(serialized, null, 2), 'utf-8');
-  renameSync(tmpPath, filePath);
-}
-
-// Debounce timers for persist calls per team
-const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-/**
- * Debounced persist — coalesces rapid state changes into a single write.
- * Flushes after 500ms of quiet.
- */
-export function persistTeamDebounced(team: TeamState): void {
-  const existing = persistTimers.get(team.teamId);
-  if (existing) clearTimeout(existing);
-
-  persistTimers.set(team.teamId, setTimeout(() => {
-    persistTimers.delete(team.teamId);
-    persistTeam(team);
-  }, 500));
-}
-
-/**
- * Flush all pending debounced persists immediately.
- */
-export function flushPendingPersists(): void {
-  for (const [teamId, timer] of persistTimers.entries()) {
-    clearTimeout(timer);
-    persistTimers.delete(teamId);
-    if (activeTeam?.teamId === teamId) {
-      persistTeam(activeTeam);
+  for (const task of team.tasks) {
+    if (task.status === 'pending' || task.status === 'active') {
+      task.status = taskStatus;
+      task.updatedAt = Date.now();
     }
   }
 }
 
 /**
- * Load a team from disk by teamId.
+ * Remove output and close observers.
  */
-export function loadTeam(teamId: string): TeamState | null {
-  const filePath = join(TEAMS_DIR, `${teamId}.json`);
-  try {
-    const raw = readFileSync(filePath, 'utf-8');
-    const data = JSON.parse(raw) as TeamStateSerialized;
-    return deserializeTeam(data);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Summary info for listing teams.
- */
-export interface TeamSummaryInfo {
-  teamId: string;
-  title: string;
-  status: string;
-  template: string | undefined;
-  agentCount: number;
-  taskCount: number;
-  totalCost: number;
-  createdAt: number;
-}
-
-/**
- * List all persisted teams, sorted by createdAt descending (newest first).
- */
-export function listTeams(): TeamSummaryInfo[] {
-  ensureTeamsDir();
-
-  const files = readdirSync(TEAMS_DIR).filter(f => f.endsWith('.json'));
-  const teams: TeamSummaryInfo[] = [];
-
-  for (const file of files) {
-    try {
-      const raw = readFileSync(join(TEAMS_DIR, file), 'utf-8');
-      const data = JSON.parse(raw) as TeamStateSerialized;
-      teams.push({
-        teamId: data.teamId,
-        title: data.title,
-        status: data.status,
-        template: data.config.template,
-        agentCount: data.agents.length,
-        taskCount: data.tasks.length,
-        totalCost: data.totalCost,
-        createdAt: data.createdAt,
-      });
-    } catch {
-      // Skip corrupted files
-    }
-  }
-
-  teams.sort((a, b) => b.createdAt - a.createdAt);
-  return teams;
-}
-
-/**
- * Delete a persisted team file.
- */
-export function deleteTeam(teamId: string): boolean {
-  const filePath = join(TEAMS_DIR, `${teamId}.json`);
-  try {
-    unlinkSync(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function renameTeam(teamId: string, newTitle: string): boolean {
-  const filePath = join(TEAMS_DIR, `${teamId}.json`);
-  try {
-    const raw = readFileSync(filePath, 'utf-8');
-    const data = JSON.parse(raw) as TeamStateSerialized;
-    data.title = newTitle;
-    const tmpPath = filePath + '.tmp';
-    writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
-    renameSync(tmpPath, filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// ── Template definitions ────────────────────────────────────────────────
-
-interface AgentDef {
-  description: string;
-  prompt: string;
-  tools: string[];
-}
-
-type AgentsDefMap = Record<string, AgentDef>;
-
-const TEMPLATE_AGENTS: Record<string, AgentsDefMap> = {
-  'code-review': {
-    'security-reviewer': {
-      description: 'Security expert focused on cryptographic, auth, and injection vulnerabilities',
-      prompt: 'You are a security reviewer. Analyze code for vulnerabilities including injection attacks, authentication/authorization flaws, cryptographic issues, and data exposure risks. Provide specific file/line references and severity ratings.',
-      tools: ['Read', 'Grep', 'Glob'],
-    },
-    'quality-reviewer': {
-      description: 'Code quality expert focused on maintainability, patterns, and best practices',
-      prompt: 'You are a code quality reviewer. Analyze code structure, naming conventions, error handling, test coverage, and adherence to best practices. Identify code smells, unnecessary complexity, and improvement opportunities.',
-      tools: ['Read', 'Grep', 'Glob'],
-    },
-    'performance-reviewer': {
-      description: 'Performance expert focused on efficiency, resource usage, and scalability',
-      prompt: 'You are a performance reviewer. Identify performance bottlenecks, memory leaks, inefficient algorithms, unnecessary allocations, and scalability concerns. Suggest concrete optimizations with benchmarks where possible.',
-      tools: ['Read', 'Grep', 'Glob'],
-    },
-  },
-  'full-stack': {
-    'backend-dev': {
-      description: 'Backend developer for API endpoints, database, and server-side logic',
-      prompt: 'You are a backend developer. Implement server-side features including API endpoints, data models, business logic, and integrations. Write clean, tested, production-ready code.',
-      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
-    },
-    'frontend-dev': {
-      description: 'Frontend developer for UI components, styling, and client-side logic',
-      prompt: 'You are a frontend developer. Build user interface components, handle state management, implement responsive layouts, and ensure good UX. Follow the project\'s existing patterns and framework conventions.',
-      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
-    },
-    'test-engineer': {
-      description: 'Test engineer for unit tests, integration tests, and quality assurance',
-      prompt: 'You are a test engineer. Write comprehensive tests (unit, integration, E2E) for new and existing code. Ensure edge cases are covered, mocks are appropriate, and tests are maintainable.',
-      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
-    },
-  },
-  'debug': {
-    'hypothesis-a': {
-      description: 'Debug investigator exploring the first hypothesis',
-      prompt: 'You are a debugging specialist. Investigate the bug by exploring one specific hypothesis. Read relevant code, trace execution paths, check logs, and report your findings with evidence.',
-      tools: ['Read', 'Grep', 'Glob', 'Bash'],
-    },
-    'hypothesis-b': {
-      description: 'Debug investigator exploring an alternative hypothesis',
-      prompt: 'You are a debugging specialist. Investigate the bug by exploring an alternative hypothesis different from other investigators. Read relevant code, trace execution paths, check logs, and report your findings with evidence.',
-      tools: ['Read', 'Grep', 'Glob', 'Bash'],
-    },
-    'hypothesis-c': {
-      description: 'Debug investigator exploring a third hypothesis',
-      prompt: 'You are a debugging specialist. Investigate the bug by exploring yet another hypothesis different from the other investigators. Think creatively about less obvious causes. Report findings with evidence.',
-      tools: ['Read', 'Grep', 'Glob', 'Bash'],
-    },
-  },
-  'custom': {
-    'worker-1': {
-      description: 'General-purpose development agent',
-      prompt: 'You are a skilled software engineer. Complete the assigned task thoroughly and report your results.',
-      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
-    },
-    'worker-2': {
-      description: 'General-purpose development agent',
-      prompt: 'You are a skilled software engineer. Complete the assigned task thoroughly and report your results.',
-      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
-    },
-    'worker-3': {
-      description: 'General-purpose development agent',
-      prompt: 'You are a skilled software engineer. Complete the assigned task thoroughly and report your results.',
-      tools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash'],
-    },
-  },
-};
-
-const TEMPLATE_LEAD_INSTRUCTIONS: Record<string, string> = {
-  'code-review': `You are a team lead coordinating a code review.
-
-Instructions:
-1. First, analyze the codebase to understand its structure and what needs reviewing
-2. Use the Agent tool to spawn each reviewer IN PARALLEL (multiple Agent calls simultaneously)
-3. Give each reviewer specific, detailed instructions referencing exact files and directories to review
-4. After all reviewers complete, synthesize their findings into a unified summary with prioritized action items
-
-Important:
-- When calling the Agent tool, use a descriptive role-based name (e.g., "Security Reviewer", "Quality Analyst", "Performance Auditor") instead of generic names. The name should reflect the agent's specialty.
-- Spawn agents in parallel for efficiency. Each agent should focus on their specialty area.`,
-
-  'full-stack': `You are a team lead coordinating full-stack development.
-
-Instructions:
-1. First, analyze the codebase to understand the architecture, existing patterns, and what needs building
-2. Break the task into backend, frontend, and test subtasks, and analyze dependencies between them
-3. Define clear interfaces, API contracts, and data schemas before spawning any agents
-4. Spawn independent subtasks IN PARALLEL using the Agent tool. If a subtask depends on another's output (e.g., frontend needs the API built first, tests need the implementation), wait for the dependency to complete, then spawn the dependent agent with the prior result as context
-5. Provide each agent with specific, detailed instructions including file paths and shared contracts
-6. After all agents complete, review their work and provide a summary of what was built
-
-Important:
-- When calling the Agent tool, use a descriptive role-based name (e.g., "Backend Engineer", "Frontend Engineer", "Test Engineer") instead of generic names. The name should reflect the agent's responsibility.
-- Maximize parallelism for truly independent tasks, but respect dependencies. Do not spawn all agents simultaneously if some need others' output first.`,
-
-  'debug': `You are a team lead coordinating a debugging investigation.
-
-Instructions:
-1. First, analyze the bug report and relevant code to understand the problem space
-2. Formulate 3 distinct hypotheses about the root cause
-3. Use the Agent tool to assign each hypothesis to a different investigator IN PARALLEL
-4. Give each investigator specific areas of code to examine and tests to run
-5. After all investigators complete, compare their findings and synthesize a diagnosis with a recommended fix
-
-Important:
-- When calling the Agent tool, use a descriptive name that reflects the hypothesis being investigated (e.g., "Race Condition Investigator", "Memory Leak Analyst", "Config Error Detective") instead of generic names.
-- Each investigator should explore a DIFFERENT hypothesis. Avoid overlap.`,
-
-  'custom': `You are a team lead coordinating a development task.
-
-Instructions:
-1. First, analyze the codebase and the user's request to understand what needs to be done
-2. Break the task into subtasks and analyze dependencies between them
-3. Spawn independent tasks IN PARALLEL using the Agent tool for efficiency
-4. If a task depends on another's output (e.g., implementation needs a design doc, tests need the implementation), wait for the dependency to complete first, then spawn the dependent task with the prior result as context
-5. Give each worker specific, detailed instructions
-6. After all workers complete, review their work and provide a summary
-
-Important:
-- When calling the Agent tool, use a descriptive role-based name (e.g., "Designer", "Developer", "Tester", "Architect") instead of generic names like "Agent 1". The name should reflect what the agent does.
-- Maximize parallelism for truly independent tasks, but respect dependencies. For example, if one agent writes a design doc and another implements it, spawn the doc agent first, wait for its result, then spawn the implementation agent with the doc content.`,
-};
-
-/**
- * Build the agents definition JSON for the --agents CLI flag.
- */
-export function buildAgentsDef(template?: string): AgentsDefMap {
-  const key = template && TEMPLATE_AGENTS[template] ? template : 'custom';
-  return { ...TEMPLATE_AGENTS[key] };
-}
-
-/**
- * Build the lead prompt that instructs the Lead to use Agent tool.
- */
-export function buildLeadPrompt(config: TeamConfig, agentsDef: AgentsDefMap): string {
-  const template = config.template || 'custom';
-  const instructions = TEMPLATE_LEAD_INSTRUCTIONS[template] || TEMPLATE_LEAD_INSTRUCTIONS['custom'];
-
-  const agentList = Object.entries(agentsDef)
-    .map(([id, def]) => `- ${id}: ${def.description}`)
-    .join('\n');
-
-  return `${instructions}
-
-Available agents (use the Agent tool to delegate to them):
-${agentList}
-
-User's request: "${config.instruction}"`;
+function cleanupObservers(): void {
+  if (clearOutputObserverFn) clearOutputObserverFn();
+  if (clearCloseObserverFn) clearCloseObserverFn();
 }
 
 // ── Output stream parser (observer callback) ────────────────────────────
@@ -927,34 +457,7 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
           const toolUseId = block.id as string;
           const agent = registerSubagent(team, toolUseId, input);
 
-          // Emit agent status + task update to web
-          sendFn({
-            type: 'team_agent_status',
-            teamId: team.teamId,
-            agent: {
-              id: agent.role.id,
-              name: agent.role.name,
-              color: agent.role.color,
-              status: agent.status,
-              taskId: agent.currentTaskId,
-            },
-          });
-
-          const task = team.tasks.find(t => t.assignee === agent.role.id);
-          if (task) {
-            sendFn({
-              type: 'team_task_update',
-              teamId: team.teamId,
-              task,
-            });
-          }
-
-          addFeedEntry(team, agent.role.id, 'status_change', `${agent.role.name} has joined and is getting ready`);
-          sendFn({
-            type: 'team_feed',
-            teamId: team.teamId,
-            entry: team.feed[team.feed.length - 1],
-          });
+          emitAgentUpdate(team, agent, 'status_change', `${agent.role.name} has joined and is getting ready`);
         }
       }
     }
@@ -972,32 +475,7 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
     const agent = linkSubagentTaskId(team, toolUseId, taskId);
 
     if (agent) {
-      addFeedEntry(team, agent.role.id, 'task_started', `${agent.role.name} started working on the task`);
-      sendFn({
-        type: 'team_agent_status',
-        teamId: team.teamId,
-        agent: {
-          id: agent.role.id,
-          name: agent.role.name,
-          color: agent.role.color,
-          status: agent.status,
-          taskId: agent.currentTaskId,
-        },
-      });
-      sendFn({
-        type: 'team_feed',
-        teamId: team.teamId,
-        entry: team.feed[team.feed.length - 1],
-      });
-
-      const task = team.tasks.find(t => t.assignee === agent.role.id);
-      if (task) {
-        sendFn({
-          type: 'team_task_update',
-          teamId: team.teamId,
-          task,
-        });
-      }
+      emitAgentUpdate(team, agent, 'task_started', `${agent.role.name} started working on the task`);
     }
     return true; // suppress system.task_started from normal forwarding
   }
@@ -1025,35 +503,13 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
             if (agent.currentTaskId) {
               updateTaskStatus(team, agent.currentTaskId, isError ? 'failed' : 'done');
             }
-            addFeedEntry(team, agent.role.id, isError ? 'task_failed' : 'task_completed',
-              isError ? `${agent.role.name} ran into an issue and stopped` : `${agent.role.name} finished the task successfully`);
 
-            sendFn({
-              type: 'team_agent_status',
-              teamId: team.teamId,
-              agent: {
-                id: agent.role.id,
-                name: agent.role.name,
-                color: agent.role.color,
-                status: agent.status,
-                taskId: agent.currentTaskId,
-              },
-            });
-
-            const task = team.tasks.find(t => t.assignee === agent.role.id);
-            if (task) {
-              sendFn({
-                type: 'team_task_update',
-                teamId: team.teamId,
-                task,
-              });
-            }
-
-            sendFn({
-              type: 'team_feed',
-              teamId: team.teamId,
-              entry: team.feed[team.feed.length - 1],
-            });
+            emitAgentUpdate(
+              team,
+              agent,
+              isError ? 'task_failed' : 'task_completed',
+              isError ? `${agent.role.name} ran into an issue and stopped` : `${agent.role.name} finished the task successfully`,
+            );
 
             // Check if all subagents are done → transition to summarizing
             if (allSubagentsDone(team) && team.status === 'running') {
@@ -1101,28 +557,13 @@ export function onLeadClose(conversationId: string, _exitCode: number | null, re
   console.log(`[Team] Lead process exited without result — marking team as failed`);
   const team = activeTeam;
 
-  // Mark remaining agents as error
-  for (const agent of team.agents.values()) {
-    if (agent.status === 'starting' || agent.status === 'working') {
-      agent.status = 'error';
-    }
-  }
-
-  // Mark remaining tasks as failed
-  for (const task of team.tasks) {
-    if (task.status === 'pending' || task.status === 'active') {
-      task.status = 'failed';
-      task.updatedAt = Date.now();
-    }
-  }
+  finalizeAgentsAndTasks(team, 'error', 'failed');
 
   team.status = 'failed';
   team.durationMs = Date.now() - team.createdAt;
   persistTeam(team);
 
-  // Remove observers
-  if (clearOutputObserverFn) clearOutputObserverFn();
-  if (clearCloseObserverFn) clearCloseObserverFn();
+  cleanupObservers();
 
   // Notify clients
   sendFn({
@@ -1327,33 +768,12 @@ export function dissolveTeam(): void {
     cancelExecutionFn(team.conversationId);
   }
 
-  // Mark remaining agents as error
-  for (const agent of team.agents.values()) {
-    if (agent.status === 'starting' || agent.status === 'working') {
-      agent.status = 'error';
-    }
-  }
-
-  // Mark remaining tasks as failed
-  for (const task of team.tasks) {
-    if (task.status === 'pending' || task.status === 'active') {
-      task.status = 'failed';
-      task.updatedAt = Date.now();
-    }
-  }
+  finalizeAgentsAndTasks(team, 'error', 'failed');
 
   team.status = 'failed';
   persistTeam(team);
 
-  // Remove output observer
-  if (clearOutputObserverFn) {
-    clearOutputObserverFn();
-  }
-
-  // Remove close observer
-  if (clearCloseObserverFn) {
-    clearCloseObserverFn();
-  }
+  cleanupObservers();
 
   // Notify clients
   sendFn({
@@ -1379,32 +799,11 @@ export function completeTeam(summary?: string): void {
     team.summary = summary;
   }
 
-  // Mark all agents as done (unless they already errored)
-  for (const agent of team.agents.values()) {
-    if (agent.status !== 'error') {
-      agent.status = 'done';
-    }
-  }
-
-  // Mark remaining active/pending tasks as done
-  for (const task of team.tasks) {
-    if (task.status === 'active' || task.status === 'pending') {
-      task.status = 'done';
-      task.updatedAt = Date.now();
-    }
-  }
+  finalizeAgentsAndTasks(team, 'done', 'done');
 
   persistTeam(team);
 
-  // Remove output observer
-  if (clearOutputObserverFn) {
-    clearOutputObserverFn();
-  }
-
-  // Remove close observer
-  if (clearCloseObserverFn) {
-    clearCloseObserverFn();
-  }
+  cleanupObservers();
 
   // Notify clients
   sendFn({

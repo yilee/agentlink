@@ -19,6 +19,7 @@ import { createConnection } from './modules/connection.js';
 import { createFileBrowser } from './modules/fileBrowser.js';
 import { createFilePreview } from './modules/filePreview.js';
 import { createTeam } from './modules/team.js';
+import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 
 // ── App ─────────────────────────────────────────────────────────────────────
 const App = {
@@ -231,38 +232,10 @@ const App = {
     applyTheme();
 
     // ── Scroll management ──
-    let _scrollTimer = null;
-    let _userScrolledUp = false;
-
-    function onMessageListScroll(e) {
-      const el = e.target;
-      _userScrolledUp = (el.scrollHeight - el.scrollTop - el.clientHeight) > 80;
-    }
-
-    function scrollToBottom(force) {
-      if (_userScrolledUp && !force) return;
-      if (_scrollTimer) return;
-      _scrollTimer = setTimeout(() => {
-        _scrollTimer = null;
-        const el = document.querySelector('.message-list');
-        if (el) el.scrollTop = el.scrollHeight;
-      }, 50);
-    }
+    const { onScroll: onMessageListScroll, scrollToBottom, cleanup: cleanupScroll } = createScrollManager('.message-list');
 
     // ── Highlight.js scheduling ──
-    let _hlTimer = null;
-    function scheduleHighlight() {
-      if (_hlTimer) return;
-      _hlTimer = setTimeout(() => {
-        _hlTimer = null;
-        if (typeof hljs !== 'undefined') {
-          document.querySelectorAll('pre code:not([data-highlighted])').forEach(block => {
-            hljs.highlightElement(block);
-            block.dataset.highlighted = 'true';
-          });
-        }
-      }, 300);
-    }
+    const { scheduleHighlight, cleanup: cleanupHighlight } = createHighlightScheduler();
 
     // ── Create module instances ──
 
@@ -475,25 +448,10 @@ const App = {
       document.title = name ? `${name} — AgentLink` : 'AgentLink';
     });
 
-    // ── Usage formatting ──
-    function formatTokens(n) {
-      if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-      return String(n);
-    }
-    function formatUsage(u) {
-      if (!u) return '';
-      const pct = u.contextWindow ? Math.round(u.inputTokens / u.contextWindow * 100) : 0;
-      const ctx = formatTokens(u.inputTokens) + ' / ' + formatTokens(u.contextWindow) + ' (' + pct + '%)';
-      const cost = '$' + u.totalCost.toFixed(2);
-      const model = u.model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-1m$/, '');
-      const dur = (u.durationMs / 1000).toFixed(1) + 's';
-      return 'Context ' + ctx + '  \u00b7  Cost ' + cost + '  \u00b7  ' + model + '  \u00b7  ' + dur;
-    }
-
     // ── Lifecycle ──
     onMounted(() => { connect(scheduleHighlight); });
     onUnmounted(() => {
-      closeWs(); streaming.cleanup();
+      closeWs(); streaming.cleanup(); cleanupScroll(); cleanupHighlight();
       window.removeEventListener('resize', _resizeHandler);
       document.removeEventListener('click', _workdirMenuClickHandler);
       document.removeEventListener('keydown', _workdirMenuKeyHandler);

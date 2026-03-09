@@ -80,7 +80,27 @@ interface PendingControlRequest {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const DEFAULT_CONVERSATION_ID = 'default';
-export const MAX_CONVERSATIONS = 5;
+export const MAX_CONVERSATIONS = 15;
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+/** Build a control_response JSON payload for writing to Claude's stdin. */
+export function buildControlResponse(
+  requestId: string,
+  updatedInput: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    type: 'control_response',
+    response: {
+      subtype: 'success',
+      request_id: requestId,
+      response: {
+        behavior: 'allow',
+        updatedInput,
+      },
+    },
+  };
+}
 
 // ── Module state ───────────────────────────────────────────────────────────
 
@@ -310,23 +330,13 @@ export function handleUserAnswer(requestId: string, answers: Record<string, unkn
   pendingControlRequests.delete(requestId);
   console.log(`[Claude] Answering AskUserQuestion ${requestId}`);
 
-  const controlResponse = {
-    type: 'control_response',
-    response: {
-      subtype: 'success',
-      request_id: pending.request.request_id,
-      response: {
-        behavior: 'allow',
-        updatedInput: {
-          questions: pending.request.request.input?.questions || [],
-          answers,
-        },
-      },
-    },
-  };
+  const response = buildControlResponse(pending.request.request_id, {
+    questions: pending.request.request.input?.questions || [],
+    answers,
+  });
 
   if (pending.child.stdin && !pending.child.stdin.destroyed) {
-    pending.child.stdin.write(JSON.stringify(controlResponse) + '\n');
+    pending.child.stdin.write(JSON.stringify(response) + '\n');
   }
 }
 
@@ -507,6 +517,120 @@ function evictOldestIdle(excludeId: string): void {
   }
 }
 
+// ── Message processing helpers (used by processOutput) ───────────────────
+
+/**
+ * Handle a 'result' message from Claude: send errors and turn_completed.
+ * Returns true so the caller can `continue`.
+ */
+export function handleResultMessage(
+  msg: ClaudeMessage,
+  state: ConversationState,
+  sendWithConvId: SendFn,
+): void {
+  state.turnActive = false;
+
+  // If the result contains an error, send it as an error message for the chat
+  if (msg.is_error || (msg.subtype === 'error_response')) {
+    const errorText = typeof msg.result === 'string' ? msg.result
+      : typeof msg.error === 'string' ? msg.error
+      : '';
+    if (errorText) {
+      sendWithConvId({ type: 'error', message: errorText });
+    }
+  }
+
+  // Signal turn_completed with usage stats
+  const modelUsageValues = Object.values((msg.modelUsage as Record<string, Record<string, unknown>>) || {});
+  sendWithConvId({
+    type: 'turn_completed',
+    usage: {
+      inputTokens: (msg.usage as Record<string, unknown>)?.input_tokens ?? 0,
+      outputTokens: (msg.usage as Record<string, unknown>)?.output_tokens ?? 0,
+      cacheReadTokens: (msg.usage as Record<string, unknown>)?.cache_read_input_tokens ?? 0,
+      totalCost: msg.total_cost_usd ?? 0,
+      durationMs: msg.duration_ms ?? 0,
+      model: Object.keys((msg.modelUsage as Record<string, unknown>) || {})[0] || '',
+      contextWindow: (modelUsageValues[0] as Record<string, unknown>)?.contextWindow ?? 200000,
+    },
+  });
+}
+
+/**
+ * Handle an 'assistant' message: compute text delta and forward tool_use blocks.
+ * Returns the updated lastSentText for delta tracking.
+ */
+export function handleAssistantMessage(
+  msg: ClaudeMessage,
+  lastSentText: string,
+  sendWithConvId: SendFn,
+): string {
+  const message = msg.message as { content?: Array<Record<string, unknown>> };
+  const content = message.content;
+  if (!Array.isArray(content)) return lastSentText;
+
+  // Extract full text from all text blocks
+  const fullText = content
+    .filter((b) => b.type === 'text')
+    .map((b) => (b.text as string) || '')
+    .join('');
+
+  // Compute delta (new text since last emit)
+  if (fullText.length > lastSentText.length) {
+    const delta = fullText.slice(lastSentText.length);
+    lastSentText = fullText;
+    sendWithConvId({
+      type: 'claude_output',
+      data: { type: 'content_block_delta', delta },
+    });
+  }
+
+  // Forward tool_use blocks as-is (they appear once)
+  // Filter out AskUserQuestion — handled via control_request path
+  const toolBlocks = content.filter(
+    (b) => b.type === 'tool_use' && b.name !== 'AskUserQuestion'
+  );
+  if (toolBlocks.length > 0) {
+    sendWithConvId({
+      type: 'claude_output',
+      data: { type: 'tool_use', tools: toolBlocks },
+    });
+  }
+
+  return lastSentText;
+}
+
+/**
+ * Handle a 'user' (tool_result) message: detect command output or forward as-is.
+ * Returns true if a command output was extracted (caller should `continue`).
+ */
+export function handleUserMessage(
+  msg: ClaudeMessage,
+  sendWithConvId: SendFn,
+): boolean {
+  const message = msg.message as { content?: unknown } | undefined;
+  if (message && message.content) {
+    const raw = typeof message.content === 'string'
+      ? message.content
+      : Array.isArray(message.content)
+        ? (message.content as Array<{ type: string; text?: string }>)
+            .filter(b => b.type === 'text')
+            .map(b => b.text || '')
+            .join('')
+        : '';
+    const stdoutMatch = raw.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/);
+    const stderrMatch = raw.match(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/);
+    const cmdOutput = (stdoutMatch && stdoutMatch[1].trim()) || (stderrMatch && stderrMatch[1].trim());
+    if (cmdOutput) {
+      sendWithConvId({ type: 'command_output', content: cmdOutput });
+      return true;
+    }
+  }
+
+  sendWithConvId({ type: 'claude_output', data: msg });
+  return false;
+}
+
 async function processOutput(
   child: ChildProcess,
   state: ConversationState,
@@ -592,103 +716,21 @@ async function processOutput(
         }
         state.turnResultReceived = true;
         resultHandled = true;
-        state.turnActive = false;
-
-        // Reset streaming text tracker
         lastSentText = '';
-
-        // If the result contains an error, send it as an error message for the chat
-        if (msg.is_error || (msg.subtype === 'error_response')) {
-          const errorText = typeof msg.result === 'string' ? msg.result
-            : typeof msg.error === 'string' ? msg.error
-            : '';
-          if (errorText) {
-            sendWithConvId({ type: 'error', message: errorText });
-          }
-        }
-
-        // Signal turn_completed with usage stats
-        // Note: we intentionally do NOT forward the raw result as claude_output here.
-        // The web client has no handler for data.type === 'result', and the useful
-        // fields (usage, cost, duration) are already sent inside turn_completed.
-        const modelUsageValues = Object.values((msg.modelUsage as Record<string, Record<string, unknown>>) || {});
-        sendWithConvId({
-          type: 'turn_completed',
-          usage: {
-            inputTokens: (msg.usage as Record<string, unknown>)?.input_tokens ?? 0,
-            outputTokens: (msg.usage as Record<string, unknown>)?.output_tokens ?? 0,
-            cacheReadTokens: (msg.usage as Record<string, unknown>)?.cache_read_input_tokens ?? 0,
-            totalCost: msg.total_cost_usd ?? 0,
-            durationMs: msg.duration_ms ?? 0,
-            model: Object.keys((msg.modelUsage as Record<string, unknown>) || {})[0] || '',
-            contextWindow: (modelUsageValues[0] as Record<string, unknown>)?.contextWindow ?? 200000,
-          },
-        });
+        handleResultMessage(msg, state, sendWithConvId);
         continue;
       }
 
       // ── assistant message → extract delta and forward incrementally ──
       if (msg.type === 'assistant' && msg.message) {
-        const message = msg.message as { content?: Array<Record<string, unknown>> };
-        const content = message.content;
-        if (Array.isArray(content)) {
-          // Extract full text from all text blocks
-          const fullText = content
-            .filter((b) => b.type === 'text')
-            .map((b) => (b.text as string) || '')
-            .join('');
-
-          // Compute delta (new text since last emit)
-          if (fullText.length > lastSentText.length) {
-            const delta = fullText.slice(lastSentText.length);
-            lastSentText = fullText;
-            sendWithConvId({
-              type: 'claude_output',
-              data: { type: 'content_block_delta', delta },
-            });
-          }
-
-          // Forward tool_use blocks as-is (they appear once)
-          // Filter out AskUserQuestion — handled via control_request path
-          const toolBlocks = content.filter(
-            (b) => b.type === 'tool_use' && b.name !== 'AskUserQuestion'
-          );
-          if (toolBlocks.length > 0) {
-            sendWithConvId({
-              type: 'claude_output',
-              data: { type: 'tool_use', tools: toolBlocks },
-            });
-          }
-        }
+        lastSentText = handleAssistantMessage(msg, lastSentText, sendWithConvId);
         continue;
       }
 
       // ── user (tool_result) → forward, reset text tracker ──
       if (msg.type === 'user') {
-        // New turn segment — reset delta tracker for next assistant message
         lastSentText = '';
-
-        // Check for command output (e.g. /cost, /context) — extract and send separately
-        const message = msg.message as { content?: unknown } | undefined;
-        if (message && message.content) {
-          const raw = typeof message.content === 'string'
-            ? message.content
-            : Array.isArray(message.content)
-              ? (message.content as Array<{ type: string; text?: string }>)
-                  .filter(b => b.type === 'text')
-                  .map(b => b.text || '')
-                  .join('')
-              : '';
-          const stdoutMatch = raw.match(/<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/);
-          const stderrMatch = raw.match(/<local-command-stderr>([\s\S]*?)<\/local-command-stderr>/);
-          const cmdOutput = (stdoutMatch && stdoutMatch[1].trim()) || (stderrMatch && stderrMatch[1].trim());
-          if (cmdOutput) {
-            sendWithConvId({ type: 'command_output', content: cmdOutput });
-            continue;
-          }
-        }
-
-        sendWithConvId({ type: 'claude_output', data: msg });
+        if (handleUserMessage(msg, sendWithConvId)) continue;
         continue;
       }
 
@@ -780,20 +822,10 @@ function handleControlRequest(request: ControlRequest, child: ChildProcess, conv
   }
 
   // Auto-approve all other tool calls
-  const autoApproveResponse = {
-    type: 'control_response',
-    response: {
-      subtype: 'success',
-      request_id: requestId,
-      response: {
-        behavior: 'allow',
-        updatedInput: request.request.input || {},
-      },
-    },
-  };
+  const response = buildControlResponse(requestId, request.request.input || {});
 
   if (child.stdin && !child.stdin.destroyed) {
-    child.stdin.write(JSON.stringify(autoApproveResponse) + '\n');
+    child.stdin.write(JSON.stringify(response) + '\n');
   }
 }
 
