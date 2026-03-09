@@ -858,7 +858,7 @@ describe('team.ts state management', () => {
         expect(team.status).toBe('running'); // not summarizing yet
       });
 
-      it('does not suppress tool_result for non-Agent tool calls', () => {
+      it('suppresses and re-forwards tool_result for non-Agent tool calls with team context', () => {
         const result = onLeadOutput('conv-team-1', {
           type: 'user',
           message: {
@@ -868,7 +868,7 @@ describe('team.ts state management', () => {
           },
         });
 
-        expect(result).toBe(false); // not suppressed
+        expect(result).toBe(true); // suppressed — re-forwarded with team context
       });
     });
 

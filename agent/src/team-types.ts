@@ -38,6 +38,7 @@ export interface TeamState {
   feed: TeamFeedEntry[];
   status: 'planning' | 'running' | 'summarizing' | 'completed' | 'failed';
   leadStatus: string;            // human-readable lead activity description
+  leadMessages: TeamAgentMessage[]; // accumulated messages for lead detail view
   summary: string | null;        // Lead's final summary
   totalCost: number;
   durationMs: number;
@@ -57,6 +58,7 @@ export interface TeamAgentMessage {
   id: number;
   role: 'assistant' | 'tool' | 'user';
   content?: string;
+  toolId?: string;
   toolName?: string;
   toolInput?: string;
   toolOutput?: string;
@@ -94,6 +96,7 @@ export interface TeamStateSerialized {
   feed: TeamFeedEntry[];
   status: string;
   leadStatus: string;
+  leadMessages?: TeamAgentMessage[];
   summary: string | null;
   totalCost: number;
   durationMs: number;
