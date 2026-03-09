@@ -552,6 +552,7 @@ export function createConnection(deps) {
           timestamp: new Date(),
         });
         sidebar.requestSessionList();
+        if (team) team.requestTeamsList();
       }
     };
 
