@@ -332,9 +332,14 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       break;
     }
     case 'create_team': {
-      const m = msg as unknown as { instruction: string; template?: string };
+      const m = msg as unknown as { instruction: string; template?: string; leadPrompt?: string; agents?: Record<string, unknown> };
       try {
-        createTeam({ instruction: m.instruction, template: m.template }, state.workDir);
+        createTeam({
+          instruction: m.instruction,
+          template: m.template,
+          leadPrompt: m.leadPrompt,
+          agents: m.agents as TeamConfig['agents'],
+        }, state.workDir);
       } catch (err) {
         send({ type: 'error', message: (err as Error).message });
       }

@@ -72,8 +72,8 @@ export function createTeam(deps) {
 
   // ── Methods ──
 
-  function launchTeam(instruction, template) {
-    wsSend({ type: 'create_team', instruction, template: template || 'custom' });
+  function launchTeam(instruction, leadPrompt, agents) {
+    wsSend({ type: 'create_team', instruction, leadPrompt, agents });
   }
 
   function dissolveTeam() {

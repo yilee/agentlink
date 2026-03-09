@@ -1051,6 +1051,37 @@ describe('team.ts state management', () => {
         expect(agentsDef).toHaveProperty('worker-2');
         expect(agentsDef).toHaveProperty('worker-3');
       });
+
+      it('uses config.agents when provided instead of template lookup', () => {
+        const customAgents = {
+          'my-agent': {
+            description: 'A custom agent',
+            prompt: 'Do custom work',
+            tools: ['Read', 'Write'],
+          },
+        };
+        createTeam({ instruction: 'custom agents test', agents: customAgents }, '/tmp');
+
+        const [, , , options] = mockHandleChat.mock.calls[0];
+        const agentsDef = JSON.parse(options.extraArgs[1]);
+        expect(agentsDef).toHaveProperty('my-agent');
+        expect(agentsDef['my-agent'].description).toBe('A custom agent');
+        // Should NOT have template agents
+        expect(agentsDef).not.toHaveProperty('worker-1');
+      });
+
+      it('uses config.leadPrompt when provided instead of building from template', () => {
+        const customPrompt = 'You are a specialized lead for testing.';
+        createTeam({
+          instruction: 'lead prompt test',
+          leadPrompt: customPrompt,
+        }, '/tmp');
+
+        const [, prompt] = mockHandleChat.mock.calls[0];
+        expect(prompt).toBe(customPrompt);
+        // Should use the custom prompt directly, not template-built one
+        expect(prompt).not.toContain('team lead coordinating a development task');
+      });
     });
 
     describe('dissolveTeam()', () => {

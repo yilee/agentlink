@@ -724,12 +724,12 @@ export function createTeam(config: TeamConfig, workDir: string): TeamState {
   const conversationId = `team-${randomUUID().slice(0, 8)}`;
   const team = createTeamState(config, conversationId, workDir);
 
-  // Build agents definition for --agents flag
-  const agentsDef = buildAgentsDef(config.template);
+  // Use agents from config (web UI) or fall back to template lookup
+  const agentsDef = config.agents || buildAgentsDef(config.template);
   const agentsJson = JSON.stringify(agentsDef);
 
-  // Build the lead prompt
-  const leadPrompt = buildLeadPrompt(config, agentsDef);
+  // Use leadPrompt from config (web UI) or fall back to template builder
+  const leadPrompt = config.leadPrompt || buildLeadPrompt(config, agentsDef);
 
   // Attach output observer before spawning
   setOutputObserverFn(onLeadOutput);
