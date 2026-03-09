@@ -82,10 +82,9 @@ export function classifyRole(input: { name?: string; description?: string; promp
  */
 export function deriveAgentDisplayName(
   team: TeamState,
-  input: { name?: string; description?: string; prompt?: string },
+  _input: { name?: string; description?: string; prompt?: string },
 ): string {
-  const category = classifyRole(input);
-  return pickCharacter(team, category);
+  return `Agent ${team.agents.size + 1}`;
 }
 
 /**

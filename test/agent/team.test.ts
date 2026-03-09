@@ -113,7 +113,7 @@ describe('team.ts state management', () => {
       });
 
       expect(agent.role.id).toBe('security-reviewer');
-      expect(agent.role.name).toBe('Spock'); // reviewer role → Spock
+      expect(agent.role.name).toBe('Agent 2');
       expect(agent.role.color).toBeTruthy();
       expect(agent.toolUseId).toBe('tool-use-1');
       expect(agent.status).toBe('starting');
@@ -295,7 +295,7 @@ describe('team.ts state management', () => {
         expect(loaded!.status).toBe(team.status);
         expect(loaded!.agents.size).toBe(2); // Lead + Worker
         expect(loaded!.agents.get('lead')?.role.name).toBe('Lead');
-        expect(loaded!.agents.get('worker')?.role.name).toBe('Aragorn'); // general role → Aragorn
+        expect(loaded!.agents.get('worker')?.role.name).toBe('Agent 2');
         expect(loaded!.tasks).toHaveLength(1);
         expect(loaded!.tasks[0].assignee).toBe('worker');
         expect(loaded!.feed).toHaveLength(2); // 1 initial + 1 added
@@ -547,7 +547,7 @@ describe('team.ts state management', () => {
 
         const feedMsg = sentMessages.find(m => m.type === 'team_feed');
         expect(feedMsg).toBeDefined();
-        expect((feedMsg?.entry as Record<string, unknown>)?.content).toContain('Spock'); // reviewer role → Spock
+        expect((feedMsg?.entry as Record<string, unknown>)?.content).toContain('Agent 2');
       });
 
       it('does not suppress Lead assistant messages without parent_tool_use_id', () => {
@@ -706,7 +706,7 @@ describe('team.ts state management', () => {
         // Feed should have a tool_call entry
         const feedEntries = team.feed.filter(f => f.type === 'tool_call' && f.agentId === 'agentx');
         expect(feedEntries.length).toBeGreaterThan(0);
-        expect(feedEntries[0].content).toContain('Aragorn'); // general role → Aragorn
+        expect(feedEntries[0].content).toContain('Agent 2');
         expect(feedEntries[0].content).toContain('reading');
       });
 

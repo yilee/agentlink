@@ -130,10 +130,9 @@ describe('team-naming', () => {
   });
 
   describe('deriveAgentDisplayName', () => {
-    it('returns a character name based on role classification', () => {
+    it('returns Agent N based on team size', () => {
       const name = deriveAgentDisplayName(team, { description: 'Run the test suite for QA' });
-      // Should be a tester name
-      expect(['Sherlock', 'L', 'Conan', 'Poirot', 'Columbo']).toContain(name);
+      expect(name).toBe('Agent 1');
     });
   });
 
