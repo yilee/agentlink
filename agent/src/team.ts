@@ -57,6 +57,7 @@ import { buildAgentsDef, buildLeadPrompt } from './team-templates.js';
 import {
   serializeTeam,
   persistTeam,
+  persistTeamDebounced,
   flushPendingPersists as _flushPendingPersists,
 } from './team-persistence.js';
 
@@ -202,6 +203,7 @@ export function registerSubagent(
   // Update team status
   if (team.status === 'planning') {
     team.status = 'running';
+    persistTeamDebounced(team);
   }
 
   return teammate;
@@ -516,9 +518,10 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
             if (allSubagentsDone(team) && team.status === 'running') {
               team.status = 'summarizing';
               team.leadStatus = 'Reviewing results and writing summary...';
-              sendFn({ type: 'team_lead_status', teamId: team.teamId, leadStatus: team.leadStatus });
+              sendFn({ type: 'team_lead_status', teamId: team.teamId, leadStatus: team.leadStatus, teamStatus: team.status });
               addFeedEntry(team, 'lead', 'lead_activity', 'Lead is reviewing everyone\'s work and writing a summary');
               sendFn({ type: 'team_feed', teamId: team.teamId, entry: team.feed[team.feed.length - 1] });
+              persistTeamDebounced(team);
             }
 
             return true; // suppress from normal forwarding

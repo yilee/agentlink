@@ -72,6 +72,13 @@ export function createTeam(deps) {
 
   // ── Methods ──
 
+  /** Sync active team's status into the sidebar teamsList entry. */
+  function syncTeamsListStatus() {
+    if (!teamState.value) return;
+    const item = teamsList.value.find(t => t.teamId === teamState.value.teamId);
+    if (item) item.status = teamState.value.status;
+  }
+
   function launchTeam(instruction, leadPrompt, agents) {
     wsSend({ type: 'create_team', instruction, leadPrompt, agents });
   }
@@ -186,6 +193,7 @@ export function createTeam(deps) {
         // Update team status to running when first subagent appears
         if (teamState.value.status === 'planning') {
           teamState.value.status = 'running';
+          syncTeamsListStatus();
         }
         return true;
       }
@@ -216,12 +224,17 @@ export function createTeam(deps) {
         if (!teamState.value || teamState.value.teamId !== msg.teamId) return false;
         // Update with final state from server
         teamState.value = msg.team;
+        syncTeamsListStatus();
         return true;
       }
 
       case 'team_lead_status': {
         if (!teamState.value || teamState.value.teamId !== msg.teamId) return false;
         teamState.value.leadStatus = msg.leadStatus;
+        if (msg.teamStatus) {
+          teamState.value.status = msg.teamStatus;
+          syncTeamsListStatus();
+        }
         return true;
       }
 
