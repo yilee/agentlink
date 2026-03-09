@@ -3571,6 +3571,14 @@ body {
   font-weight: 600;
 }
 
+.sidebar-section-collapsible {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* ── Teams sidebar section (history list in sidebar) ── */
 .sidebar-teams {
   padding: 0.75rem;
