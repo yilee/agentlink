@@ -3640,7 +3640,8 @@ body {
 .team-history-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 2px 6px;
   margin-top: 2px;
   font-size: 0.7rem;
   color: var(--text-secondary);
@@ -3648,6 +3649,7 @@ body {
 
 .team-history-tasks {
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .team-status-badge-sm {
