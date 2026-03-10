@@ -19,6 +19,7 @@ import { join } from 'path';
 import cron from 'node-cron';
 import { CONFIG_DIR } from './config.js';
 import type { ClaudeMessage, HandleChatOptions } from './claude.js';
+import type { HistoryMessage } from './history.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -238,7 +239,7 @@ export function listLoopExecutions(loopId: string, limit = 50): LoopExecution[] 
   return readExecutionIndex(loopId, limit);
 }
 
-export function getLoopExecutionMessages(loopId: string, executionId: string): ClaudeMessage[] {
+export function getLoopExecutionMessages(loopId: string, executionId: string): HistoryMessage[] {
   return readExecutionLog(loopId, executionId);
 }
 
@@ -624,24 +625,76 @@ function appendToExecutionLog(loopId: string, executionId: string, msg: ClaudeMe
   }
 }
 
-function readExecutionLog(loopId: string, executionId: string): ClaudeMessage[] {
+function readExecutionLog(loopId: string, executionId: string): HistoryMessage[] {
   try {
     const logPath = getExecutionLogPath(loopId, executionId);
     if (!existsSync(logPath)) return [];
 
     const raw = readFileSync(logPath, 'utf-8');
     const lines = raw.trim().split('\n').filter(l => l.trim());
-    const messages: ClaudeMessage[] = [];
+    const result: HistoryMessage[] = [];
 
     for (const line of lines) {
       try {
-        messages.push(JSON.parse(line) as ClaudeMessage);
+        const data = JSON.parse(line);
+        const ts = data.timestamp || undefined;
+
+        if (data.type === 'user' && data.message?.content) {
+          // Extract tool results for tool_result content blocks
+          const content = data.message.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === 'tool_result' && block.content) {
+                const text = typeof block.content === 'string'
+                  ? block.content
+                  : JSON.stringify(block.content);
+                // Find the matching tool message and add output
+                for (let i = result.length - 1; i >= 0; i--) {
+                  if (result[i].role === 'tool' && result[i].toolId === block.tool_use_id) {
+                    result[i].toolOutput = text;
+                    break;
+                  }
+                }
+              }
+            }
+          } else if (typeof content === 'string' && content.trim()) {
+            result.push({ role: 'user', content, timestamp: ts });
+          }
+        }
+
+        if (data.type === 'assistant' && data.message?.content && Array.isArray(data.message.content)) {
+          const textParts: string[] = [];
+          const toolBlocks: typeof data.message.content = [];
+
+          for (const block of data.message.content) {
+            if (block.type === 'text' && block.text) {
+              textParts.push(block.text);
+            } else if (block.type === 'tool_use') {
+              toolBlocks.push(block);
+            }
+          }
+
+          if (textParts.length > 0) {
+            result.push({ role: 'assistant', content: textParts.join('\n\n'), timestamp: ts });
+          }
+
+          for (const tool of toolBlocks) {
+            result.push({
+              role: 'tool',
+              content: '',
+              toolName: tool.name,
+              toolInput: JSON.stringify(tool.input || {}),
+              toolId: tool.id,
+              timestamp: ts,
+            });
+          }
+        }
       } catch {
         // skip unparseable lines
       }
     }
 
-    return messages;
+    return result;
   } catch (err) {
     console.error(`[Scheduler] Failed to read execution log: ${(err as Error).message}`);
     return [];

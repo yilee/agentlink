@@ -1778,8 +1778,9 @@ const App = {
                         <span v-if="exec.trigger === 'manual'" class="loop-exec-trigger-badge">manual</span>
                       </div>
                       <div class="loop-exec-item-right">
+                        <button v-if="exec.status === 'running'" class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">View</button>
                         <button v-if="exec.status === 'running'" class="loop-action-btn loop-action-cancel" @click="cancelLoopExecution(selectedLoop.id)">Cancel</button>
-                        <button v-else class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">View</button>
+                        <button v-if="exec.status !== 'running'" class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">View</button>
                       </div>
                     </div>
                     <!-- Load more executions -->

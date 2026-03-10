@@ -88,7 +88,7 @@ export function createLoop(deps) {
   }
 
   function runNow(loopId) {
-    wsSend({ type: 'run_loop_now', loopId });
+    wsSend({ type: 'run_loop', loopId });
   }
 
   function cancelExecution(loopId) {
@@ -119,7 +119,7 @@ export function createLoop(deps) {
     selectedExecution.value = executionId;
     loadingExecution.value = true;
     executionMessages.value = [];
-    wsSend({ type: 'get_loop_execution', loopId, executionId });
+    wsSend({ type: 'get_loop_execution_messages', loopId, executionId });
   }
 
   function backToLoopsList() {
@@ -295,11 +295,15 @@ export function createLoop(deps) {
         }
         return true;
 
-      case 'loop_execution_detail':
+      case 'loop_execution_messages':
         if (selectedExecution.value === msg.executionId) {
-          executionMessages.value = msg.messages && msg.messages.length > 0
-            ? buildHistoryBatch(msg.messages, 0)
-            : [];
+          if (msg.messages && msg.messages.length > 0) {
+            let idCounter = 0;
+            executionMessages.value = buildHistoryBatch(msg.messages, () => ++idCounter);
+            liveMsgIdCounter = idCounter;
+          } else {
+            executionMessages.value = [];
+          }
           loadingExecution.value = false;
           scrollToBottom();
         }

@@ -22,6 +22,7 @@ export interface HistoryMessage {
   toolName?: string;
   toolInput?: string;
   toolId?: string;
+  toolOutput?: string;
   timestamp?: string;
   isCommandOutput?: boolean;
 }
