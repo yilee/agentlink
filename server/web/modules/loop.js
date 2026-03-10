@@ -41,6 +41,18 @@ export function createLoop(deps) {
   /** @type {import('vue').Ref<string|null>} Loop being edited (loopId) or null for new */
   const editingLoopId = ref(null);
 
+  /** @type {import('vue').Ref<string>} Error message from last loop operation (create/update) */
+  const loopError = ref('');
+
+  /** @type {number} Current execution history page limit */
+  let execPageLimit = 20;
+
+  /** @type {import('vue').Ref<boolean>} Whether more execution history may be available */
+  const hasMoreExecutions = ref(false);
+
+  /** @type {import('vue').Ref<boolean>} Loading more executions via pagination */
+  const loadingMoreExecutions = ref(false);
+
   // ── Computed ──────────────────────────────────────
 
   /** Whether any Loop execution is currently running */
@@ -98,7 +110,9 @@ export function createLoop(deps) {
     executionHistory.value = [];
     loadingExecutions.value = true;
     editingLoopId.value = null;
-    wsSend({ type: 'list_loop_executions', loopId, limit: 50 });
+    execPageLimit = 20;
+    hasMoreExecutions.value = false;
+    wsSend({ type: 'list_loop_executions', loopId, limit: execPageLimit });
   }
 
   function viewExecution(loopId, executionId) {
@@ -127,6 +141,17 @@ export function createLoop(deps) {
 
   function cancelEditing() {
     editingLoopId.value = null;
+  }
+
+  function loadMoreExecutions() {
+    if (!selectedLoop.value || loadingMoreExecutions.value) return;
+    loadingMoreExecutions.value = true;
+    execPageLimit *= 2;
+    wsSend({ type: 'list_loop_executions', loopId: selectedLoop.value.id, limit: execPageLimit });
+  }
+
+  function clearLoopError() {
+    loopError.value = '';
   }
 
   // ── Live output accumulation ─────────────────────
@@ -195,6 +220,7 @@ export function createLoop(deps) {
 
       case 'loop_created':
         loopsList.value.push(msg.loop);
+        loopError.value = '';
         return true;
 
       case 'loop_updated': {
@@ -204,6 +230,7 @@ export function createLoop(deps) {
           selectedLoop.value = { ...msg.loop };
         }
         editingLoopId.value = null;
+        loopError.value = '';
         return true;
       }
 
@@ -260,8 +287,11 @@ export function createLoop(deps) {
 
       case 'loop_executions_list':
         if (selectedLoop.value?.id === msg.loopId) {
-          executionHistory.value = msg.executions || [];
+          const execs = msg.executions || [];
+          executionHistory.value = execs;
           loadingExecutions.value = false;
+          loadingMoreExecutions.value = false;
+          hasMoreExecutions.value = execs.length >= execPageLimit;
         }
         return true;
 
@@ -285,6 +315,7 @@ export function createLoop(deps) {
     loopsList, selectedLoop, selectedExecution,
     executionHistory, executionMessages, runningLoops,
     loadingExecutions, loadingExecution, editingLoopId,
+    loopError, hasMoreExecutions, loadingMoreExecutions,
     // Computed
     hasRunningLoop, firstRunningLoop,
     // CRUD
@@ -294,6 +325,8 @@ export function createLoop(deps) {
     viewLoopDetail, viewExecution,
     backToLoopsList, backToLoopDetail,
     startEditing, cancelEditing,
+    // Pagination & errors
+    loadMoreExecutions, clearLoopError,
     // Message routing
     handleLoopMessage,
   };

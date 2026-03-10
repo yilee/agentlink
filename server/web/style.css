@@ -4323,6 +4323,73 @@ body {
   .team-create-panel {
     padding: 1rem;
   }
+
+  /* Loop dashboard — responsive */
+  .loop-active-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .loop-active-item-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .loop-active-item-actions .loop-action-btn {
+    min-height: 36px;
+    padding: 6px 14px;
+  }
+
+  .loop-active-item-meta {
+    flex-wrap: wrap;
+  }
+
+  .loop-detail-actions {
+    flex-wrap: wrap;
+  }
+
+  .loop-detail-actions .loop-action-btn {
+    min-height: 36px;
+    padding: 6px 14px;
+  }
+
+  .loop-exec-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .loop-exec-item-left {
+    flex-wrap: wrap;
+  }
+
+  .loop-exec-item-right {
+    width: 100%;
+  }
+
+  .loop-exec-item-right .loop-action-btn {
+    min-height: 36px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .loop-schedule-detail {
+    flex-wrap: wrap;
+  }
+
+  .loop-running-banner {
+    left: 1rem;
+    right: 1rem;
+    transform: none;
+    bottom: 70px;
+  }
+
+  .loop-exec-messages {
+    max-height: calc(100vh - 160px);
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -4343,6 +4410,27 @@ body {
 
   .folder-picker-dialog {
     width: calc(100vw - 1rem);
+  }
+
+  /* Loop — extra-small adjustments */
+  .loop-detail-name {
+    font-size: 1rem;
+  }
+
+  .loop-active-item-name {
+    font-size: 0.82rem;
+  }
+
+  .loop-schedule-options {
+    padding: 8px;
+  }
+
+  .loop-schedule-radio {
+    font-size: 0.82rem;
+  }
+
+  .loop-cron-input {
+    width: 110px;
   }
 }
 
@@ -4847,4 +4935,47 @@ body {
 }
 .modal-cancel-btn:hover {
   border-color: var(--text-primary);
+}
+
+/* ── Loop error banner ── */
+.loop-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: var(--error);
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.loop-error-banner:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+.loop-error-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+.loop-error-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.loop-error-dismiss {
+  flex-shrink: 0;
+  opacity: 0.6;
+  font-size: 0.8rem;
+}
+.loop-error-dismiss:hover {
+  opacity: 1;
+}
+
+/* ── Load more executions ── */
+.loop-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
 }

@@ -744,6 +744,9 @@ const App = {
       editingLoopId: loop.editingLoopId,
       hasRunningLoop: loop.hasRunningLoop,
       firstRunningLoop: loop.firstRunningLoop,
+      loopError: loop.loopError,
+      hasMoreExecutions: loop.hasMoreExecutions,
+      loadingMoreExecutions: loop.loadingMoreExecutions,
       toggleLoop: loop.toggleLoop,
       runNow: loop.runNow,
       cancelLoopExecution: loop.cancelExecution,
@@ -807,6 +810,7 @@ const App = {
         const name = loopName.value.trim();
         const prompt = loopPrompt.value.trim();
         if (!name || !prompt) return;
+        loop.clearLoopError();
         const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
         if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
         if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
@@ -841,6 +845,7 @@ const App = {
         const name = loopName.value.trim();
         const prompt = loopPrompt.value.trim();
         if (!name || !prompt) return;
+        loop.clearLoopError();
         const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
         if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
         if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
@@ -874,6 +879,12 @@ const App = {
       cancelDeleteLoop() {
         loopDeleteConfirmOpen.value = false;
         loopDeleteConfirmId.value = null;
+      },
+      loadMoreExecutions() {
+        loop.loadMoreExecutions();
+      },
+      clearLoopError() {
+        loop.clearLoopError();
       },
       loopScheduleDisplay(l) {
         return formatSchedule(l.scheduleType, l.scheduleConfig || {}, l.schedule);
@@ -1771,6 +1782,12 @@ const App = {
                         <button v-else class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">View</button>
                       </div>
                     </div>
+                    <!-- Load more executions -->
+                    <div v-if="hasMoreExecutions && !loadingExecutions" class="loop-load-more">
+                      <button class="loop-action-btn" :disabled="loadingMoreExecutions" @click="loadMoreExecutions()">
+                        {{ loadingMoreExecutions ? 'Loading...' : 'Load more' }}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1888,6 +1905,13 @@ const App = {
                   </button>
                   <button v-if="editingLoopId" class="team-create-cancel" @click="cancelEditingLoop()">Cancel</button>
                   <button class="team-create-cancel" @click="backToChat()">Back to Chat</button>
+                </div>
+
+                <!-- Error message -->
+                <div v-if="loopError" class="loop-error-banner" @click="clearLoopError()">
+                  <span class="loop-error-icon">\u{26A0}</span>
+                  <span class="loop-error-text">{{ loopError }}</span>
+                  <span class="loop-error-dismiss">\u{2715}</span>
                 </div>
 
                 <!-- Active Loops list -->

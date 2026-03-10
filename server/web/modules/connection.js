@@ -398,6 +398,10 @@ export function createConnection(deps) {
         if (currentConversationId && currentConversationId.value) {
           processingConversations.value[currentConversationId.value] = false;
         }
+        // Forward error to Loop module for inline display
+        if (loop && loop.loopError) {
+          loop.loopError.value = msg.message || '';
+        }
         _dequeueNext();
       } else if (msg.type === 'claude_output') {
         handleClaudeOutput(msg, scheduleHighlight);
