@@ -161,6 +161,19 @@ const App = {
     const kanbanExpanded = ref(false);
     const instructionExpanded = ref(false);
 
+    // Loop creation/editing form state
+    const loopName = ref('');
+    const loopPrompt = ref('');
+    const loopScheduleType = ref('daily');
+    const loopScheduleHour = ref(9);
+    const loopScheduleMinute = ref(0);
+    const loopScheduleDayOfWeek = ref(1);
+    const loopCronExpr = ref('0 9 * * *');
+    const loopSelectedTemplate = ref(null);
+    const loopDeleteConfirmOpen = ref(false);
+    const loopDeleteConfirmId = ref(null);
+    const loopDeleteConfirmName = ref('');
+
     // File preview state
     const previewPanelOpen = ref(false);
     const previewPanelWidth = ref(parseInt(localStorage.getItem('agentlink-preview-panel-width'), 10) || 400);
@@ -731,31 +744,164 @@ const App = {
       editingLoopId: loop.editingLoopId,
       hasRunningLoop: loop.hasRunningLoop,
       firstRunningLoop: loop.firstRunningLoop,
-      createNewLoop: loop.createNewLoop,
-      updateExistingLoop: loop.updateExistingLoop,
-      deleteExistingLoop: loop.deleteExistingLoop,
       toggleLoop: loop.toggleLoop,
       runNow: loop.runNow,
-      cancelExecution: loop.cancelExecution,
+      cancelLoopExecution: loop.cancelExecution,
       viewLoopDetail: loop.viewLoopDetail,
       viewExecution: loop.viewExecution,
       backToLoopsList: loop.backToLoopsList,
       backToLoopDetail: loop.backToLoopDetail,
-      startEditing: loop.startEditing,
-      cancelEditing: loop.cancelEditing,
       LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS,
       buildCronExpression, formatSchedule,
+      // Loop form state
+      loopName, loopPrompt, loopScheduleType,
+      loopScheduleHour, loopScheduleMinute, loopScheduleDayOfWeek,
+      loopCronExpr, loopSelectedTemplate,
+      loopDeleteConfirmOpen, loopDeleteConfirmId, loopDeleteConfirmName,
       requestLoopsList() {
         loadingLoops.value = true;
         loop.requestLoopsList();
       },
       newLoop() {
         loop.backToLoopsList();
+        loop.editingLoopId.value = null;
+        loopSelectedTemplate.value = null;
+        loopName.value = '';
+        loopPrompt.value = '';
+        loopScheduleType.value = 'daily';
+        loopScheduleHour.value = 9;
+        loopScheduleMinute.value = 0;
+        loopScheduleDayOfWeek.value = 1;
+        loopCronExpr.value = '0 9 * * *';
         team.viewMode.value = 'loop';
       },
       viewLoop(loopId) {
         loop.viewLoopDetail(loopId);
         team.viewMode.value = 'loop';
+      },
+      selectLoopTemplate(key) {
+        loopSelectedTemplate.value = key;
+        const tpl = LOOP_TEMPLATES[key];
+        if (!tpl) return;
+        loopName.value = tpl.name || '';
+        loopPrompt.value = tpl.prompt || '';
+        loopScheduleType.value = tpl.scheduleType || 'daily';
+        const cfg = tpl.scheduleConfig || {};
+        loopScheduleHour.value = cfg.hour ?? 9;
+        loopScheduleMinute.value = cfg.minute ?? 0;
+        loopScheduleDayOfWeek.value = cfg.dayOfWeek ?? 1;
+        loopCronExpr.value = buildCronExpression(tpl.scheduleType || 'daily', cfg);
+      },
+      resetLoopForm() {
+        loopSelectedTemplate.value = null;
+        loopName.value = '';
+        loopPrompt.value = '';
+        loopScheduleType.value = 'daily';
+        loopScheduleHour.value = 9;
+        loopScheduleMinute.value = 0;
+        loopScheduleDayOfWeek.value = 1;
+        loopCronExpr.value = '0 9 * * *';
+        loop.editingLoopId.value = null;
+      },
+      createLoopFromPanel() {
+        const name = loopName.value.trim();
+        const prompt = loopPrompt.value.trim();
+        if (!name || !prompt) return;
+        const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
+        if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
+        if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
+        const schedule = loopScheduleType.value === 'cron'
+          ? loopCronExpr.value
+          : buildCronExpression(loopScheduleType.value, schedCfg);
+        loop.createNewLoop({ name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
+        // Reset form
+        loopSelectedTemplate.value = null;
+        loopName.value = '';
+        loopPrompt.value = '';
+        loopScheduleType.value = 'daily';
+        loopScheduleHour.value = 9;
+        loopScheduleMinute.value = 0;
+        loopScheduleDayOfWeek.value = 1;
+        loopCronExpr.value = '0 9 * * *';
+      },
+      startEditingLoop(l) {
+        loop.editingLoopId.value = l.id;
+        loopName.value = l.name || '';
+        loopPrompt.value = l.prompt || '';
+        loopScheduleType.value = l.scheduleType || 'daily';
+        const cfg = l.scheduleConfig || {};
+        loopScheduleHour.value = cfg.hour ?? 9;
+        loopScheduleMinute.value = cfg.minute ?? 0;
+        loopScheduleDayOfWeek.value = cfg.dayOfWeek ?? 1;
+        loopCronExpr.value = l.schedule || buildCronExpression(l.scheduleType || 'daily', cfg);
+      },
+      saveLoopEdits() {
+        const lid = loop.editingLoopId.value;
+        if (!lid) return;
+        const name = loopName.value.trim();
+        const prompt = loopPrompt.value.trim();
+        if (!name || !prompt) return;
+        const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
+        if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
+        if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
+        const schedule = loopScheduleType.value === 'cron'
+          ? loopCronExpr.value
+          : buildCronExpression(loopScheduleType.value, schedCfg);
+        loop.updateExistingLoop(lid, { name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
+        loop.editingLoopId.value = null;
+        loopName.value = '';
+        loopPrompt.value = '';
+      },
+      cancelEditingLoop() {
+        loop.editingLoopId.value = null;
+        loopName.value = '';
+        loopPrompt.value = '';
+        loopScheduleType.value = 'daily';
+        loopScheduleHour.value = 9;
+        loopScheduleMinute.value = 0;
+      },
+      requestDeleteLoop(l) {
+        loopDeleteConfirmId.value = l.id;
+        loopDeleteConfirmName.value = l.name || l.id.slice(0, 8);
+        loopDeleteConfirmOpen.value = true;
+      },
+      confirmDeleteLoop() {
+        if (!loopDeleteConfirmId.value) return;
+        loop.deleteExistingLoop(loopDeleteConfirmId.value);
+        loopDeleteConfirmOpen.value = false;
+        loopDeleteConfirmId.value = null;
+      },
+      cancelDeleteLoop() {
+        loopDeleteConfirmOpen.value = false;
+        loopDeleteConfirmId.value = null;
+      },
+      loopScheduleDisplay(l) {
+        return formatSchedule(l.scheduleType, l.scheduleConfig || {}, l.schedule);
+      },
+      loopLastRunDisplay(l) {
+        if (!l.lastExecution) return '';
+        const exec = l.lastExecution;
+        const ago = formatRelativeTime(exec.startedAt);
+        const icon = exec.status === 'success' ? 'OK' : exec.status === 'error' ? 'ERR' : exec.status;
+        return ago + ' ' + icon;
+      },
+      formatExecTime(ts) {
+        if (!ts) return '';
+        const d = new Date(ts);
+        return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      },
+      formatDuration(ms) {
+        if (!ms && ms !== 0) return '';
+        const secs = Math.floor(ms / 1000);
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return m + 'm ' + String(s).padStart(2, '0') + 's';
+      },
+      isLoopRunning(loopId) {
+        return !!loop.runningLoops.value[loopId];
+      },
+      padTwo(n) {
+        return String(n).padStart(2, '0');
       },
     };
   },
@@ -1519,13 +1665,277 @@ const App = {
 
           <!-- ══ Loop Dashboard ══ -->
           <template v-else-if="viewMode === 'loop'">
-            <div class="team-create-panel">
+
+            <!-- ── Execution detail view ── -->
+            <div v-if="selectedLoop && selectedExecution" class="team-create-panel">
+              <div class="team-create-inner">
+                <div class="loop-detail-header">
+                  <button class="team-agent-back-btn" @click="backToLoopDetail()">
+                    <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                    {{ selectedLoop.name }}
+                  </button>
+                </div>
+
+                <div v-if="loadingExecution" class="loop-loading">
+                  <div class="history-loading-spinner"></div>
+                  <span>Loading execution...</span>
+                </div>
+
+                <div v-else class="loop-exec-messages">
+                  <div v-if="executionMessages.length === 0" class="team-agent-empty-msg">No messages recorded for this execution.</div>
+                  <template v-for="(msg, mi) in executionMessages" :key="msg.id">
+                    <div v-if="msg.role === 'user' && msg.content" class="team-agent-prompt">
+                      <div class="team-agent-prompt-label">Loop Prompt</div>
+                      <div class="team-agent-prompt-body markdown-body" v-html="getRenderedContent(msg)"></div>
+                    </div>
+                    <div v-else-if="msg.role === 'assistant'" :class="['message', 'message-assistant']">
+                      <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
+                        <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
+                      </div>
+                    </div>
+                    <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
+                      <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
+                        <span class="tool-icon" v-html="getToolIcon(msg.toolName)"></span>
+                        <span class="tool-name">{{ msg.toolName }}</span>
+                        <span class="tool-summary">{{ getToolSummary(msg) }}</span>
+                        <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>
+                        <span class="tool-status-icon running-dots" v-else>
+                          <span></span><span></span><span></span>
+                        </span>
+                        <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
+                      </div>
+                      <div v-show="msg.expanded" class="tool-expand">
+                        <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
+                        <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
+                        <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
+                        <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Loop detail view (execution history) ── -->
+            <div v-else-if="selectedLoop" class="team-create-panel">
+              <div class="team-create-inner">
+                <div class="loop-detail-header">
+                  <button class="team-agent-back-btn" @click="backToLoopsList()">
+                    <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                    Back to Loops
+                  </button>
+                </div>
+                <div class="loop-detail-info">
+                  <h2 class="loop-detail-name">{{ selectedLoop.name }}</h2>
+                  <div class="loop-detail-meta">
+                    <span class="loop-detail-schedule">{{ loopScheduleDisplay(selectedLoop) }}</span>
+                    <span :class="['loop-status-badge', selectedLoop.enabled ? 'loop-status-enabled' : 'loop-status-disabled']">{{ selectedLoop.enabled ? 'Enabled' : 'Disabled' }}</span>
+                  </div>
+                  <div class="loop-detail-actions">
+                    <button class="loop-action-btn" @click="startEditingLoop(selectedLoop); backToLoopsList()">Edit</button>
+                    <button class="loop-action-btn loop-action-run" @click="runNow(selectedLoop.id)" :disabled="isLoopRunning(selectedLoop.id)">Run Now</button>
+                    <button class="loop-action-btn" @click="toggleLoop(selectedLoop.id)">{{ selectedLoop.enabled ? 'Disable' : 'Enable' }}</button>
+                  </div>
+                </div>
+
+                <div class="loop-detail-prompt-section">
+                  <div class="loop-detail-prompt-label">Prompt</div>
+                  <div class="loop-detail-prompt-text">{{ selectedLoop.prompt }}</div>
+                </div>
+
+                <div class="loop-exec-history-section">
+                  <div class="loop-exec-history-header">Execution History</div>
+                  <div v-if="loadingExecutions" class="loop-loading">
+                    <div class="history-loading-spinner"></div>
+                    <span>Loading executions...</span>
+                  </div>
+                  <div v-else-if="executionHistory.length === 0" class="loop-exec-empty">No executions yet.</div>
+                  <div v-else class="loop-exec-list">
+                    <div v-for="exec in executionHistory" :key="exec.id" class="loop-exec-item">
+                      <div class="loop-exec-item-left">
+                        <span :class="['loop-exec-status-icon', 'loop-exec-status-' + exec.status]">
+                          <template v-if="exec.status === 'running'">\u{21BB}</template>
+                          <template v-else-if="exec.status === 'success'">\u{2713}</template>
+                          <template v-else-if="exec.status === 'error'">\u{2717}</template>
+                          <template v-else-if="exec.status === 'cancelled'">\u{25CB}</template>
+                          <template v-else>?</template>
+                        </span>
+                        <span class="loop-exec-time">{{ formatExecTime(exec.startedAt) }}</span>
+                        <span v-if="exec.status === 'running'" class="loop-exec-running-label">Running...</span>
+                        <span v-else-if="exec.durationMs" class="loop-exec-duration">{{ formatDuration(exec.durationMs) }}</span>
+                        <span v-if="exec.error" class="loop-exec-error-text" :title="exec.error">{{ exec.error.length > 40 ? exec.error.slice(0, 40) + '...' : exec.error }}</span>
+                        <span v-if="exec.trigger === 'manual'" class="loop-exec-trigger-badge">manual</span>
+                      </div>
+                      <div class="loop-exec-item-right">
+                        <button v-if="exec.status === 'running'" class="loop-action-btn loop-action-cancel" @click="cancelLoopExecution(selectedLoop.id)">Cancel</button>
+                        <button v-else class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">View</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Loop creation panel (default) ── -->
+            <div v-else class="team-create-panel">
               <div class="team-create-inner">
                 <div class="team-create-header">
                   <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" opacity="0.5" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
-                  <h2>Scheduled Loops</h2>
+                  <h2>{{ editingLoopId ? 'Edit Loop' : 'Create a Scheduled Loop' }}</h2>
                 </div>
-                <p class="team-create-desc">Configure recurring tasks that run on a schedule. Loop creation UI will be available in Phase 4.</p>
+                <p class="team-create-desc">Configure recurring tasks that run on a schedule. Select a template or create your own.</p>
+
+                <!-- Template cards -->
+                <div v-if="!editingLoopId" class="team-examples-section" style="margin-top: 0;">
+                  <div class="team-examples-header">Templates</div>
+                  <div class="team-examples-list">
+                    <div v-for="key in LOOP_TEMPLATE_KEYS" :key="key"
+                         :class="['team-example-card', { 'loop-template-selected': loopSelectedTemplate === key }]"
+                    >
+                      <div class="team-example-icon">
+                        <svg v-if="key === 'competitive-intel'" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.987 7.987 0 0 1 5.08 16zm2.95-8H5.08a7.987 7.987 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>
+                        <svg v-else-if="key === 'knowledge-base'" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                        <svg v-else viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      </div>
+                      <div class="team-example-body">
+                        <div class="team-example-title">{{ LOOP_TEMPLATES[key].label }}</div>
+                        <div class="team-example-text">{{ LOOP_TEMPLATES[key].description }}</div>
+                      </div>
+                      <button class="team-example-try" @click="selectLoopTemplate(key)">Try it</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Name field -->
+                <div class="team-tpl-section">
+                  <label class="team-tpl-label">Name</label>
+                  <input
+                    v-model="loopName"
+                    type="text"
+                    class="loop-name-input"
+                    placeholder="e.g. Daily Code Review"
+                  />
+                </div>
+
+                <!-- Prompt field -->
+                <div class="team-tpl-section">
+                  <label class="team-tpl-label">Prompt</label>
+                  <textarea
+                    v-model="loopPrompt"
+                    class="team-create-textarea"
+                    placeholder="Describe what the Loop should do each time it runs..."
+                    rows="5"
+                  ></textarea>
+                </div>
+
+                <!-- Schedule selector -->
+                <div class="team-tpl-section">
+                  <label class="team-tpl-label">Schedule</label>
+                  <div class="loop-schedule-options">
+                    <label class="loop-schedule-radio">
+                      <input type="radio" v-model="loopScheduleType" value="hourly" />
+                      <span>Every hour</span>
+                      <span v-if="loopScheduleType === 'hourly'" class="loop-schedule-detail">at minute {{ padTwo(loopScheduleMinute) }}</span>
+                    </label>
+                    <label class="loop-schedule-radio">
+                      <input type="radio" v-model="loopScheduleType" value="daily" />
+                      <span>Every day</span>
+                      <span v-if="loopScheduleType === 'daily'" class="loop-schedule-detail">
+                        at
+                        <input type="number" v-model.number="loopScheduleHour" min="0" max="23" class="loop-time-input" />
+                        :
+                        <input type="number" v-model.number="loopScheduleMinute" min="0" max="59" class="loop-time-input" />
+                      </span>
+                    </label>
+                    <label class="loop-schedule-radio">
+                      <input type="radio" v-model="loopScheduleType" value="weekly" />
+                      <span>Every week</span>
+                      <span v-if="loopScheduleType === 'weekly'" class="loop-schedule-detail">
+                        on
+                        <select v-model.number="loopScheduleDayOfWeek" class="loop-day-select">
+                          <option :value="0">Sunday</option>
+                          <option :value="1">Monday</option>
+                          <option :value="2">Tuesday</option>
+                          <option :value="3">Wednesday</option>
+                          <option :value="4">Thursday</option>
+                          <option :value="5">Friday</option>
+                          <option :value="6">Saturday</option>
+                        </select>
+                        at
+                        <input type="number" v-model.number="loopScheduleHour" min="0" max="23" class="loop-time-input" />
+                        :
+                        <input type="number" v-model.number="loopScheduleMinute" min="0" max="59" class="loop-time-input" />
+                      </span>
+                    </label>
+                    <label class="loop-schedule-radio">
+                      <input type="radio" v-model="loopScheduleType" value="cron" />
+                      <span>Advanced (cron)</span>
+                      <span v-if="loopScheduleType === 'cron'" class="loop-schedule-detail">
+                        <input type="text" v-model="loopCronExpr" class="loop-cron-input" placeholder="0 9 * * *" />
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="team-create-actions">
+                  <button v-if="editingLoopId" class="team-create-launch" :disabled="!loopName.trim() || !loopPrompt.trim()" @click="saveLoopEdits()">
+                    Save Changes
+                  </button>
+                  <button v-else class="team-create-launch" :disabled="!loopName.trim() || !loopPrompt.trim()" @click="createLoopFromPanel()">
+                    <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                    Create Loop
+                  </button>
+                  <button v-if="editingLoopId" class="team-create-cancel" @click="cancelEditingLoop()">Cancel</button>
+                  <button class="team-create-cancel" @click="backToChat()">Back to Chat</button>
+                </div>
+
+                <!-- Active Loops list -->
+                <div v-if="loopsList.length > 0" class="loop-active-section">
+                  <div class="loop-active-header">Active Loops</div>
+                  <div class="loop-active-list">
+                    <div v-for="l in loopsList" :key="l.id" class="loop-active-item">
+                      <div class="loop-active-item-info" @click="viewLoop(l.id)">
+                        <div class="loop-active-item-top">
+                          <span class="loop-active-item-name">{{ l.name }}</span>
+                          <span :class="['loop-status-dot', l.enabled ? 'loop-status-dot-on' : 'loop-status-dot-off']"></span>
+                        </div>
+                        <div class="loop-active-item-meta">
+                          <span class="loop-active-item-schedule">{{ loopScheduleDisplay(l) }}</span>
+                          <span v-if="l.lastExecution" class="loop-active-item-last">
+                            Last: {{ loopLastRunDisplay(l) }}
+                          </span>
+                          <span v-if="isLoopRunning(l.id)" class="loop-exec-running-label">Running...</span>
+                        </div>
+                      </div>
+                      <div class="loop-active-item-actions">
+                        <button class="loop-action-btn loop-action-sm" @click="startEditingLoop(l)" title="Edit">Edit</button>
+                        <button class="loop-action-btn loop-action-sm loop-action-run" @click="runNow(l.id)" :disabled="isLoopRunning(l.id)" title="Run now">Run</button>
+                        <button class="loop-action-btn loop-action-sm" @click="toggleLoop(l.id)" :title="l.enabled ? 'Disable' : 'Enable'">{{ l.enabled ? 'Pause' : 'Resume' }}</button>
+                        <button v-if="!l.enabled" class="loop-action-btn loop-action-sm loop-action-delete" @click="requestDeleteLoop(l)" title="Delete">Del</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Running Loop notification banner -->
+            <div v-if="hasRunningLoop && !selectedLoop" class="loop-running-banner">
+              <span class="loop-running-banner-dot"></span>
+              <span>{{ firstRunningLoop.name }} is running...</span>
+              <button class="loop-action-btn loop-action-sm" @click="viewLoop(firstRunningLoop.loopId)">View</button>
+            </div>
+
+            <!-- Loop delete confirm dialog -->
+            <div v-if="loopDeleteConfirmOpen" class="modal-overlay" @click.self="cancelDeleteLoop()">
+              <div class="modal-dialog">
+                <div class="modal-title">Delete Loop</div>
+                <div class="modal-body">Are you sure you want to delete <strong>{{ loopDeleteConfirmName }}</strong>? This cannot be undone.</div>
+                <div class="modal-actions">
+                  <button class="modal-confirm-btn" @click="confirmDeleteLoop()">Delete</button>
+                  <button class="modal-cancel-btn" @click="cancelDeleteLoop()">Cancel</button>
+                </div>
               </div>
             </div>
           </template>
