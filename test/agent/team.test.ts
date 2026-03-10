@@ -914,8 +914,10 @@ describe('team.ts state management', () => {
   describe('Team lifecycle (createTeam, dissolveTeam, completeTeam)', () => {
     let mockHandleChat: ReturnType<typeof vi.fn>;
     let mockCancelExecution: ReturnType<typeof vi.fn>;
-    let mockSetOutputObserver: ReturnType<typeof vi.fn>;
-    let mockClearOutputObserver: ReturnType<typeof vi.fn>;
+    let mockAddOutputObserver: ReturnType<typeof vi.fn>;
+    let mockRemoveOutputObserver: ReturnType<typeof vi.fn>;
+    let mockAddCloseObserver: ReturnType<typeof vi.fn>;
+    let mockRemoveCloseObserver: ReturnType<typeof vi.fn>;
     let sentMessages: Record<string, unknown>[];
 
     beforeEach(() => {
@@ -927,14 +929,18 @@ describe('team.ts state management', () => {
       // Set up mock claude functions
       mockHandleChat = vi.fn();
       mockCancelExecution = vi.fn();
-      mockSetOutputObserver = vi.fn();
-      mockClearOutputObserver = vi.fn();
+      mockAddOutputObserver = vi.fn();
+      mockRemoveOutputObserver = vi.fn();
+      mockAddCloseObserver = vi.fn();
+      mockRemoveCloseObserver = vi.fn();
 
       setTeamClaudeFns({
         handleChat: mockHandleChat,
         cancelExecution: mockCancelExecution,
-        setOutputObserver: mockSetOutputObserver,
-        clearOutputObserver: mockClearOutputObserver,
+        addOutputObserver: mockAddOutputObserver,
+        removeOutputObserver: mockRemoveOutputObserver,
+        addCloseObserver: mockAddCloseObserver,
+        removeCloseObserver: mockRemoveCloseObserver,
       });
     });
 
@@ -984,9 +990,9 @@ describe('team.ts state management', () => {
       it('registers the output observer before spawning', () => {
         createTeam({ instruction: 'test', template: 'custom' }, '/tmp');
 
-        expect(mockSetOutputObserver).toHaveBeenCalledTimes(1);
+        expect(mockAddOutputObserver).toHaveBeenCalledTimes(1);
         // Output observer should be set before handleChat
-        const setObserverOrder = mockSetOutputObserver.mock.invocationCallOrder[0];
+        const setObserverOrder = mockAddOutputObserver.mock.invocationCallOrder[0];
         const handleChatOrder = mockHandleChat.mock.invocationCallOrder[0];
         expect(setObserverOrder).toBeLessThan(handleChatOrder);
       });
@@ -1016,8 +1022,10 @@ describe('team.ts state management', () => {
         setTeamClaudeFns({
           handleChat: null as unknown as any,
           cancelExecution: mockCancelExecution,
-          setOutputObserver: null as unknown as any,
-          clearOutputObserver: mockClearOutputObserver,
+          addOutputObserver: null as unknown as any,
+          removeOutputObserver: mockRemoveOutputObserver,
+          addCloseObserver: mockAddCloseObserver,
+          removeCloseObserver: mockRemoveCloseObserver,
         });
 
         expect(() => createTeam({ instruction: 'fail' }, '/tmp')).toThrow(
@@ -1148,11 +1156,11 @@ describe('team.ts state management', () => {
 
       it('clears the output observer', () => {
         createTeam({ instruction: 'dissolve me', template: 'custom' }, '/tmp');
-        mockClearOutputObserver.mockClear();
+        mockRemoveOutputObserver.mockClear();
 
         dissolveTeam();
 
-        expect(mockClearOutputObserver).toHaveBeenCalled();
+        expect(mockRemoveOutputObserver).toHaveBeenCalled();
       });
 
       it('clears activeTeam after dissolving', () => {
@@ -1239,11 +1247,11 @@ describe('team.ts state management', () => {
 
       it('clears the output observer', () => {
         createTeam({ instruction: 'complete me', template: 'custom' }, '/tmp');
-        mockClearOutputObserver.mockClear();
+        mockRemoveOutputObserver.mockClear();
 
         completeTeam();
 
-        expect(mockClearOutputObserver).toHaveBeenCalled();
+        expect(mockRemoveOutputObserver).toHaveBeenCalled();
       });
 
       it('clears activeTeam after completing', () => {

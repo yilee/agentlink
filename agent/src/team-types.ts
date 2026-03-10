@@ -127,9 +127,18 @@ export type HandleChatFn = (
   options?: { resumeSessionId?: string; extraArgs?: string[] },
 ) => void;
 export type CancelExecutionFn = (conversationId?: string) => void;
-export type SetOutputObserverFn = (fn: (conversationId: string, msg: Record<string, unknown>) => boolean | void) => void;
+export type AddOutputObserverFn = (fn: (conversationId: string, msg: Record<string, unknown>) => boolean | void) => void;
+export type RemoveOutputObserverFn = (fn: (conversationId: string, msg: Record<string, unknown>) => boolean | void) => void;
+export type AddCloseObserverFn = (fn: (conversationId: string, exitCode: number | null, resultReceived: boolean) => void) => void;
+export type RemoveCloseObserverFn = (fn: (conversationId: string, exitCode: number | null, resultReceived: boolean) => void) => void;
+
+/** @deprecated Use AddOutputObserverFn instead. */
+export type SetOutputObserverFn = AddOutputObserverFn;
+/** @deprecated Use RemoveOutputObserverFn instead. */
 export type ClearOutputObserverFn = () => void;
-export type SetCloseObserverFn = (fn: (conversationId: string, exitCode: number | null, resultReceived: boolean) => void) => void;
+/** @deprecated Use AddCloseObserverFn instead. */
+export type SetCloseObserverFn = AddCloseObserverFn;
+/** @deprecated Use RemoveCloseObserverFn instead. */
 export type ClearCloseObserverFn = () => void;
 
 // ── Template-related types ─────────────────────────────────────────────

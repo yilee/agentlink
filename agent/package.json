@@ -40,12 +40,14 @@
   },
   "dependencies": {
     "commander": "^12.0.0",
+    "node-cron": "^4.2.1",
     "qrcode-terminal": "^0.12.0",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "ws": "^8.16.0"
   },
   "devDependencies": {
+    "@types/node-cron": "^3.0.11",
     "@types/ws": "^8.5.10",
     "tsx": "^4.7.0"
   }

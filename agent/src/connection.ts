@@ -7,10 +7,24 @@ import { handleListDirectory, handleReadFile, handleChangeWorkDir } from './dire
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 import { setTeamSendFn, setTeamClaudeFns, createTeam, dissolveTeam, getActiveTeam, loadTeam, listTeams, deleteTeam, renameTeam, serializeTeam, type TeamConfig } from './team.js';
+import {
+  initScheduler,
+  shutdownScheduler,
+  createLoop,
+  updateLoop,
+  deleteLoop,
+  listLoops,
+  getLoop,
+  runLoopNow,
+  cancelLoopExecution,
+  listLoopExecutions,
+  getLoopExecutionMessages,
+  getRunningExecutions,
+} from './scheduler.js';
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 30_000;
@@ -60,10 +74,26 @@ export function connect(config: AgentConfig): Promise<string> {
   setTeamClaudeFns({
     handleChat: claudeHandleChat,
     cancelExecution: claudeCancelExecution,
+    addOutputObserver,
+    removeOutputObserver,
+    addCloseObserver,
+    removeCloseObserver,
+    // Deprecated aliases kept for team.ts backward compat
     setOutputObserver,
     clearOutputObserver,
     setCloseObserver,
     clearCloseObserver,
+  });
+
+  // Initialize the Loop scheduler
+  initScheduler({
+    send,
+    handleChat: claudeHandleChat,
+    cancelExecution: claudeCancelExecution,
+    addOutputObserver,
+    removeOutputObserver,
+    addCloseObserver,
+    removeCloseObserver,
   });
 
   return new Promise((resolve, reject) => {
@@ -323,11 +353,17 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         }
       }
       const activeTeamState = getActiveTeam();
+      // Collect running loop executions for status recovery
+      const runningLoops: Array<{ executionId: string; loopId: string; conversationId?: string }> = [];
+      for (const [execId, exec] of getRunningExecutions()) {
+        runningLoops.push({ executionId: execId, loopId: exec.loopId, conversationId: exec.conversationId });
+      }
       console.log(`[AgentLink] → active_conversations (${active.length} active)`);
       send({
         type: 'active_conversations',
         conversations: active,
         activeTeam: activeTeamState ? serializeTeam(activeTeamState) : null,
+        runningLoopExecutions: runningLoops,
       });
       break;
     }
@@ -426,6 +462,111 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       } else {
         send({ type: 'error', message: 'Team not found or could not be renamed.' });
       }
+      break;
+    }
+    // ── Loop (Scheduled Tasks) handlers ────────────────────────────────
+    case 'create_loop': {
+      const m = msg as unknown as {
+        name: string;
+        prompt: string;
+        schedule: string;
+        scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron';
+        scheduleConfig: { hour?: number; minute?: number; dayOfWeek?: number };
+      };
+      try {
+        const loop = createLoop({
+          name: m.name,
+          prompt: m.prompt,
+          schedule: m.schedule,
+          scheduleType: m.scheduleType,
+          scheduleConfig: m.scheduleConfig,
+          workDir: state.workDir,
+        });
+        send({ type: 'loop_created', loop });
+      } catch (err) {
+        send({ type: 'error', message: (err as Error).message });
+      }
+      break;
+    }
+    case 'update_loop': {
+      const m = msg as unknown as {
+        loopId: string;
+        updates: Partial<{
+          name: string;
+          prompt: string;
+          schedule: string;
+          scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron';
+          scheduleConfig: { hour?: number; minute?: number; dayOfWeek?: number };
+          enabled: boolean;
+        }>;
+      };
+      try {
+        const loop = updateLoop(m.loopId, m.updates);
+        if (loop) {
+          send({ type: 'loop_updated', loop });
+        } else {
+          send({ type: 'error', message: `Loop not found: ${m.loopId}` });
+        }
+      } catch (err) {
+        send({ type: 'error', message: (err as Error).message });
+      }
+      break;
+    }
+    case 'delete_loop': {
+      const m = msg as unknown as { loopId: string };
+      const deleted = deleteLoop(m.loopId);
+      if (deleted) {
+        send({ type: 'loop_deleted', loopId: m.loopId });
+      } else {
+        send({ type: 'error', message: 'Loop not found or could not be deleted.' });
+      }
+      break;
+    }
+    case 'list_loops':
+      send({ type: 'loops_list', loops: listLoops() });
+      break;
+    case 'get_loop': {
+      const m = msg as unknown as { loopId: string };
+      const loop = getLoop(m.loopId);
+      if (loop) {
+        send({ type: 'loop_detail', loop });
+      } else {
+        send({ type: 'error', message: `Loop not found: ${m.loopId}` });
+      }
+      break;
+    }
+    case 'run_loop': {
+      const m = msg as unknown as { loopId: string };
+      try {
+        runLoopNow(m.loopId);
+      } catch (err) {
+        send({ type: 'error', message: (err as Error).message });
+      }
+      break;
+    }
+    case 'cancel_loop_execution': {
+      const m = msg as unknown as { loopId: string };
+      cancelLoopExecution(m.loopId);
+      break;
+    }
+    case 'list_loop_executions': {
+      const m = msg as unknown as { loopId: string; limit?: number };
+      const executions = listLoopExecutions(m.loopId, m.limit);
+      send({ type: 'loop_executions_list', loopId: m.loopId, executions });
+      break;
+    }
+    case 'get_loop_execution_messages': {
+      const m = msg as unknown as { loopId: string; executionId: string };
+      const messages = getLoopExecutionMessages(m.loopId, m.executionId);
+      send({ type: 'loop_execution_messages', loopId: m.loopId, executionId: m.executionId, messages });
+      break;
+    }
+    case 'query_loop_status': {
+      const running: Array<{ executionId: string; loopId: string; conversationId?: string }> = [];
+      for (const [execId, exec] of getRunningExecutions()) {
+        running.push({ executionId: execId, loopId: exec.loopId, conversationId: exec.conversationId });
+      }
+      send({ type: 'loop_status', loops: listLoops(), runningExecutions: running });
       break;
     }
     case 'ping':

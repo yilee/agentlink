@@ -80,7 +80,24 @@ interface PendingControlRequest {
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const DEFAULT_CONVERSATION_ID = 'default';
-export const MAX_CONVERSATIONS = 15;
+export const MAX_CHAT_CONVERSATIONS = 15;
+export const MAX_LOOP_CONVERSATIONS = 3;
+
+/** @deprecated Use MAX_CHAT_CONVERSATIONS instead. Kept for backward compat. */
+export const MAX_CONVERSATIONS = MAX_CHAT_CONVERSATIONS;
+
+function isLoopConversation(conversationId: string): boolean {
+  return conversationId.startsWith('loop-');
+}
+
+function getConversationCount(type: 'chat' | 'loop'): number {
+  let count = 0;
+  for (const [id] of conversations) {
+    if (type === 'loop' && isLoopConversation(id)) count++;
+    if (type === 'chat' && !isLoopConversation(id)) count++;
+  }
+  return count;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -108,36 +125,59 @@ const conversations = new Map<string, ConversationState>();
 let sendFn: SendFn = () => {};
 const pendingControlRequests = new Map<string, PendingControlRequest>();
 
-// ── Output observer ────────────────────────────────────────────────────────
-// Optional callback invoked for every parsed JSON line from Claude stdout.
-// Receives (conversationId, rawMessage). If it returns true, the message is
-// suppressed from normal forwarding to the web client.
+// ── Output observer chain ──────────────────────────────────────────────────
+// Callbacks invoked for every parsed JSON line from Claude stdout.
+// Receives (conversationId, rawMessage). If any observer returns true, the
+// message is suppressed from normal forwarding to the web client.
+// Multiple observers can be registered (e.g., team + loop).
 
 type OutputObserverFn = (conversationId: string, msg: ClaudeMessage) => boolean | void;
-let outputObserver: OutputObserverFn | null = null;
+const outputObservers: OutputObserverFn[] = [];
 
+export function addOutputObserver(fn: OutputObserverFn): void {
+  outputObservers.push(fn);
+}
+
+export function removeOutputObserver(fn: OutputObserverFn): void {
+  const idx = outputObservers.indexOf(fn);
+  if (idx >= 0) outputObservers.splice(idx, 1);
+}
+
+/** @deprecated Use addOutputObserver() instead. Kept for backward compat (team.ts). */
 export function setOutputObserver(fn: OutputObserverFn): void {
-  outputObserver = fn;
+  addOutputObserver(fn);
 }
 
+/** @deprecated Use removeOutputObserver() instead. Clears ALL observers. */
 export function clearOutputObserver(): void {
-  outputObserver = null;
+  outputObservers.length = 0;
 }
 
-// ── Close observer ────────────────────────────────────────────────────────
-// Optional callback invoked when a Claude process exits. Receives
+// ── Close observer chain ──────────────────────────────────────────────────
+// Callbacks invoked when a Claude process exits. Receives
 // (conversationId, exitCode, resultReceived). Allows the team module to
-// detect Lead crashes (process exited without a result message).
+// detect Lead crashes and the scheduler to detect Loop process exits.
 
 type CloseObserverFn = (conversationId: string, exitCode: number | null, resultReceived: boolean) => void;
-let closeObserver: CloseObserverFn | null = null;
+const closeObservers: CloseObserverFn[] = [];
 
-export function setCloseObserver(fn: CloseObserverFn): void {
-  closeObserver = fn;
+export function addCloseObserver(fn: CloseObserverFn): void {
+  closeObservers.push(fn);
 }
 
+export function removeCloseObserver(fn: CloseObserverFn): void {
+  const idx = closeObservers.indexOf(fn);
+  if (idx >= 0) closeObservers.splice(idx, 1);
+}
+
+/** @deprecated Use addCloseObserver() instead. Kept for backward compat (team.ts). */
+export function setCloseObserver(fn: CloseObserverFn): void {
+  addCloseObserver(fn);
+}
+
+/** @deprecated Use removeCloseObserver() instead. Clears ALL close observers. */
 export function clearCloseObserver(): void {
-  closeObserver = null;
+  closeObservers.length = 0;
 }
 
 export function setSendFn(fn: SendFn): void {
@@ -394,9 +434,11 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     abort(conversationId);
   }
 
-  // Evict oldest idle conversation if at capacity
-  if (conversations.size >= MAX_CONVERSATIONS) {
-    evictOldestIdle(conversationId);
+  // Evict oldest idle conversation if at capacity (quota-aware)
+  const convType = isLoopConversation(conversationId) ? 'loop' : 'chat';
+  const maxForType = convType === 'loop' ? MAX_LOOP_CONVERSATIONS : MAX_CHAT_CONVERSATIONS;
+  if (getConversationCount(convType) >= maxForType) {
+    evictOldestIdle(conversationId, convType);
   }
 
   const inputStream = new Stream<ClaudeMessage>();
@@ -491,16 +533,20 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
 }
 
 /**
- * Evict the oldest idle conversation to make room for a new one.
+ * Evict the oldest idle conversation of the given type to make room for a new one.
  * Only evicts conversations that are NOT actively processing (turnActive === false).
- * If all conversations are active, evicts the oldest one regardless.
+ * If all same-type conversations are active, evicts the oldest one regardless.
  */
-function evictOldestIdle(excludeId: string): void {
+function evictOldestIdle(excludeId: string, convType: 'chat' | 'loop'): void {
   let oldest: { id: string; createdAt: number } | null = null;
   let oldestIdle: { id: string; createdAt: number } | null = null;
+  const maxForType = convType === 'loop' ? MAX_LOOP_CONVERSATIONS : MAX_CHAT_CONVERSATIONS;
 
   for (const [id, conv] of conversations) {
     if (id === excludeId) continue;
+    // Only consider same-type conversations
+    const sameType = convType === 'loop' ? isLoopConversation(id) : !isLoopConversation(id);
+    if (!sameType) continue;
 
     if (!oldest || conv.createdAt < oldest.createdAt) {
       oldest = { id, createdAt: conv.createdAt };
@@ -512,7 +558,7 @@ function evictOldestIdle(excludeId: string): void {
 
   const target = oldestIdle || oldest;
   if (target) {
-    console.log(`[Claude] Evicting conversation ${target.id.slice(0, 8)} (capacity: ${conversations.size}/${MAX_CONVERSATIONS})`);
+    console.log(`[Claude] Evicting ${convType} conversation ${target.id.slice(0, 8)} (capacity: ${getConversationCount(convType)}/${maxForType})`);
     abort(target.id);
   }
 }
@@ -647,9 +693,15 @@ async function processOutput(
         try {
           const msg: ClaudeMessage = JSON.parse(line);
 
-          // Notify output observer (if set) before any processing.
-          // If observer returns true, suppress this message from normal handling.
-          if (outputObserver && outputObserver(state.conversationId, msg)) {
+          // Notify output observers before any processing.
+          // If any observer returns true, suppress this message from normal handling.
+          let suppressed = false;
+          for (const observer of outputObservers) {
+            if (observer(state.conversationId, msg)) {
+              suppressed = true;
+            }
+          }
+          if (suppressed) {
             continue;
           }
 
@@ -785,9 +837,9 @@ async function processOutput(
     }
     state.turnActive = false;
 
-    // Notify close observer (used by team module to detect Lead crash)
-    if (closeObserver) {
-      closeObserver(state.conversationId, child.exitCode, resultHandled);
+    // Notify close observers (used by team + scheduler modules)
+    for (const observer of closeObservers) {
+      observer(state.conversationId, child.exitCode, resultHandled);
     }
 
     // Only clean up if this conversation is still in the map with the same state
