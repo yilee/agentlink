@@ -20,6 +20,8 @@ import { createFileBrowser } from './modules/fileBrowser.js';
 import { createFilePreview } from './modules/filePreview.js';
 import { createTeam } from './modules/team.js';
 import { TEMPLATES, TEMPLATE_KEYS, buildFullLeadPrompt } from './modules/teamTemplates.js';
+import { createLoop } from './modules/loop.js';
+import { LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS, buildCronExpression, formatSchedule } from './modules/loopTemplates.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 
 // ── App ─────────────────────────────────────────────────────────────────────
@@ -124,10 +126,6 @@ const App = {
     const loopsCollapsed = ref(false);
     const loadingTeams = ref(false);
     const loadingLoops = ref(false);
-
-    // Loops state (stubs until loop.js module is wired in Phase 3)
-    const loopsList = ref([]);
-    const selectedLoopId = ref(null);
 
     // Team creation state
     const teamInstruction = ref('');
@@ -284,7 +282,7 @@ const App = {
       switchConversation,
     });
 
-    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+    const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -311,6 +309,11 @@ const App = {
       wsSend, scrollToBottom,
     });
     setTeam(team);
+    // Loop module
+    const loop = createLoop({
+      wsSend, scrollToBottom,
+    });
+    setLoop(loop);
     sidebar.setOnSwitchToChat(() => {
       team.viewMode.value = 'chat';
       team.historicalTeam.value = null;
@@ -715,17 +718,43 @@ const App = {
         }
         return '';
       },
-      // Loop mode (stubs — wired in Phase 3)
-      loopsList, selectedLoopId,
+      // Loop mode
+      loop,
+      loopsList: loop.loopsList,
+      selectedLoop: loop.selectedLoop,
+      selectedExecution: loop.selectedExecution,
+      executionHistory: loop.executionHistory,
+      executionMessages: loop.executionMessages,
+      runningLoops: loop.runningLoops,
+      loadingExecutions: loop.loadingExecutions,
+      loadingExecution: loop.loadingExecution,
+      editingLoopId: loop.editingLoopId,
+      hasRunningLoop: loop.hasRunningLoop,
+      firstRunningLoop: loop.firstRunningLoop,
+      createNewLoop: loop.createNewLoop,
+      updateExistingLoop: loop.updateExistingLoop,
+      deleteExistingLoop: loop.deleteExistingLoop,
+      toggleLoop: loop.toggleLoop,
+      runNow: loop.runNow,
+      cancelExecution: loop.cancelExecution,
+      viewLoopDetail: loop.viewLoopDetail,
+      viewExecution: loop.viewExecution,
+      backToLoopsList: loop.backToLoopsList,
+      backToLoopDetail: loop.backToLoopDetail,
+      startEditing: loop.startEditing,
+      cancelEditing: loop.cancelEditing,
+      LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS,
+      buildCronExpression, formatSchedule,
       requestLoopsList() {
         loadingLoops.value = true;
-        wsSend({ type: 'list_loops' });
+        loop.requestLoopsList();
       },
       newLoop() {
+        loop.backToLoopsList();
         team.viewMode.value = 'loop';
       },
       viewLoop(loopId) {
-        selectedLoopId.value = loopId;
+        loop.viewLoopDetail(loopId);
         team.viewMode.value = 'loop';
       },
     };
@@ -1071,7 +1100,7 @@ const App = {
             <div v-else class="loop-history-list">
               <div
                 v-for="l in loopsList" :key="l.id"
-                :class="['team-history-item', { active: selectedLoopId === l.id }]"
+                :class="['team-history-item', { active: selectedLoop?.id === l.id }]"
                 @click="viewLoop(l.id)"
                 :title="l.name"
               >
@@ -1079,7 +1108,7 @@ const App = {
                   <div class="team-history-title">{{ l.name || 'Untitled loop' }}</div>
                   <div class="team-history-meta">
                     <span :class="['team-status-badge', 'team-status-badge-sm', l.enabled ? 'team-status-running' : 'team-status-completed']">{{ l.enabled ? 'active' : 'paused' }}</span>
-                    <span v-if="l.schedule" class="team-history-tasks">{{ l.schedule }}</span>
+                    <span v-if="l.scheduleType" class="team-history-tasks">{{ formatSchedule(l.scheduleType, l.scheduleConfig || {}, l.schedule) }}</span>
                   </div>
                 </div>
               </div>
