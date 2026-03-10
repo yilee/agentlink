@@ -121,7 +121,13 @@ const App = {
     const workdirMenuOpen = ref(false);
     const teamsCollapsed = ref(false);
     const chatsCollapsed = ref(false);
+    const loopsCollapsed = ref(false);
     const loadingTeams = ref(false);
+    const loadingLoops = ref(false);
+
+    // Loops state (stubs until loop.js module is wired in Phase 3)
+    const loopsList = ref([]);
+    const selectedLoopId = ref(null);
 
     // Team creation state
     const teamInstruction = ref('');
@@ -306,7 +312,7 @@ const App = {
     });
     setTeam(team);
     sidebar.setOnSwitchToChat(() => {
-      team.teamMode.value = 'chat';
+      team.viewMode.value = 'chat';
       team.historicalTeam.value = null;
     });
 
@@ -579,7 +585,7 @@ const App = {
       // File preview
       previewPanelOpen, previewPanelWidth, previewFile, previewLoading, previewMarkdownRendered, filePreview,
       workdirMenuOpen,
-      teamsCollapsed, chatsCollapsed, loadingTeams,
+      teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
       toggleWorkdirMenu() { workdirMenuOpen.value = !workdirMenuOpen.value; },
       workdirMenuBrowse() {
         workdirMenuOpen.value = false;
@@ -597,7 +603,7 @@ const App = {
       // Team mode
       team,
       teamState: team.teamState,
-      teamMode: team.teamMode,
+      viewMode: team.viewMode,
       activeAgentView: team.activeAgentView,
       historicalTeam: team.historicalTeam,
       teamsList: team.teamsList,
@@ -709,6 +715,19 @@ const App = {
         }
         return '';
       },
+      // Loop mode (stubs — wired in Phase 3)
+      loopsList, selectedLoopId,
+      requestLoopsList() {
+        loadingLoops.value = true;
+        wsSend({ type: 'list_loops' });
+      },
+      newLoop() {
+        team.viewMode.value = 'loop';
+      },
+      viewLoop(loopId) {
+        selectedLoopId.value = loopId;
+        team.viewMode.value = 'loop';
+      },
     };
   },
   template: `
@@ -725,8 +744,9 @@ const App = {
           <span v-if="latency !== null && status === 'Connected'" class="latency" :class="{ good: latency < 100, ok: latency >= 100 && latency < 500, bad: latency >= 500 }">{{ latency }}ms</span>
           <span v-if="agentName" class="agent-label">{{ agentName }}</span>
           <div class="team-mode-toggle">
-            <button :class="['team-mode-btn', { active: teamMode === 'chat' }]" @click="teamMode = 'chat'">Chat</button>
-            <button :class="['team-mode-btn', { active: teamMode === 'team' }]" @click="teamMode = 'team'">Team</button>
+            <button :class="['team-mode-btn', { active: viewMode === 'chat' }]" @click="viewMode = 'chat'">Chat</button>
+            <button :class="['team-mode-btn', { active: viewMode === 'team' }]" @click="viewMode = 'team'">Team</button>
+            <button :class="['team-mode-btn', { active: viewMode === 'loop' }]" @click="viewMode = 'loop'">Loop</button>
           </div>
           <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
             <svg v-if="theme === 'dark'" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
@@ -1025,6 +1045,48 @@ const App = {
             </div>
           </div>
 
+          <!-- Loops section -->
+          <div class="sidebar-section sidebar-loops">
+            <div class="sidebar-section-header" @click="loopsCollapsed = !loopsCollapsed" style="cursor: pointer;">
+              <span>Loops</span>
+              <span class="sidebar-section-header-actions">
+                <button class="sidebar-refresh-btn" @click.stop="requestLoopsList" title="Refresh" :disabled="loadingLoops">
+                  <svg :class="{ spinning: loadingLoops }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                </button>
+                <button class="sidebar-collapse-btn" :title="loopsCollapsed ? 'Expand' : 'Collapse'">
+                  <svg :class="{ collapsed: loopsCollapsed }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+                </button>
+              </span>
+            </div>
+
+            <div v-show="!loopsCollapsed" class="sidebar-section-collapsible">
+            <button class="new-conversation-btn" @click="newLoop">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              New loop
+            </button>
+
+            <div v-if="loopsList.length === 0 && !loadingLoops" class="sidebar-empty">
+              No loops configured.
+            </div>
+            <div v-else class="loop-history-list">
+              <div
+                v-for="l in loopsList" :key="l.id"
+                :class="['team-history-item', { active: selectedLoopId === l.id }]"
+                @click="viewLoop(l.id)"
+                :title="l.name"
+              >
+                <div class="team-history-info">
+                  <div class="team-history-title">{{ l.name || 'Untitled loop' }}</div>
+                  <div class="team-history-meta">
+                    <span :class="['team-status-badge', 'team-status-badge-sm', l.enabled ? 'team-status-running' : 'team-status-completed']">{{ l.enabled ? 'active' : 'paused' }}</span>
+                    <span v-if="l.schedule" class="team-history-tasks">{{ l.schedule }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            </div>
+          </div>
+
           <div v-if="serverVersion || agentVersion" class="sidebar-version-footer">
             <span v-if="serverVersion">server {{ serverVersion }}</span>
             <span v-if="serverVersion && agentVersion" class="sidebar-version-sep">/</span>
@@ -1080,7 +1142,7 @@ const App = {
         <div class="chat-area">
 
           <!-- ══ Team Dashboard ══ -->
-          <template v-if="teamMode === 'team'">
+          <template v-if="viewMode === 'team'">
 
             <!-- Team creation panel (no active team) -->
             <div v-if="!displayTeam" class="team-create-panel">
@@ -1426,8 +1488,21 @@ const App = {
             </div>
           </template>
 
+          <!-- ══ Loop Dashboard ══ -->
+          <template v-else-if="viewMode === 'loop'">
+            <div class="team-create-panel">
+              <div class="team-create-inner">
+                <div class="team-create-header">
+                  <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" opacity="0.5" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                  <h2>Scheduled Loops</h2>
+                </div>
+                <p class="team-create-desc">Configure recurring tasks that run on a schedule. Loop creation UI will be available in Phase 4.</p>
+              </div>
+            </div>
+          </template>
+
           <!-- ══ Normal Chat ══ -->
-          <template v-else>
+          <template v-else-if="viewMode === 'chat'">
           <div class="message-list" @scroll="onMessageListScroll">
             <div class="message-list-inner">
               <div v-if="messages.length === 0 && status === 'Connected' && !loadingHistory" class="empty-state">
@@ -1599,7 +1674,7 @@ const App = {
           </template>
 
           <!-- Input area (shown in both chat and team create mode) -->
-          <div class="input-area" v-if="teamMode !== 'team'">
+          <div class="input-area" v-if="viewMode === 'chat'">
             <input
               type="file"
               ref="fileInputRef"

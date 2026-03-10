@@ -23,8 +23,8 @@ export function createTeam(deps) {
   /** @type {import('vue').Ref<object|null>} Current team state (TeamStateSerialized or null) */
   const teamState = ref(null);
 
-  /** @type {import('vue').Ref<string>} 'chat' | 'team' — current input mode */
-  const teamMode = ref('chat');
+  /** @type {import('vue').Ref<string>} 'chat' | 'team' | 'loop' — current view mode */
+  const viewMode = ref('chat');
 
   /** @type {import('vue').Ref<string|null>} Currently viewed agent ID, null = dashboard */
   const activeAgentView = ref(null);
@@ -135,13 +135,13 @@ export function createTeam(deps) {
   }
 
   function backToChat() {
-    teamMode.value = 'chat';
+    viewMode.value = 'chat';
     historicalTeam.value = null;
     activeAgentView.value = null;
   }
 
   function newTeam() {
-    teamMode.value = 'team';
+    viewMode.value = 'team';
     historicalTeam.value = null;
     activeAgentView.value = null;
     // If completed team is still in teamState, clear it so create panel shows
@@ -161,7 +161,7 @@ export function createTeam(deps) {
     switch (msg.type) {
       case 'team_created':
         teamState.value = msg.team;
-        teamMode.value = 'team';
+        viewMode.value = 'team';
         historicalTeam.value = null;
         activeAgentView.value = null;
         agentMessages.value = {};
@@ -266,7 +266,7 @@ export function createTeam(deps) {
 
       case 'team_detail':
         historicalTeam.value = msg.team;
-        teamMode.value = 'team';
+        viewMode.value = 'team';
         activeAgentView.value = null;
         return true;
 
@@ -355,7 +355,7 @@ export function createTeam(deps) {
   function handleActiveTeamRestore(activeTeam) {
     if (!activeTeam) return;
     teamState.value = activeTeam;
-    teamMode.value = 'team';
+    viewMode.value = 'team';
     // Re-initialize agent message lists (messages lost on reconnect)
     if (!agentMessages.value['lead']) {
       agentMessages.value['lead'] = [];
@@ -371,7 +371,7 @@ export function createTeam(deps) {
 
   return {
     // State
-    teamState, teamMode, activeAgentView, historicalTeam, teamsList,
+    teamState, viewMode, activeAgentView, historicalTeam, teamsList,
     agentMessages,
     // Computed
     isTeamActive, isTeamRunning, displayTeam,

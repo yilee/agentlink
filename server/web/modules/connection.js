@@ -43,6 +43,10 @@ export function createConnection(deps) {
   let team = null;
   function setTeam(t) { team = t; }
 
+  // Loop module — set after creation to resolve circular dependency
+  let loop = null;
+  function setLoop(l) { loop = l; }
+
   let ws = null;
   let sessionKey = null;
   let reconnectAttempts = 0;
@@ -230,6 +234,12 @@ export function createConnection(deps) {
         return;
       }
 
+      // ── Loop messages: route before normal conversation routing ──
+      if (loop && (msg.type?.startsWith('loop_') || msg.type === 'loops_list')) {
+        loop.handleLoopMessage(msg);
+        return;
+      }
+
       // ── Multi-session: route messages to background conversations ──
       // Messages with a conversationId that doesn't match the current foreground
       // conversation are routed to their cached background state.
@@ -268,6 +278,7 @@ export function createConnection(deps) {
           }
           sidebar.requestSessionList();
           if (team) team.requestTeamsList();
+          if (loop) loop.requestLoopsList();
           startPing();
           wsSend({ type: 'query_active_conversations' });
         } else {
@@ -312,6 +323,7 @@ export function createConnection(deps) {
         }
         sidebar.requestSessionList();
         if (team) team.requestTeamsList();
+        if (loop) loop.requestLoopsList();
         startPing();
         wsSend({ type: 'query_active_conversations' });
       } else if (msg.type === 'active_conversations') {
@@ -554,8 +566,10 @@ export function createConnection(deps) {
         // Clear old history immediately so UI doesn't show stale data
         historySessions.value = [];
         if (team) team.teamsList.value = [];
+        if (loop) loop.loopsList.value = [];
         sidebar.requestSessionList();
         if (team) team.requestTeamsList();
+        if (loop) loop.requestLoopsList();
       }
     };
 
@@ -606,5 +620,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }
