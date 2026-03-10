@@ -551,6 +551,9 @@ export function createConnection(deps) {
           content: 'Working directory changed to: ' + msg.workDir,
           timestamp: new Date(),
         });
+        // Clear old history immediately so UI doesn't show stale data
+        historySessions.value = [];
+        if (team) team.teamsList.value = [];
         sidebar.requestSessionList();
         if (team) team.requestTeamsList();
       }
