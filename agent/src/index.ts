@@ -3,6 +3,7 @@ import type { AgentConfig } from './config.js';
 import { saveRuntimeState, clearRuntimeState } from './config.js';
 import { connect, disconnect } from './connection.js';
 import { startAutoUpdate, stopAutoUpdate } from './auto-update.js';
+import { shutdownScheduler } from './scheduler.js';
 
 const require = createRequire(import.meta.url);
 const qrcode = require('qrcode-terminal');
@@ -54,6 +55,7 @@ export async function start(config: AgentConfig, daemon = false): Promise<void> 
     // Keep process alive, handle graceful shutdown
     const shutdown = () => {
       console.log('\n[AgentLink] Shutting down...');
+      shutdownScheduler();
       stopAutoUpdate();
       clearRuntimeState();
       disconnect();

@@ -45,7 +45,8 @@ export function buildHistoryBatch(history, nextId) {
       batch.push({
         id: nextId(), role: 'tool',
         toolId: h.toolId || '', toolName: h.toolName || 'unknown',
-        toolInput: h.toolInput || '', hasResult: true,
+        toolInput: h.toolInput || '', hasResult: !!h.toolOutput,
+        toolOutput: h.toolOutput || '',
         expanded: (h.toolName === 'Edit' || h.toolName === 'TodoWrite' || h.toolName === 'Agent'),
         timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
       });

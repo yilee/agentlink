@@ -46,10 +46,10 @@ import type {
   SendFn,
   HandleChatFn,
   CancelExecutionFn,
-  SetOutputObserverFn,
-  ClearOutputObserverFn,
-  SetCloseObserverFn,
-  ClearCloseObserverFn,
+  AddOutputObserverFn,
+  RemoveOutputObserverFn,
+  AddCloseObserverFn,
+  RemoveCloseObserverFn,
 } from './team-types.js';
 
 import { getNextAgentColor, deriveAgentDisplayName, deriveTaskTitle } from './team-naming.js';
@@ -67,10 +67,10 @@ let activeTeam: TeamState | null = null;
 let sendFn: SendFn = () => {};
 let handleChatFn: HandleChatFn | null = null;
 let cancelExecutionFn: CancelExecutionFn | null = null;
-let setOutputObserverFn: SetOutputObserverFn | null = null;
-let clearOutputObserverFn: ClearOutputObserverFn | null = null;
-let setCloseObserverFn: SetCloseObserverFn | null = null;
-let clearCloseObserverFn: ClearCloseObserverFn | null = null;
+let addOutputObserverFn: AddOutputObserverFn | null = null;
+let removeOutputObserverFn: RemoveOutputObserverFn | null = null;
+let addCloseObserverFn: AddCloseObserverFn | null = null;
+let removeCloseObserverFn: RemoveCloseObserverFn | null = null;
 let agentMessageIdCounter = 0;
 
 // ── Public API ─────────────────────────────────────────────────────────
@@ -86,17 +86,25 @@ export function setTeamSendFn(fn: SendFn): void {
 export function setTeamClaudeFns(fns: {
   handleChat: HandleChatFn;
   cancelExecution: CancelExecutionFn;
-  setOutputObserver: SetOutputObserverFn;
-  clearOutputObserver: ClearOutputObserverFn;
-  setCloseObserver: SetCloseObserverFn;
-  clearCloseObserver: ClearCloseObserverFn;
+  addOutputObserver: AddOutputObserverFn;
+  removeOutputObserver: RemoveOutputObserverFn;
+  addCloseObserver: AddCloseObserverFn;
+  removeCloseObserver: RemoveCloseObserverFn;
+  /** @deprecated Alias for addOutputObserver */
+  setOutputObserver?: AddOutputObserverFn;
+  /** @deprecated Alias for removeOutputObserver */
+  clearOutputObserver?: () => void;
+  /** @deprecated Alias for addCloseObserver */
+  setCloseObserver?: AddCloseObserverFn;
+  /** @deprecated Alias for removeCloseObserver */
+  clearCloseObserver?: () => void;
 }): void {
   handleChatFn = fns.handleChat;
   cancelExecutionFn = fns.cancelExecution;
-  setOutputObserverFn = fns.setOutputObserver;
-  clearOutputObserverFn = fns.clearOutputObserver;
-  setCloseObserverFn = fns.setCloseObserver;
-  clearCloseObserverFn = fns.clearCloseObserver;
+  addOutputObserverFn = fns.addOutputObserver;
+  removeOutputObserverFn = fns.removeOutputObserver;
+  addCloseObserverFn = fns.addCloseObserver;
+  removeCloseObserverFn = fns.removeCloseObserver;
 }
 
 export function getActiveTeam(): TeamState | null {
@@ -403,11 +411,11 @@ function finalizeAgentsAndTasks(
 }
 
 /**
- * Remove output and close observers.
+ * Remove output and close observers for the team.
  */
 function cleanupObservers(): void {
-  if (clearOutputObserverFn) clearOutputObserverFn();
-  if (clearCloseObserverFn) clearCloseObserverFn();
+  if (removeOutputObserverFn) removeOutputObserverFn(onLeadOutput);
+  if (removeCloseObserverFn) removeCloseObserverFn(onLeadClose);
 }
 
 // ── Output stream parser (observer callback) ────────────────────────────
@@ -770,7 +778,7 @@ function extractOutputData(msg: Record<string, unknown>): Record<string, unknown
  * Spawns the Lead Claude process with --agents flag and attaches the output observer.
  */
 export function createTeam(config: TeamConfig, workDir: string): TeamState {
-  if (!handleChatFn || !setOutputObserverFn) {
+  if (!handleChatFn || !addOutputObserverFn) {
     throw new Error('Team claude functions not initialized. Call setTeamClaudeFns() first.');
   }
 
@@ -785,11 +793,11 @@ export function createTeam(config: TeamConfig, workDir: string): TeamState {
   const leadPrompt = config.leadPrompt || buildLeadPrompt(config, agentsDef);
 
   // Attach output observer before spawning
-  setOutputObserverFn(onLeadOutput);
+  addOutputObserverFn(onLeadOutput);
 
   // Attach close observer to detect Lead crash
-  if (setCloseObserverFn) {
-    setCloseObserverFn(onLeadClose);
+  if (addCloseObserverFn) {
+    addCloseObserverFn(onLeadClose);
   }
 
   // Spawn the Lead process with --agents flag
