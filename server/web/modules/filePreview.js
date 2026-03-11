@@ -188,9 +188,19 @@ export function createFilePreview(deps) {
     return renderMarkdown(content || '');
   }
 
+  /** Force re-fetch the currently open preview file (e.g. after editing) */
+  function refreshPreview() {
+    if (!previewFile.value?.filePath) return;
+    const filePath = previewFile.value.filePath;
+    previewFile.value = null;
+    previewLoading.value = true;
+    wsSend({ type: 'read_file', filePath });
+  }
+
   return {
     openPreview,
     closePreview,
+    refreshPreview,
     handleFileContent,
     onWorkdirChanged,
     detectLanguage,

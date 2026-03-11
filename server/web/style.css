@@ -5046,3 +5046,126 @@ body {
   justify-content: center;
   padding: 12px 0 4px;
 }
+
+/* ── Memory management ── */
+.memory-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.memory-empty-hint {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+.memory-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.memory-file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.memory-file-row:hover {
+  background: var(--hover-bg);
+}
+.memory-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.memory-file-item:hover .memory-delete-btn {
+  opacity: 1;
+}
+.memory-delete-btn:hover {
+  color: var(--error-color, #e53e3e);
+  background: var(--hover-bg);
+}
+.memory-edit-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.memory-edit-textarea {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: none;
+  resize: none;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.memory-edit-textarea:focus {
+  outline: none;
+}
+.memory-header-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.memory-header-cancel:hover {
+  background: var(--bg-tertiary);
+}
+.memory-header-save {
+  background: var(--accent);
+  border: none;
+  color: white;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.memory-header-save:hover {
+  opacity: 0.9;
+}
+.memory-header-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.preview-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+.preview-edit-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+.preview-edit-label {
+  font-size: 0.75rem;
+  color: var(--accent-color);
+  margin-left: auto;
+}
