@@ -119,12 +119,21 @@ const App = {
     const fileTreeRoot = ref(null);
     const fileTreeLoading = ref(false);
     const fileContextMenu = ref(null);
-    const sidebarView = ref('sessions');       // 'sessions' | 'files' | 'preview' (mobile only)
+    const sidebarView = ref('sessions');       // 'sessions' | 'files' | 'preview' | 'memory' (mobile only)
     const isMobile = ref(window.innerWidth <= 768);
     const workdirMenuOpen = ref(false);
     const teamsCollapsed = ref(false);
     const chatsCollapsed = ref(false);
     const loopsCollapsed = ref(false);
+
+    // Memory management state
+    const memoryPanelOpen = ref(false);
+    const memoryFiles = ref([]);
+    const memoryDir = ref(null);
+    const memoryLoading = ref(false);
+    const memoryEditing = ref(false);
+    const memoryEditContent = ref('');
+    const memorySaving = ref(false);
     const _sidebarCollapseKey = () => hostname.value ? `agentlink-sidebar-collapsed-${hostname.value}` : null;
     const loadingTeams = ref(false);
     const loadingLoops = ref(false);
@@ -331,6 +340,8 @@ const App = {
       // Multi-session parallel
       currentConversationId, processingConversations, conversationCache,
       switchConversation,
+      // Memory management
+      memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
       // i18n
       t,
     });
@@ -669,6 +680,59 @@ const App = {
       workdirMenuCopyPath() {
         workdirMenuOpen.value = false;
         navigator.clipboard.writeText(workDir.value);
+      },
+      // Memory management
+      memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
+      memoryEditing, memoryEditContent, memorySaving,
+      workdirMenuMemory() {
+        workdirMenuOpen.value = false;
+        if (isMobile.value) {
+          sidebarView.value = 'memory';
+        } else {
+          memoryPanelOpen.value = !memoryPanelOpen.value;
+          if (memoryPanelOpen.value) filePanelOpen.value = false;
+        }
+        if (!memoryFiles.value.length) {
+          memoryLoading.value = true;
+          wsSend({ type: 'list_memory' });
+        }
+      },
+      refreshMemory() {
+        memoryLoading.value = true;
+        wsSend({ type: 'list_memory' });
+      },
+      openMemoryFile(file) {
+        memoryEditing.value = false;
+        memoryEditContent.value = '';
+        if (memoryDir.value) {
+          const sep = memoryDir.value.includes('\\') ? '\\' : '/';
+          filePreview.openPreview(memoryDir.value + sep + file.name);
+        }
+        if (isMobile.value) sidebarView.value = 'preview';
+      },
+      startMemoryEdit() {
+        memoryEditing.value = true;
+        memoryEditContent.value = previewFile.value?.content || '';
+      },
+      cancelMemoryEdit() {
+        if (memoryEditContent.value !== (previewFile.value?.content || '')) {
+          if (!confirm(t('memory.discardChanges'))) return;
+        }
+        memoryEditing.value = false;
+        memoryEditContent.value = '';
+      },
+      saveMemoryEdit() {
+        if (!previewFile.value) return;
+        memorySaving.value = true;
+        wsSend({
+          type: 'update_memory',
+          filename: previewFile.value.fileName,
+          content: memoryEditContent.value,
+        });
+      },
+      deleteMemoryFile(file) {
+        if (!confirm(t('memory.deleteConfirm', { name: file.name }))) return;
+        wsSend({ type: 'delete_memory', filename: file.name });
       },
       // Team mode
       team,
@@ -1122,6 +1186,31 @@ const App = {
             </div>
           </div>
 
+          <!-- Mobile: memory view -->
+          <div v-else-if="isMobile && sidebarView === 'memory'" class="file-panel-mobile">
+            <div class="file-panel-mobile-header">
+              <button class="file-panel-mobile-back" @click="sidebarView = 'sessions'">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                {{ t('sidebar.sessions') }}
+              </button>
+              <button class="file-panel-btn" @click="refreshMemory()" :title="t('sidebar.refresh')">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              </button>
+            </div>
+            <div v-if="memoryLoading" class="file-panel-loading">{{ t('memory.loading') }}</div>
+            <div v-else-if="memoryFiles.length === 0" class="memory-empty">
+              <p>{{ t('memory.noFiles') }}</p>
+              <p class="memory-empty-hint">{{ t('memory.noFilesHint') }}</p>
+            </div>
+            <div v-else class="file-tree">
+              <div v-for="file in memoryFiles" :key="file.name"
+                   class="file-tree-item" @click="openMemoryFile(file)">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM6 20V4h5v5c0 .55.45 1 1 1h5v10H6z"/></svg>
+                <span class="file-tree-name">{{ file.name }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Normal sidebar content (sessions view) -->
           <template v-else>
           <div class="sidebar-section">
@@ -1149,6 +1238,10 @@ const App = {
                 <div class="workdir-menu-item" @click.stop="workdirMenuCopyPath()">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
                   <span>{{ t('sidebar.copyPath') }}</span>
+                </div>
+                <div class="workdir-menu-item" @click.stop="workdirMenuMemory()">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM6 20V4h5v5c0 .55.45 1 1 1h5v10H6z"/></svg>
+                  <span>{{ t('sidebar.memory') }}</span>
                 </div>
               </div>
               <div v-if="filteredWorkdirHistory.length > 0" class="workdir-history">
@@ -1417,6 +1510,39 @@ const App = {
               <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ t('filePanel.empty') }}</div>
               <div v-if="item.node.error" class="file-tree-error" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ item.node.error }}</div>
             </template>
+          </div>
+        </div>
+        </Transition>
+
+        <!-- Memory panel (desktop) -->
+        <Transition name="file-panel">
+        <div v-if="memoryPanelOpen && !isMobile" class="file-panel memory-panel">
+          <div class="file-panel-header">
+            <span class="file-panel-title">{{ t('memory.title') }}</span>
+            <div class="file-panel-actions">
+              <button class="file-panel-btn" @click="refreshMemory()" :title="t('sidebar.refresh')">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              </button>
+              <button class="file-panel-btn" @click="memoryPanelOpen = false" :title="t('sidebar.close')">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div v-if="memoryLoading" class="file-panel-loading">{{ t('memory.loading') }}</div>
+          <div v-else-if="memoryFiles.length === 0" class="memory-empty">
+            <p>{{ t('memory.noFiles') }}</p>
+            <p class="memory-empty-hint">{{ t('memory.noFilesHint') }}</p>
+          </div>
+          <div v-else class="file-tree">
+            <div v-for="file in memoryFiles" :key="file.name" class="file-tree-item memory-file-item">
+              <div class="memory-file-row" @click="openMemoryFile(file)">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM6 20V4h5v5c0 .55.45 1 1 1h5v10H6z"/></svg>
+                <span class="file-tree-name">{{ file.name }}</span>
+              </div>
+              <button class="memory-delete-btn" @click.stop="deleteMemoryFile(file)" :title="t('memory.deleteFile')">
+                <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+              </button>
+            </div>
           </div>
         </div>
         </Transition>
@@ -2304,10 +2430,25 @@ const App = {
             <span v-if="previewFile" class="preview-panel-size">
               {{ filePreview.formatFileSize(previewFile.totalSize) }}
             </span>
-            <button class="preview-panel-close" @click="filePreview.closePreview()" :title="t('preview.closePreview')">&times;</button>
+            <button v-if="memoryPanelOpen && previewFile && !memoryEditing"
+                    class="preview-edit-btn" @click="startMemoryEdit()" :title="t('memory.edit')">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
+              {{ t('memory.edit') }}
+            </button>
+            <span v-if="memoryEditing" class="preview-edit-label">{{ t('memory.editing') }}</span>
+            <button class="preview-panel-close" @click="filePreview.closePreview(); memoryEditing = false" :title="t('preview.closePreview')">&times;</button>
           </div>
           <div class="preview-panel-body">
-            <div v-if="previewLoading" class="preview-loading">{{ t('preview.loading') }}</div>
+            <div v-if="memoryEditing" class="memory-edit-container">
+              <textarea class="memory-edit-textarea" v-model="memoryEditContent"></textarea>
+              <div class="memory-edit-actions">
+                <button class="memory-edit-cancel" @click="cancelMemoryEdit()">{{ t('loop.cancel') }}</button>
+                <button class="memory-edit-save" @click="saveMemoryEdit()" :disabled="memorySaving">
+                  {{ memorySaving ? t('memory.saving') : t('memory.save') }}
+                </button>
+              </div>
+            </div>
+            <div v-else-if="previewLoading" class="preview-loading">{{ t('preview.loading') }}</div>
             <div v-else-if="previewFile?.error" class="preview-error">
               {{ previewFile.error }}
             </div>

@@ -31,7 +31,7 @@ function getClaudeProjectsDir(): string {
   return join(homedir(), '.claude', 'projects');
 }
 
-function pathToProjectFolder(workDir: string): string {
+export function pathToProjectFolder(workDir: string): string {
   const sanitized = workDir.replace(/[^a-zA-Z0-9]/g, '-');
   if (sanitized.length <= 200) return sanitized;
   // Hash for long paths (matches Claude CLI's Java-style hashCode)

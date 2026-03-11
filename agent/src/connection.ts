@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
+import { listMemoryFiles, updateMemoryFile, deleteMemoryFile } from './memory.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 import { setTeamSendFn, setTeamClaudeFns, createTeam, dissolveTeam, getActiveTeam, loadTeam, listTeams, deleteTeam, renameTeam, serializeTeam, type TeamConfig } from './team.js';
 import {
@@ -572,6 +573,23 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'ping':
       send({ type: 'pong', ts: (msg as unknown as { ts: number }).ts });
       break;
+    case 'list_memory': {
+      const result = listMemoryFiles(state.workDir);
+      send({ type: 'memory_list', memoryDir: result.memoryDir, files: result.files });
+      break;
+    }
+    case 'update_memory': {
+      const { filename, content } = msg as unknown as { filename: string; content: string };
+      const result = updateMemoryFile(state.workDir, filename, content);
+      send({ type: 'memory_updated', filename, ...result });
+      break;
+    }
+    case 'delete_memory': {
+      const { filename } = msg as unknown as { filename: string };
+      const result = deleteMemoryFile(state.workDir, filename);
+      send({ type: 'memory_deleted', filename, ...result });
+      break;
+    }
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
   }

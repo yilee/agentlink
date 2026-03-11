@@ -246,5 +246,18 @@
   "tool.replaceAll": "(replace all)",
 
   "usage.context": "Context",
-  "usage.cost": "Cost"
+  "usage.cost": "Cost",
+
+  "sidebar.memory": "Memory",
+  "memory.title": "Memory Files",
+  "memory.loading": "Loading memory files...",
+  "memory.noFiles": "No memory files found.",
+  "memory.noFilesHint": "Claude will create memory files as you work.",
+  "memory.edit": "Edit",
+  "memory.editing": "Editing",
+  "memory.save": "Save",
+  "memory.saving": "Saving...",
+  "memory.deleteFile": "Delete",
+  "memory.deleteConfirm": "Delete {name}?",
+  "memory.discardChanges": "Discard changes?"
 }

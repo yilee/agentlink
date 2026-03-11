@@ -246,5 +246,18 @@
   "tool.replaceAll": "（全部替换）",
 
   "usage.context": "上下文",
-  "usage.cost": "费用"
+  "usage.cost": "费用",
+
+  "sidebar.memory": "记忆",
+  "memory.title": "记忆文件",
+  "memory.loading": "加载记忆文件...",
+  "memory.noFiles": "未找到记忆文件。",
+  "memory.noFilesHint": "Claude 会在工作过程中自动创建记忆文件。",
+  "memory.edit": "编辑",
+  "memory.editing": "编辑中",
+  "memory.save": "保存",
+  "memory.saving": "保存中...",
+  "memory.deleteFile": "删除",
+  "memory.deleteConfirm": "删除 {name}？",
+  "memory.discardChanges": "放弃更改？"
 }

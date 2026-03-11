@@ -5010,3 +5010,130 @@ body {
   justify-content: center;
   padding: 12px 0 4px;
 }
+
+/* ── Memory management ── */
+.memory-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.memory-empty-hint {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+.memory-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.memory-file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.memory-file-row:hover {
+  background: var(--hover-bg);
+}
+.memory-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.memory-file-item:hover .memory-delete-btn {
+  opacity: 1;
+}
+.memory-delete-btn:hover {
+  color: var(--error-color, #e53e3e);
+  background: var(--hover-bg);
+}
+.memory-edit-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.memory-edit-textarea {
+  flex: 1;
+  width: 100%;
+  border: none;
+  resize: none;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.memory-edit-textarea:focus {
+  outline: none;
+}
+.memory-edit-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color);
+  justify-content: flex-end;
+}
+.memory-edit-cancel {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.memory-edit-cancel:hover {
+  background: var(--hover-bg);
+}
+.memory-edit-save {
+  background: var(--accent-color);
+  border: none;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.memory-edit-save:hover {
+  opacity: 0.9;
+}
+.memory-edit-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.preview-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+.preview-edit-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+.preview-edit-label {
+  font-size: 0.75rem;
+  color: var(--accent-color);
+  margin-left: auto;
+}

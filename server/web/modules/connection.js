@@ -25,6 +25,8 @@ export function createConnection(deps) {
     // Multi-session parallel
     currentConversationId, processingConversations, conversationCache,
     switchConversation,
+    // Memory management
+    memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
     // i18n
     t,
   } = deps;
@@ -539,6 +541,24 @@ export function createConnection(deps) {
         }
       } else if (msg.type === 'file_content') {
         if (filePreview) filePreview.handleFileContent(msg);
+      } else if (msg.type === 'memory_list') {
+        memoryLoading.value = false;
+        memoryFiles.value = msg.files || [];
+        memoryDir.value = msg.memoryDir || null;
+      } else if (msg.type === 'memory_updated') {
+        memorySaving.value = false;
+        if (msg.success) {
+          memoryEditing.value = false;
+          memoryEditContent.value = '';
+          // Refresh list
+          wsSend({ type: 'list_memory' });
+        }
+      } else if (msg.type === 'memory_deleted') {
+        if (msg.success) {
+          memoryFiles.value = memoryFiles.value.filter(f => f.name !== msg.filename);
+          // Close preview if open (might be showing the deleted file)
+          if (filePreview) filePreview.closePreview();
+        }
       } else if (msg.type === 'workdir_changed') {
         workdirSwitching.value = false;
         workDir.value = msg.workDir;
@@ -573,6 +593,10 @@ export function createConnection(deps) {
         historySessions.value = [];
         if (team) team.teamsList.value = [];
         if (loop) loop.loopsList.value = [];
+        memoryFiles.value = [];
+        memoryDir.value = null;
+        memoryPanelOpen.value = false;
+        memoryEditing.value = false;
         sidebar.requestSessionList();
         if (team) team.requestTeamsList();
         if (loop) loop.requestLoopsList();
