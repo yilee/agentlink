@@ -25,6 +25,8 @@ export function createConnection(deps) {
     // Multi-session parallel
     currentConversationId, processingConversations, conversationCache,
     switchConversation,
+    // i18n
+    t,
   } = deps;
 
   // Dequeue callback — set after creation to resolve circular dependency
@@ -163,7 +165,7 @@ export function createConnection(deps) {
     const sid = getSessionId();
     if (!sid) {
       status.value = 'No Session';
-      error.value = 'No session ID in URL. Use a session URL provided by agentlink start.';
+      error.value = t('error.noSessionId');
       return;
     }
     sessionId.value = sid;
@@ -194,9 +196,9 @@ export function createConnection(deps) {
         return;
       }
       if (parsed.type === 'auth_failed') {
-        authError.value = parsed.message || 'Incorrect password.';
+        authError.value = parsed.message || t('error.incorrectPassword');
         authAttempts.value = parsed.attemptsRemaining != null
-          ? `${parsed.attemptsRemaining} attempt${parsed.attemptsRemaining !== 1 ? 's' : ''} remaining`
+          ? t('error.attemptsRemaining', { n: parsed.attemptsRemaining })
           : null;
         authPassword.value = '';
         return;
@@ -204,7 +206,7 @@ export function createConnection(deps) {
       if (parsed.type === 'auth_locked') {
         authLocked.value = true;
         authRequired.value = false;
-        authError.value = parsed.message || 'Too many failed attempts.';
+        authError.value = parsed.message || t('error.tooManyAttempts');
         status.value = 'Locked';
         return;
       }
@@ -283,7 +285,7 @@ export function createConnection(deps) {
           wsSend({ type: 'query_active_conversations' });
         } else {
           status.value = 'Waiting';
-          error.value = 'Agent is not connected yet.';
+          error.value = t('error.agentNotConnected');
         }
       } else if (msg.type === 'pong') {
         if (typeof msg.ts === 'number') {
@@ -294,7 +296,7 @@ export function createConnection(deps) {
         status.value = 'Waiting';
         agentName.value = '';
         hostname.value = '';
-        error.value = 'Agent disconnected. Waiting for reconnect...';
+        error.value = t('error.agentDisconnected');
         isProcessing.value = false;
         isCompacting.value = false;
         queuedMessages.value = [];
@@ -423,7 +425,7 @@ export function createConnection(deps) {
           isCompacting.value = true;
           messages.value.push({
             id: streaming.nextId(), role: 'system',
-            content: 'Context compacting...', isCompactStart: true,
+            content: t('system.contextCompacting'), isCompactStart: true,
             timestamp: new Date(),
           });
           scrollToBottom();
@@ -432,7 +434,7 @@ export function createConnection(deps) {
           // Update the start message to show completed
           const startMsg = [...messages.value].reverse().find(m => m.isCompactStart && !m.compactDone);
           if (startMsg) {
-            startMsg.content = 'Context compacted';
+            startMsg.content = t('system.contextCompacted');
             startMsg.compactDone = true;
           }
           scrollToBottom();
@@ -451,7 +453,7 @@ export function createConnection(deps) {
           needsResume.value = true;
           messages.value.push({
             id: streaming.nextId(), role: 'system',
-            content: 'Generation stopped.', timestamp: new Date(),
+            content: t('system.generationStopped'), timestamp: new Date(),
           });
           scrollToBottom();
         }
@@ -507,20 +509,20 @@ export function createConnection(deps) {
           isProcessing.value = true;
           messages.value.push({
             id: streaming.nextId(), role: 'system',
-            content: 'Context compacting...', isCompactStart: true,
+            content: t('system.contextCompacting'), isCompactStart: true,
             timestamp: new Date(),
           });
         } else if (msg.isProcessing) {
           isProcessing.value = true;
           messages.value.push({
             id: streaming.nextId(), role: 'system',
-            content: 'Agent is processing...',
+            content: t('system.agentProcessing'),
             timestamp: new Date(),
           });
         } else {
           messages.value.push({
             id: streaming.nextId(), role: 'system',
-            content: 'Session restored. You can continue the conversation.',
+            content: t('system.sessionRestored'),
             timestamp: new Date(),
           });
         }
@@ -564,7 +566,7 @@ export function createConnection(deps) {
         }
         messages.value.push({
           id: streaming.nextId(), role: 'system',
-          content: 'Working directory changed to: ' + msg.workDir,
+          content: t('system.workdirChanged', { dir: msg.workDir }),
           timestamp: new Date(),
         });
         // Clear old history immediately so UI doesn't show stale data
@@ -601,13 +603,13 @@ export function createConnection(deps) {
   function scheduleReconnect(scheduleHighlight) {
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       status.value = 'Disconnected';
-      error.value = 'Unable to reconnect. Please refresh the page.';
+      error.value = t('error.unableToReconnect');
       return;
     }
     const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(1.5, reconnectAttempts), RECONNECT_MAX_DELAY);
     reconnectAttempts++;
     status.value = 'Reconnecting...';
-    error.value = 'Connection lost. Reconnecting... (attempt ' + reconnectAttempts + ')';
+    error.value = t('error.connectionLost', { n: reconnectAttempts });
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(scheduleHighlight); }, delay);
   }
