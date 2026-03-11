@@ -201,6 +201,12 @@ const App = {
     const previewFile = ref(null);
     const previewLoading = ref(false);
     const previewMarkdownRendered = ref(false);
+    const isMemoryPreview = computed(() => {
+      if (!previewFile.value?.filePath || !memoryDir.value) return false;
+      const fp = previewFile.value.filePath.replace(/\\/g, '/');
+      const md = memoryDir.value.replace(/\\/g, '/');
+      return fp.startsWith(md);
+    });
 
     // ── switchConversation: save current → load target ──
     // Defined here and used by sidebar.newConversation, sidebar.resumeSession, workdir_changed
@@ -738,7 +744,7 @@ const App = {
       },
       // Memory management
       memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
-      memoryEditing, memoryEditContent, memorySaving,
+      memoryEditing, memoryEditContent, memorySaving, isMemoryPreview,
       workdirMenuMemory() {
         workdirMenuOpen.value = false;
         if (isMobile.value) {
@@ -2494,23 +2500,21 @@ const App = {
             <span v-if="previewFile" class="preview-panel-size">
               {{ filePreview.formatFileSize(previewFile.totalSize) }}
             </span>
-            <button v-if="memoryPanelOpen && previewFile && !memoryEditing"
+            <button v-if="isMemoryPreview && previewFile && !memoryEditing"
                     class="preview-edit-btn" @click="startMemoryEdit()" :title="t('memory.edit')">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
               {{ t('memory.edit') }}
             </button>
             <span v-if="memoryEditing" class="preview-edit-label">{{ t('memory.editing') }}</span>
+            <button v-if="memoryEditing" class="memory-header-cancel" @click="cancelMemoryEdit()">{{ t('loop.cancel') }}</button>
+            <button v-if="memoryEditing" class="memory-header-save" @click="saveMemoryEdit()" :disabled="memorySaving">
+              {{ memorySaving ? t('memory.saving') : t('memory.save') }}
+            </button>
             <button class="preview-panel-close" @click="filePreview.closePreview(); memoryEditing = false" :title="t('preview.closePreview')">&times;</button>
           </div>
           <div class="preview-panel-body">
             <div v-if="memoryEditing" class="memory-edit-container">
               <textarea class="memory-edit-textarea" v-model="memoryEditContent"></textarea>
-              <div class="memory-edit-actions">
-                <button class="memory-edit-cancel" @click="cancelMemoryEdit()">{{ t('loop.cancel') }}</button>
-                <button class="memory-edit-save" @click="saveMemoryEdit()" :disabled="memorySaving">
-                  {{ memorySaving ? t('memory.saving') : t('memory.save') }}
-                </button>
-              </div>
             </div>
             <div v-else-if="previewLoading" class="preview-loading">{{ t('preview.loading') }}</div>
             <div v-else-if="previewFile?.error" class="preview-error">

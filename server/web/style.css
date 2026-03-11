@@ -5102,6 +5102,7 @@ body {
 }
 .memory-edit-textarea {
   flex: 1;
+  min-height: 0;
   width: 100%;
   border: none;
   resize: none;
@@ -5116,38 +5117,33 @@ body {
 .memory-edit-textarea:focus {
   outline: none;
 }
-.memory-edit-actions {
-  display: flex;
-  gap: 8px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--border-color);
-  justify-content: flex-end;
-}
-.memory-edit-cancel {
+.memory-header-cancel {
   background: none;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border);
   color: var(--text-secondary);
-  padding: 6px 14px;
-  border-radius: 6px;
+  padding: 3px 10px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
-.memory-edit-cancel:hover {
-  background: var(--hover-bg);
+.memory-header-cancel:hover {
+  background: var(--bg-tertiary);
 }
-.memory-edit-save {
-  background: var(--accent-color);
+.memory-header-save {
+  background: var(--accent);
   border: none;
   color: white;
-  padding: 6px 14px;
-  border-radius: 6px;
+  padding: 3px 10px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
-.memory-edit-save:hover {
+.memory-header-save:hover {
   opacity: 0.9;
 }
-.memory-edit-save:disabled {
+.memory-header-save:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

@@ -550,8 +550,9 @@ export function createConnection(deps) {
         if (msg.success) {
           memoryEditing.value = false;
           memoryEditContent.value = '';
-          // Refresh list
+          // Refresh list and preview
           wsSend({ type: 'list_memory' });
+          if (filePreview) filePreview.refreshPreview();
         }
       } else if (msg.type === 'memory_deleted') {
         if (msg.success) {
