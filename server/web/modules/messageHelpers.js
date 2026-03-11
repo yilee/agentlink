@@ -8,15 +8,15 @@ export function isContextSummary(text) {
   return typeof text === 'string' && text.trimStart().startsWith(CONTEXT_SUMMARY_PREFIX);
 }
 
-export function formatRelativeTime(ts) {
+export function formatRelativeTime(ts, t) {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t ? t('time.justNow') : 'just now';
+  if (mins < 60) return t ? t('time.minutesAgo', { n: mins }) : `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t ? t('time.hoursAgo', { n: hours }) : `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return t ? t('time.daysAgo', { n: days }) : `${days}d ago`;
   return new Date(ts).toLocaleDateString();
 }
 
@@ -53,7 +53,7 @@ export function toggleTool(msg) {
   msg.expanded = !msg.expanded;
 }
 
-export function getToolSummary(msg) {
+export function getToolSummary(msg, t) {
   const name = msg.toolName;
   const input = msg.toolInput;
   try {
@@ -65,8 +65,8 @@ export function getToolSummary(msg) {
     if (name === 'Glob' && obj.pattern) return obj.pattern;
     if (name === 'Grep' && obj.pattern) return obj.pattern;
     if (name === 'TodoWrite' && obj.todos) {
-      const done = obj.todos.filter(t => t.status === 'completed').length;
-      return `${done}/${obj.todos.length} done`;
+      const doneCount = obj.todos.filter(td => td.status === 'completed').length;
+      return t ? t('tool.done', { done: doneCount, total: obj.todos.length }) : `${doneCount}/${obj.todos.length} done`;
     }
     if (name === 'Task' && obj.description) return obj.description;
     if (name === 'Agent' && obj.description) return obj.description;
@@ -81,7 +81,7 @@ export function isEditTool(msg) {
   return msg.role === 'tool' && msg.toolName === 'Edit' && msg.toolInput;
 }
 
-export function getFormattedToolInput(msg) {
+export function getFormattedToolInput(msg, t) {
   if (!msg.toolInput) return null;
   try {
     const obj = JSON.parse(msg.toolInput);
@@ -91,18 +91,22 @@ export function getFormattedToolInput(msg) {
     if (name === 'Read' && obj.file_path) {
       let detail = esc(obj.file_path);
       if (obj.offset && obj.limit) {
-        detail += `  <span class="tool-input-meta">lines ${obj.offset}\u2013${obj.offset + obj.limit - 1}</span>`;
+        const meta = t ? t('tool.lines', { start: obj.offset, end: obj.offset + obj.limit - 1 }) : `lines ${obj.offset}\u2013${obj.offset + obj.limit - 1}`;
+        detail += `  <span class="tool-input-meta">${meta}</span>`;
       } else if (obj.offset) {
-        detail += `  <span class="tool-input-meta">from line ${obj.offset}</span>`;
+        const meta = t ? t('tool.fromLine', { offset: obj.offset }) : `from line ${obj.offset}`;
+        detail += `  <span class="tool-input-meta">${meta}</span>`;
       } else if (obj.limit) {
-        detail += `  <span class="tool-input-meta">first ${obj.limit} lines</span>`;
+        const meta = t ? t('tool.firstLines', { limit: obj.limit }) : `first ${obj.limit} lines`;
+        detail += `  <span class="tool-input-meta">${meta}</span>`;
       }
       return detail;
     }
 
     if (name === 'Write' && obj.file_path) {
       const lines = (obj.content || '').split('\n').length;
-      return esc(obj.file_path) + `  <span class="tool-input-meta">${lines} lines</span>`;
+      const lineCount = t ? t('tool.lineCount', { n: lines }) : `${lines} lines`;
+      return esc(obj.file_path) + `  <span class="tool-input-meta">${lineCount}</span>`;
     }
 
     if (name === 'Bash' && obj.command) {
@@ -113,13 +117,13 @@ export function getFormattedToolInput(msg) {
 
     if (name === 'Glob' && obj.pattern) {
       let html = '<code class="tool-input-cmd">' + esc(obj.pattern) + '</code>';
-      if (obj.path) html += '  <span class="tool-input-meta">in ' + esc(obj.path) + '</span>';
+      if (obj.path) html += '  <span class="tool-input-meta">' + (t ? t('tool.inPath', { path: esc(obj.path) }) : 'in ' + esc(obj.path)) + '</span>';
       return html;
     }
 
     if (name === 'Grep' && obj.pattern) {
       let html = '<code class="tool-input-cmd">' + esc(obj.pattern) + '</code>';
-      if (obj.path) html += '  <span class="tool-input-meta">in ' + esc(obj.path) + '</span>';
+      if (obj.path) html += '  <span class="tool-input-meta">' + (t ? t('tool.inPath', { path: esc(obj.path) }) : 'in ' + esc(obj.path)) + '</span>';
       return html;
     }
 
@@ -139,10 +143,13 @@ export function getFormattedToolInput(msg) {
 
     if (name === 'Task' || name === 'Agent') {
       let html = '';
-      if (obj.description) html += '<div class="task-field"><span class="tool-input-meta">Description</span> ' + esc(obj.description) + '</div>';
-      if (obj.subagent_type) html += '<div class="task-field"><span class="tool-input-meta">Agent</span> <code class="tool-input-cmd">' + esc(obj.subagent_type) + '</code></div>';
+      const descLabel = t ? t('tool.description') : 'Description';
+      const agentLabel = t ? t('tool.agent') : 'Agent';
+      const promptLabel = t ? t('tool.prompt') : 'Prompt';
+      if (obj.description) html += '<div class="task-field"><span class="tool-input-meta">' + descLabel + '</span> ' + esc(obj.description) + '</div>';
+      if (obj.subagent_type) html += '<div class="task-field"><span class="tool-input-meta">' + agentLabel + '</span> <code class="tool-input-cmd">' + esc(obj.subagent_type) + '</code></div>';
       if (obj.prompt) {
-        html += '<div class="task-field"><span class="tool-input-meta">Prompt</span></div><div class="task-prompt">' + esc(obj.prompt) + '</div>';
+        html += '<div class="task-field"><span class="tool-input-meta">' + promptLabel + '</span></div><div class="task-prompt">' + esc(obj.prompt) + '</div>';
       }
       if (html) return html;
     }
@@ -161,7 +168,7 @@ export function getFormattedToolInput(msg) {
   return null;
 }
 
-export function getEditDiffHtml(msg) {
+export function getEditDiffHtml(msg, t) {
   try {
     const obj = JSON.parse(msg.toolInput);
     if (!obj.old_string && !obj.new_string) return null;
@@ -171,7 +178,7 @@ export function getEditDiffHtml(msg) {
     const newLines = (obj.new_string || '').split('\n');
     let html = '';
     if (filePath) {
-      html += '<div class="diff-file">' + esc(filePath) + (obj.replace_all ? ' <span class="diff-replace-all">(replace all)</span>' : '') + '</div>';
+      html += '<div class="diff-file">' + esc(filePath) + (obj.replace_all ? ' <span class="diff-replace-all">' + (t ? t('tool.replaceAll') : '(replace all)') + '</span>' : '') + '</div>';
     }
     html += '<div class="diff-lines">';
     for (const line of oldLines) {

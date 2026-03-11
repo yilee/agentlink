@@ -35,6 +35,8 @@ export function createSidebar(deps) {
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations,
     switchConversation,
+    // i18n
+    t,
   } = deps;
 
   // Late-binding callback: called when user switches to a normal chat session
@@ -130,7 +132,7 @@ export function createSidebar(deps) {
       switchConversation(newConvId);
       messages.value.push({
         id: streaming.nextId(), role: 'system',
-        content: 'New conversation started.',
+        content: t('system.newConversation'),
         timestamp: new Date(),
       });
       return;
@@ -365,18 +367,25 @@ export function createSidebar(deps) {
     const yesterdayStart = todayStart - 86400000;
     const weekStart = todayStart - 6 * 86400000;
 
+    const GROUP_KEYS = {
+      today: 'session.today',
+      yesterday: 'session.yesterday',
+      thisWeek: 'session.thisWeek',
+      earlier: 'session.earlier',
+    };
+
     const groups = {};
     for (const s of historySessions.value) {
-      let label;
-      if (s.lastModified >= todayStart) label = 'Today';
-      else if (s.lastModified >= yesterdayStart) label = 'Yesterday';
-      else if (s.lastModified >= weekStart) label = 'This week';
-      else label = 'Earlier';
-      if (!groups[label]) groups[label] = [];
-      groups[label].push(s);
+      let key;
+      if (s.lastModified >= todayStart) key = 'today';
+      else if (s.lastModified >= yesterdayStart) key = 'yesterday';
+      else if (s.lastModified >= weekStart) key = 'thisWeek';
+      else key = 'earlier';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(s);
     }
-    const order = ['Today', 'Yesterday', 'This week', 'Earlier'];
-    return order.filter(k => groups[k]).map(k => ({ label: k, sessions: groups[k] }));
+    const order = ['today', 'yesterday', 'thisWeek', 'earlier'];
+    return order.filter(k => groups[k]).map(k => ({ label: t(GROUP_KEYS[k]), sessions: groups[k] }));
   });
 
   return {
