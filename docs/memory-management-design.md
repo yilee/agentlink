@@ -24,7 +24,6 @@ Claude Code's auto memory stores learned facts (project conventions, user prefer
 ### Prerequisites
 
 - **i18n system** — The web UI now uses a lightweight `t()` translation function (see `docs/i18n-design.md`). All user-facing strings in the memory feature must use `t()` with keys defined in both `server/web/locales/en.json` and `server/web/locales/zh.json`.
-
 ---
 
 ## 2. Claude Auto Memory Background

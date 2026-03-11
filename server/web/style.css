@@ -1823,6 +1823,42 @@ body {
   position: relative;
 }
 
+.slash-menu {
+  max-width: 768px;
+  margin: 0 auto 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.slash-menu-item.active {
+  background: var(--bg-tertiary);
+}
+
+.slash-menu-cmd {
+  font-weight: 600;
+  color: var(--accent);
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.9rem;
+  min-width: 90px;
+}
+
+.slash-menu-desc {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
 .input-card {
   max-width: 768px;
   margin: 0 auto;

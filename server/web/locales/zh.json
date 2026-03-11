@@ -259,5 +259,9 @@
   "memory.saving": "保存中...",
   "memory.deleteFile": "删除",
   "memory.deleteConfirm": "删除 {name}？",
-  "memory.discardChanges": "放弃更改？"
+  "memory.discardChanges": "放弃更改？",
+
+  "slash.cost": "显示 Token 用量和费用",
+  "slash.context": "显示上下文用量",
+  "slash.compact": "压缩上下文"
 }

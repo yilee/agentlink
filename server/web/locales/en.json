@@ -259,5 +259,9 @@
   "memory.saving": "Saving...",
   "memory.deleteFile": "Delete",
   "memory.deleteConfirm": "Delete {name}?",
-  "memory.discardChanges": "Discard changes?"
+  "memory.discardChanges": "Discard changes?",
+
+  "slash.cost": "Show token usage and cost",
+  "slash.context": "Show context usage",
+  "slash.compact": "Compact context"
 }
