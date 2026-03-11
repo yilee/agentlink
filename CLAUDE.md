@@ -13,7 +13,8 @@ AgentLink is a local CLI agent that proxies a local working directory to a cloud
 ```
 agentlink/
 ├── server/src/          # Express + ws server: cli.ts, index.ts, context.ts, ws-agent.ts, ws-client.ts, encryption.ts, config.ts
-│   └── web/             # Vue 3 SPA: index.html, style.css, app.js, encryption.js
+│   └── web/             # Vue 3 SPA: index.html, app.js, encryption.js
+│       ├── css/         # Modular CSS: base, sidebar, chat, markdown, tools, ask-question, input, file-browser, team, responsive, loop
 │       └── modules/     # ES modules: markdown, messageHelpers, fileAttachments, askQuestion, streaming, sidebar, connection
 ├── agent/src/           # Agent: cli.ts, connection.ts, claude.ts, sdk.ts, stream.ts, history.ts, daemon.ts, encryption.ts, auto-update.ts, service.ts, config.ts, index.ts
 └── test/                # Vitest: server/ (encryption, context), agent/ (encryption, stream, history, config), functional/ (e2e)

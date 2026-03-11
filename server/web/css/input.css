@@ -1,0 +1,594 @@
+/* ── Input area ── */
+.input-area {
+  flex-shrink: 0;
+  padding: 0 1.5rem 1rem;
+  background: transparent;
+  position: relative;
+}
+
+.slash-menu {
+  max-width: 768px;
+  margin: 0 auto 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.slash-menu-item.active {
+  background: var(--bg-tertiary);
+}
+
+.slash-menu-cmd {
+  font-weight: 600;
+  color: var(--accent);
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.9rem;
+  min-width: 90px;
+}
+
+.slash-menu-desc {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.input-card {
+  max-width: 768px;
+  margin: 0 auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-card:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 2px 16px rgba(107, 159, 206, 0.1);
+}
+
+.input-card textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  padding: 0.4rem 0.6rem;
+  font-family: inherit;
+  font-size: 16px; /* >=16px prevents iOS auto-zoom on focus */
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.input-card textarea::placeholder {
+  color: var(--text-secondary);
+}
+
+.input-bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.1rem 0.25rem 0;
+}
+
+.send-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.send-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Stop button ── */
+.stop-btn {
+  background: var(--error);
+}
+
+.stop-btn:hover {
+  background: #c04444;
+}
+
+/* ── Streaming cursor ── */
+.assistant-bubble.streaming .markdown-body > *:last-child::after,
+.assistant-bubble.streaming .message-content:not(.markdown-body)::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--accent);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink-cursor 0.8s steps(2) infinite;
+}
+
+@keyframes blink-cursor {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── Sidebar change-dir button ── */
+.sidebar-workdir-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Workdir path row (clickable) ── */
+.sidebar-workdir-path-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.sidebar-workdir-path-row:hover {
+  background: var(--bg-tertiary);
+}
+
+.sidebar-workdir-path-row .sidebar-workdir-path {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-workdir-chevron {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.sidebar-workdir-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* ── Workdir dropdown menu ── */
+.workdir-menu {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  z-index: 50;
+  margin-top: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.workdir-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.workdir-menu-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.workdir-menu-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+/* ── Workdir switching overlay ── */
+.workdir-switching-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  backdrop-filter: blur(2px);
+}
+.workdir-switching-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  animation: workdir-spin 0.7s linear infinite;
+}
+@keyframes workdir-spin {
+  to { transform: rotate(360deg); }
+}
+.workdir-switching-text {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+/* ── Folder Picker Modal ── */
+.folder-picker-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.folder-picker-dialog {
+  width: 440px;
+  height: 520px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.folder-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.folder-picker-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.folder-picker-close:hover {
+  color: var(--text-primary);
+}
+
+.folder-picker-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.folder-picker-up {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.folder-picker-up:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.folder-picker-up:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.folder-picker-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.folder-picker-path-input {
+  flex: 1;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  font-family: monospace;
+  outline: none;
+}
+
+.folder-picker-path-input:focus {
+  border-color: var(--accent);
+}
+
+.folder-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 200px;
+  max-height: 350px;
+  padding: 4px 0;
+}
+
+.folder-picker-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.folder-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.1s;
+  user-select: none;
+}
+
+.folder-picker-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.folder-picker-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.folder-picker-selected {
+  background: var(--accent) !important;
+  color: #fff !important;
+}
+
+.folder-picker-selected svg {
+  color: #fff !important;
+}
+
+.folder-picker-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.folder-picker-footer {
+  padding: 10px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.folder-picker-cancel {
+  padding: 6px 16px;
+  background: none;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.folder-picker-cancel:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.folder-picker-confirm {
+  padding: 6px 20px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.folder-picker-confirm:hover {
+  background: var(--accent-hover);
+}
+
+.folder-picker-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── File Upload: Attachment Bar ── */
+.attachment-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  max-width: 220px;
+}
+
+.attachment-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.attachment-file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.attachment-info {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.attachment-size {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+}
+
+.attachment-remove {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.attachment-remove:hover {
+  color: var(--error);
+}
+
+/* ── Paperclip attach button ── */
+.attach-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.attach-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.attach-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Drag-over highlight on input card ── */
+.input-card.drag-over {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 2px 12px rgba(107, 159, 206, 0.12);
+}
+
+/* ── Attachments displayed in sent messages ── */
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.message-attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.message-attachment-thumb {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.message-attachment-file-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+/* ── Sidebar backdrop (mobile overlay) ── */
+.sidebar-backdrop {
+  display: none;
+}
+
