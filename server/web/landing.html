@@ -668,6 +668,60 @@
   .bento-icon.amber { background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05)); color: var(--amber); }
   .bento-icon.blue { background: linear-gradient(135deg, rgba(96,165,250,0.2), rgba(96,165,250,0.05)); color: var(--blue); }
 
+  /* Mode toggle visual */
+  .mode-toggle {
+    display: flex;
+    gap: 0;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .mode-toggle-item {
+    flex: 1;
+    text-align: center;
+    padding: 0.7rem 1rem;
+    position: relative;
+    transition: all 0.3s;
+  }
+
+  .mode-toggle-item:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+
+  .mode-toggle-item.active {
+    background: rgba(59,130,246,0.12);
+  }
+
+  .mode-toggle-item .mode-icon {
+    width: 32px; height: 32px;
+    margin: 0 auto 0.4rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mode-toggle-item .mode-icon svg { width: 18px; height: 18px; }
+
+  .mode-toggle-item .mode-icon.chat-icon { background: rgba(59,130,246,0.15); color: var(--accent); }
+  .mode-toggle-item .mode-icon.team-icon { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .mode-toggle-item .mode-icon.loop-icon { background: rgba(52,211,153,0.15); color: var(--green); }
+
+  .mode-toggle-item .mode-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    color: var(--text);
+  }
+
+  .mode-toggle-item .mode-desc {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
   /* Encryption visual */
   .encrypt-visual {
     display: flex;
@@ -1142,33 +1196,35 @@
     <p>Phone, tablet, laptop &mdash; any browser becomes your Claude Code terminal.</p>
   </div>
 
-  <!-- Full Claude Code — wide -->
+  <!-- Chat | Team | Loop — wide -->
   <div class="bento-card wide">
     <div class="bento-visual">
-      <div class="device-flow">
-        <div class="device-pill">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-          Terminal
+      <div class="mode-toggle">
+        <div class="mode-toggle-item active">
+          <div class="mode-icon chat-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          </div>
+          <div class="mode-name">Chat</div>
+          <div class="mode-desc">Interactive coding sessions</div>
         </div>
-        <div class="flow-line"></div>
-        <div class="device-pill">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-          Files
+        <div class="mode-toggle-item">
+          <div class="mode-icon team-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          </div>
+          <div class="mode-name">Team</div>
+          <div class="mode-desc">Parallel sub-agents</div>
         </div>
-        <div class="flow-line"></div>
-        <div class="device-pill">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          Search
-        </div>
-        <div class="flow-line"></div>
-        <div class="device-pill">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          Chat
+        <div class="mode-toggle-item">
+          <div class="mode-icon loop-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </div>
+          <div class="mode-name">Loop</div>
+          <div class="mode-desc">Scheduled cron tasks</div>
         </div>
       </div>
     </div>
-    <h3>Full Claude Code Experience</h3>
-    <p>File editing, shell commands, search, multi-turn conversations &mdash; every capability, now in your browser.</p>
+    <h3>Three Modes, One Interface</h3>
+    <p>Chat with Claude interactively, spawn agent teams for complex tasks, or schedule recurring Loop jobs with cron &mdash; all from the same browser tab.</p>
   </div>
 
   <!-- Self-hostable -->
