@@ -584,7 +584,7 @@ export function onLeadOutput(conversationId: string, msg: Record<string, unknown
   // 5. result message → team completed
   if (msg.type === 'result') {
     team.totalCost = (msg.total_cost_usd as number) || 0;
-    team.durationMs = (msg.duration_ms as number) || 0;
+    team.durationMs = Date.now() - team.createdAt;
 
     // Extract summary from result if available
     const resultText = (msg.result as string) || undefined;

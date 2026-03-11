@@ -873,7 +873,7 @@ describe('team.ts state management', () => {
     });
 
     describe('result message', () => {
-      it('captures total_cost_usd and duration_ms', () => {
+      it('captures total_cost_usd and wall-clock duration', () => {
         onLeadOutput('conv-team-1', {
           type: 'result',
           total_cost_usd: 0.42,
@@ -881,7 +881,9 @@ describe('team.ts state management', () => {
         });
 
         expect(team.totalCost).toBe(0.42);
-        expect(team.durationMs).toBe(15000);
+        // durationMs is now wall-clock (Date.now() - createdAt), not msg.duration_ms
+        expect(team.durationMs).toBeGreaterThanOrEqual(0);
+        expect(team.durationMs).toBeLessThan(5000);
       });
 
       it('does not suppress result messages', () => {
@@ -1339,7 +1341,9 @@ describe('team.ts state management', () => {
         const serialized = completedMsg!.team as Record<string, unknown>;
         expect(serialized.summary).toBe('All tasks completed successfully.');
         expect(serialized.totalCost).toBe(0.05);
-        expect(serialized.durationMs).toBe(30000);
+        // durationMs is wall-clock time, not msg.duration_ms
+        expect(serialized.durationMs).toBeGreaterThanOrEqual(0);
+        expect(serialized.durationMs).toBeLessThan(5000);
 
         // Active team should be cleared
         expect(getActiveTeam()).toBeNull();
