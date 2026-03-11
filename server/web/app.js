@@ -25,6 +25,13 @@ import { LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS, buildCronExpression, formatSchedule
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
 
+// ── Slash commands ──────────────────────────────────────────────────────────
+const SLASH_COMMANDS = [
+  { command: '/cost', descKey: 'slash.cost' },
+  { command: '/context', descKey: 'slash.context' },
+  { command: '/compact', descKey: 'slash.compact' },
+];
+
 // ── App ─────────────────────────────────────────────────────────────────────
 const App = {
   setup() {
@@ -59,6 +66,7 @@ const App = {
     const queuedMessages = ref([]);
     const usageStats = ref(null);
     const inputRef = ref(null);
+    const slashMenuIndex = ref(0);
 
     // Sidebar state
     const sidebarOpen = ref(window.innerWidth > 768);
@@ -398,6 +406,17 @@ const App = {
       && !messages.value.some(m => m.role === 'ask-question' && !m.answered)
     );
 
+    // ── Slash command menu ──
+    const slashMenuVisible = computed(() => {
+      const txt = inputText.value;
+      return txt.startsWith('/') && !/\s/.test(txt.slice(1));
+    });
+    const filteredSlashCommands = computed(() => {
+      const txt = inputText.value.toLowerCase();
+      return SLASH_COMMANDS.filter(c => c.command.startsWith(txt));
+    });
+    watch(filteredSlashCommands, () => { slashMenuIndex.value = 0; });
+
     // ── Auto-resize textarea ──
     function autoResize() {
       const ta = inputRef.value;
@@ -487,7 +506,42 @@ const App = {
       if (idx !== -1) queuedMessages.value.splice(idx, 1);
     }
 
+    function selectSlashCommand(cmd) {
+      inputText.value = cmd.command;
+      sendMessage();
+    }
+
     function handleKeydown(e) {
+      // Slash menu key handling
+      if (slashMenuVisible.value && filteredSlashCommands.value.length > 0 && !e.isComposing) {
+        const len = filteredSlashCommands.value.length;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          slashMenuIndex.value = (slashMenuIndex.value + 1) % len;
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          slashMenuIndex.value = (slashMenuIndex.value - 1 + len) % len;
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          selectSlashCommand(filteredSlashCommands.value[slashMenuIndex.value]);
+          return;
+        }
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          inputText.value = filteredSlashCommands.value[slashMenuIndex.value].command;
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          inputText.value = '';
+          return;
+        }
+      }
+
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
         sendMessage();
@@ -554,6 +608,7 @@ const App = {
       serverVersion, agentVersion, latency,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
       inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages, usageStats,
+      slashMenuVisible, filteredSlashCommands, slashMenuIndex, selectSlashCommand,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       getRenderedContent, copyMessage, toggleTool,
       isPrevAssistant: _isPrevAssistant,
@@ -2241,6 +2296,15 @@ const App = {
               </div>
             </div>
             <div v-if="usageStats" class="usage-bar">{{ formatUsage(usageStats) }}</div>
+            <div v-if="slashMenuVisible && filteredSlashCommands.length > 0" class="slash-menu">
+              <div v-for="(cmd, i) in filteredSlashCommands" :key="cmd.command"
+                   :class="['slash-menu-item', { active: i === slashMenuIndex }]"
+                   @mouseenter="slashMenuIndex = i"
+                   @click="selectSlashCommand(cmd)">
+                <span class="slash-menu-cmd">{{ cmd.command }}</span>
+                <span class="slash-menu-desc">{{ t(cmd.descKey) }}</span>
+              </div>
+            </div>
             <div
               :class="['input-card', { 'drag-over': dragOver }]"
               @dragover="handleDragOver"

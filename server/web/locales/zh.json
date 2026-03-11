@@ -246,5 +246,9 @@
   "tool.replaceAll": "（全部替换）",
 
   "usage.context": "上下文",
-  "usage.cost": "费用"
+  "usage.cost": "费用",
+
+  "slash.cost": "显示 Token 用量和费用",
+  "slash.context": "显示上下文用量",
+  "slash.compact": "压缩上下文"
 }

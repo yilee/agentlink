@@ -12,7 +12,7 @@ Add slash command autocomplete to the Web UI input box. When the user types `/`,
 | `/context` | Show context usage |
 | `/compact` | Compact context |
 
-The command list is defined as a top-level constant array — adding a new command requires only one extra line.
+The command list is defined as a top-level constant array — adding a new command requires only one extra line. Descriptions are translated via the existing `t()` i18n function (see `modules/i18n.js`).
 
 ## UI Design
 
@@ -78,6 +78,8 @@ The command text (e.g. `/cost`) is sent as a regular prompt to the agent, which 
 |------|---------|
 | `server/web/app.js` | See details below |
 | `server/web/style.css` | Add menu styles |
+| `server/web/locales/en.json` | Add `slash.*` keys |
+| `server/web/locales/zh.json` | Add `slash.*` keys |
 
 ### app.js Changes
 
@@ -85,9 +87,9 @@ The command text (e.g. `/cost`) is sent as a regular prompt to the agent, which 
 
 ```js
 const SLASH_COMMANDS = [
-  { command: '/cost', description: 'Show token usage and cost' },
-  { command: '/context', description: 'Show context usage' },
-  { command: '/compact', description: 'Compact context' },
+  { command: '/cost', descKey: 'slash.cost' },
+  { command: '/context', descKey: 'slash.context' },
+  { command: '/compact', descKey: 'slash.compact' },
 ];
 ```
 
@@ -131,7 +133,7 @@ Insert menu DOM before `.input-card` (inside `.input-area`):
        @mouseenter="slashMenuIndex = i"
        @click="selectSlashCommand(cmd)">
     <span class="slash-menu-cmd">{{ cmd.command }}</span>
-    <span class="slash-menu-desc">{{ cmd.description }}</span>
+    <span class="slash-menu-desc">{{ t(cmd.descKey) }}</span>
   </div>
 </div>
 ```
@@ -147,6 +149,24 @@ Insert menu DOM before `.input-card` (inside `.input-area`):
 ```
 
 Note: `.input-area` needs `position: relative` added as the positioning context (not currently set).
+
+### Locale Keys
+
+Add to `server/web/locales/en.json`:
+
+```json
+"slash.cost": "Show token usage and cost",
+"slash.context": "Show context usage",
+"slash.compact": "Compact context"
+```
+
+Add to `server/web/locales/zh.json`:
+
+```json
+"slash.cost": "显示 Token 用量和费用",
+"slash.context": "显示上下文用量",
+"slash.compact": "压缩上下文"
+```
 
 ## Edge Cases
 

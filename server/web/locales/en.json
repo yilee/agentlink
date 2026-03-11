@@ -246,5 +246,9 @@
   "tool.replaceAll": "(replace all)",
 
   "usage.context": "Context",
-  "usage.cost": "Cost"
+  "usage.cost": "Cost",
+
+  "slash.cost": "Show token usage and cost",
+  "slash.context": "Show context usage",
+  "slash.compact": "Compact context"
 }
