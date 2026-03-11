@@ -523,7 +523,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       break;
     }
     case 'list_loops':
-      send({ type: 'loops_list', loops: listLoops() });
+      send({ type: 'loops_list', loops: listLoops(state.workDir) });
       break;
     case 'get_loop': {
       const m = msg as unknown as { loopId: string };

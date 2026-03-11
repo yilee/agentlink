@@ -369,7 +369,6 @@ body {
 }
 
 .sidebar-sessions {
-  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2911,6 +2910,18 @@ body {
   color: var(--text-primary);
 }
 
+.team-mode-select {
+  display: none;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
 /* ── Team create panel ── */
 .team-create-panel {
   flex: 1;
@@ -3707,11 +3718,28 @@ body {
 /* ── Teams sidebar section (history list in sidebar) ── */
 .sidebar-teams {
   padding: 0.5rem 0.75rem;
-  max-height: 35%;
   overflow: hidden;
-  flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Loops sidebar section ── */
+.sidebar-loops {
+  padding: 0.5rem 0.75rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.loop-history-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .team-history-list {
@@ -4184,9 +4212,12 @@ body {
     gap: 0.4rem;
   }
 
-  .team-mode-btn {
-    padding: 4px 10px;
-    font-size: 0.7rem;
+  .team-mode-toggle {
+    display: none;
+  }
+
+  .team-mode-select {
+    display: block;
   }
 
   /* Message area */

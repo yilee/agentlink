@@ -124,6 +124,7 @@ const App = {
     const teamsCollapsed = ref(false);
     const chatsCollapsed = ref(false);
     const loopsCollapsed = ref(false);
+    const _sidebarCollapseKey = () => hostname.value ? `agentlink-sidebar-collapsed-${hostname.value}` : null;
     const loadingTeams = ref(false);
     const loadingLoops = ref(false);
 
@@ -173,6 +174,8 @@ const App = {
     const loopDeleteConfirmOpen = ref(false);
     const loopDeleteConfirmId = ref(null);
     const loopDeleteConfirmName = ref('');
+    const renamingLoopId = ref(null);
+    const renameLoopText = ref('');
 
     // File preview state
     const previewPanelOpen = ref(false);
@@ -484,9 +487,35 @@ const App = {
 
     watch(hostname, (name) => {
       document.title = name ? `${name} — AgentLink` : 'AgentLink';
+      // Restore sidebar collapsed states from localStorage
+      const key = _sidebarCollapseKey();
+      if (key) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(key) || '{}');
+          if (saved.chats !== undefined) chatsCollapsed.value = saved.chats;
+          if (saved.teams !== undefined) teamsCollapsed.value = saved.teams;
+          if (saved.loops !== undefined) loopsCollapsed.value = saved.loops;
+        } catch (_) { /* ignore */ }
+      }
     });
 
+    // Persist sidebar collapsed states to localStorage
+    const _saveSidebarCollapsed = () => {
+      const key = _sidebarCollapseKey();
+      if (key) {
+        localStorage.setItem(key, JSON.stringify({
+          chats: chatsCollapsed.value,
+          teams: teamsCollapsed.value,
+          loops: loopsCollapsed.value,
+        }));
+      }
+    };
+    watch(chatsCollapsed, _saveSidebarCollapsed);
+    watch(teamsCollapsed, _saveSidebarCollapsed);
+    watch(loopsCollapsed, _saveSidebarCollapsed);
+
     watch(team.teamsList, () => { loadingTeams.value = false; });
+    watch(loop.loopsList, () => { loadingLoops.value = false; });
 
     // ── Lifecycle ──
     onMounted(() => { connect(scheduleHighlight); });
@@ -761,6 +790,23 @@ const App = {
       loopScheduleHour, loopScheduleMinute, loopScheduleDayOfWeek,
       loopCronExpr, loopSelectedTemplate,
       loopDeleteConfirmOpen, loopDeleteConfirmId, loopDeleteConfirmName,
+      renamingLoopId, renameLoopText,
+      startLoopRename(l) {
+        renamingLoopId.value = l.id;
+        renameLoopText.value = l.name || '';
+      },
+      confirmLoopRename() {
+        const lid = renamingLoopId.value;
+        const name = renameLoopText.value.trim();
+        if (!lid || !name) { renamingLoopId.value = null; renameLoopText.value = ''; return; }
+        loop.updateExistingLoop(lid, { name });
+        renamingLoopId.value = null;
+        renameLoopText.value = '';
+      },
+      cancelLoopRename() {
+        renamingLoopId.value = null;
+        renameLoopText.value = '';
+      },
       requestLoopsList() {
         loadingLoops.value = true;
         loop.requestLoopsList();
@@ -814,8 +860,8 @@ const App = {
         const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
         if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
         if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
-        const schedule = loopScheduleType.value === 'cron'
-          ? loopCronExpr.value
+        const schedule = loopScheduleType.value === 'manual' ? ''
+          : loopScheduleType.value === 'cron' ? loopCronExpr.value
           : buildCronExpression(loopScheduleType.value, schedCfg);
         loop.createNewLoop({ name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
         // Reset form
@@ -849,8 +895,8 @@ const App = {
         const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
         if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
         if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
-        const schedule = loopScheduleType.value === 'cron'
-          ? loopCronExpr.value
+        const schedule = loopScheduleType.value === 'manual' ? ''
+          : loopScheduleType.value === 'cron' ? loopCronExpr.value
           : buildCronExpression(loopScheduleType.value, schedCfg);
         loop.updateExistingLoop(lid, { name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
         loop.editingLoopId.value = null;
@@ -934,6 +980,11 @@ const App = {
             <button :class="['team-mode-btn', { active: viewMode === 'team' }]" @click="viewMode = 'team'">Team</button>
             <button :class="['team-mode-btn', { active: viewMode === 'loop' }]" @click="viewMode = 'loop'">Loop</button>
           </div>
+          <select class="team-mode-select" :value="viewMode" @change="viewMode = $event.target.value">
+            <option value="chat">Chat</option>
+            <option value="team">Team</option>
+            <option value="loop">Loop</option>
+          </select>
           <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
             <svg v-if="theme === 'dark'" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
             <svg v-else viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
@@ -1094,7 +1145,7 @@ const App = {
           </div>
 
           <!-- Chat History section -->
-          <div class="sidebar-section sidebar-sessions">
+          <div class="sidebar-section sidebar-sessions" :style="{ flex: chatsCollapsed ? '0 0 auto' : '1 1 0', minHeight: chatsCollapsed ? 'auto' : '0' }">
             <div class="sidebar-section-header" @click="chatsCollapsed = !chatsCollapsed" style="cursor: pointer;">
               <span>Chat History</span>
               <span class="sidebar-section-header-actions">
@@ -1172,7 +1223,7 @@ const App = {
           </div>
 
           <!-- Teams section -->
-          <div class="sidebar-section sidebar-teams">
+          <div class="sidebar-section sidebar-teams" :style="{ flex: teamsCollapsed ? '0 0 auto' : '1 1 0', minHeight: teamsCollapsed ? 'auto' : '0' }">
             <div class="sidebar-section-header" @click="teamsCollapsed = !teamsCollapsed" style="cursor: pointer;">
               <span>Teams History</span>
               <span class="sidebar-section-header-actions">
@@ -1232,7 +1283,7 @@ const App = {
           </div>
 
           <!-- Loops section -->
-          <div class="sidebar-section sidebar-loops">
+          <div class="sidebar-section sidebar-loops" :style="{ flex: loopsCollapsed ? '0 0 auto' : '1 1 0', minHeight: loopsCollapsed ? 'auto' : '0' }">
             <div class="sidebar-section-header" @click="loopsCollapsed = !loopsCollapsed" style="cursor: pointer;">
               <span>Loops</span>
               <span class="sidebar-section-header-actions">
@@ -1258,14 +1309,34 @@ const App = {
               <div
                 v-for="l in loopsList" :key="l.id"
                 :class="['team-history-item', { active: selectedLoop?.id === l.id }]"
-                @click="viewLoop(l.id)"
+                @click="renamingLoopId !== l.id && viewLoop(l.id)"
                 :title="l.name"
               >
                 <div class="team-history-info">
-                  <div class="team-history-title">{{ l.name || 'Untitled loop' }}</div>
-                  <div class="team-history-meta">
+                  <div v-if="renamingLoopId === l.id" class="session-rename-row">
+                    <input
+                      class="session-rename-input"
+                      v-model="renameLoopText"
+                      @click.stop
+                      @keydown.enter.stop="confirmLoopRename"
+                      @keydown.escape.stop="cancelLoopRename"
+                      @vue:mounted="$event.el.focus()"
+                    />
+                    <button class="session-rename-ok" @click.stop="confirmLoopRename" title="Confirm">&#10003;</button>
+                    <button class="session-rename-cancel" @click.stop="cancelLoopRename" title="Cancel">&times;</button>
+                  </div>
+                  <div v-else class="team-history-title">{{ l.name || 'Untitled loop' }}</div>
+                  <div v-if="renamingLoopId !== l.id" class="team-history-meta">
                     <span :class="['team-status-badge', 'team-status-badge-sm', l.enabled ? 'team-status-running' : 'team-status-completed']">{{ l.enabled ? 'active' : 'paused' }}</span>
                     <span v-if="l.scheduleType" class="team-history-tasks">{{ formatSchedule(l.scheduleType, l.scheduleConfig || {}, l.schedule) }}</span>
+                    <span class="session-actions">
+                      <button class="session-rename-btn" @click.stop="startLoopRename(l)" title="Rename loop">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                      </button>
+                      <button class="session-delete-btn" @click.stop="requestDeleteLoop(l)" title="Delete loop">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                      </button>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1743,7 +1814,7 @@ const App = {
                     <span :class="['loop-status-badge', selectedLoop.enabled ? 'loop-status-enabled' : 'loop-status-disabled']">{{ selectedLoop.enabled ? 'Enabled' : 'Disabled' }}</span>
                   </div>
                   <div class="loop-detail-actions">
-                    <button class="loop-action-btn" @click="startEditingLoop(selectedLoop); backToLoopsList()">Edit</button>
+                    <button class="loop-action-btn" @click="startEditingLoop(selectedLoop); selectedLoop = null">Edit</button>
                     <button class="loop-action-btn loop-action-run" @click="runNow(selectedLoop.id)" :disabled="isLoopRunning(selectedLoop.id)">Run Now</button>
                     <button class="loop-action-btn" @click="toggleLoop(selectedLoop.id)">{{ selectedLoop.enabled ? 'Disable' : 'Enable' }}</button>
                   </div>
@@ -1813,7 +1884,7 @@ const App = {
                       <div class="team-example-icon">
                         <svg v-if="key === 'competitive-intel'" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95a15.65 15.65 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.92 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56A7.987 7.987 0 0 1 5.08 16zm2.95-8H5.08a7.987 7.987 0 0 1 4.33-3.56A15.65 15.65 0 0 0 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>
                         <svg v-else-if="key === 'knowledge-base'" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-                        <svg v-else viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                        <svg v-else viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
                       </div>
                       <div class="team-example-body">
                         <div class="team-example-title">{{ LOOP_TEMPLATES[key].label }}</div>
@@ -1851,6 +1922,11 @@ const App = {
                   <label class="team-tpl-label">Schedule</label>
                   <div class="loop-schedule-options">
                     <label class="loop-schedule-radio">
+                      <input type="radio" v-model="loopScheduleType" value="manual" />
+                      <span>Manual</span>
+                      <span v-if="loopScheduleType === 'manual'" class="loop-schedule-detail" style="opacity:0.6">run only when triggered</span>
+                    </label>
+                    <label class="loop-schedule-radio">
                       <input type="radio" v-model="loopScheduleType" value="hourly" />
                       <span>Every hour</span>
                       <span v-if="loopScheduleType === 'hourly'" class="loop-schedule-detail">at minute {{ padTwo(loopScheduleMinute) }}</span>
@@ -1859,26 +1935,6 @@ const App = {
                       <input type="radio" v-model="loopScheduleType" value="daily" />
                       <span>Every day</span>
                       <span v-if="loopScheduleType === 'daily'" class="loop-schedule-detail">
-                        at
-                        <input type="number" v-model.number="loopScheduleHour" min="0" max="23" class="loop-time-input" />
-                        :
-                        <input type="number" v-model.number="loopScheduleMinute" min="0" max="59" class="loop-time-input" />
-                      </span>
-                    </label>
-                    <label class="loop-schedule-radio">
-                      <input type="radio" v-model="loopScheduleType" value="weekly" />
-                      <span>Every week</span>
-                      <span v-if="loopScheduleType === 'weekly'" class="loop-schedule-detail">
-                        on
-                        <select v-model.number="loopScheduleDayOfWeek" class="loop-day-select">
-                          <option :value="0">Sunday</option>
-                          <option :value="1">Monday</option>
-                          <option :value="2">Tuesday</option>
-                          <option :value="3">Wednesday</option>
-                          <option :value="4">Thursday</option>
-                          <option :value="5">Friday</option>
-                          <option :value="6">Saturday</option>
-                        </select>
                         at
                         <input type="number" v-model.number="loopScheduleHour" min="0" max="23" class="loop-time-input" />
                         :

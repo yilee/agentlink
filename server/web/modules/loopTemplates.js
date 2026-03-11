@@ -36,17 +36,25 @@ Provide a structured report with sections: Broken Links, Orphan Files, Duplicate
     scheduleConfig: { hour: 20, minute: 0, dayOfWeek: 5 },  // Friday 20:00
   },
 
-  custom: {
-    label: 'Custom',
-    description: 'Create your own scheduled task with a custom prompt',
-    name: '',
-    prompt: '',
+  'daily-summary': {
+    label: '日报/周报生成',
+    description: '根据 git log 自动总结代码变更和工作进展',
+    name: '每日工作总结',
+    prompt: `根据当前工作目录的 git log 生成今日工作总结。
+
+1. 列出今天所有 commit，按功能模块分组
+2. 总结主要完成的功能、修复的 bug、重构的代码
+3. 统计变更的文件数量和代码行数（新增/删除）
+4. 标注仍在进行中的工作（未完成的分支、TODO 等）
+5. 列出明日待办事项建议
+
+输出格式：结构化的日报，包含：今日完成、进行中、明日计划。`,
     scheduleType: 'daily',
-    scheduleConfig: { hour: 9, minute: 0 },
+    scheduleConfig: { hour: 18, minute: 0 },
   },
 };
 
-export const LOOP_TEMPLATE_KEYS = ['competitive-intel', 'knowledge-base', 'custom'];
+export const LOOP_TEMPLATE_KEYS = ['competitive-intel', 'knowledge-base', 'daily-summary'];
 
 /**
  * Convert scheduleType + scheduleConfig into a cron expression string.
@@ -58,6 +66,8 @@ export function buildCronExpression(scheduleType, scheduleConfig) {
   const min = scheduleConfig.minute ?? 0;
   const hr = scheduleConfig.hour ?? 9;
   switch (scheduleType) {
+    case 'manual':
+      return '';
     case 'hourly':
       return `${min} * * * *`;
     case 'daily':
@@ -82,6 +92,8 @@ export function formatSchedule(scheduleType, scheduleConfig, cronExpr) {
   const pad = n => String(n).padStart(2, '0');
   const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   switch (scheduleType) {
+    case 'manual':
+      return 'Manual only';
     case 'hourly':
       return 'Every hour';
     case 'daily':

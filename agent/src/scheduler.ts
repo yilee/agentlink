@@ -28,7 +28,7 @@ export interface Loop {
   name: string;
   prompt: string;
   schedule: string;                            // cron expression
-  scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron';
+  scheduleType: 'manual' | 'hourly' | 'daily' | 'weekly' | 'cron';
   scheduleConfig: {
     hour?: number;
     minute?: number;
@@ -124,7 +124,7 @@ export function initScheduler(deps: {
   addCloseObserverFn(onLoopClose);
 
   for (const loop of loops) {
-    if (loop.enabled) {
+    if (loop.enabled && loop.scheduleType !== 'manual') {
       scheduleLoop(loop);
     }
   }
@@ -159,8 +159,8 @@ export function createLoop(config: {
   scheduleConfig: Loop['scheduleConfig'];
   workDir: string;
 }): Loop {
-  // Validate cron expression
-  if (!cron.validate(config.schedule)) {
+  // Validate cron expression (skip for manual loops)
+  if (config.scheduleType !== 'manual' && !cron.validate(config.schedule)) {
     throw new Error(`Invalid cron expression: ${config.schedule}`);
   }
 
@@ -179,7 +179,7 @@ export function createLoop(config: {
 
   loops.push(loop);
   saveLoopsToDisk();
-  scheduleLoop(loop);
+  if (config.scheduleType !== 'manual') scheduleLoop(loop);
 
   console.log(`[Scheduler] Created loop "${loop.name}" (${loop.id.slice(0, 8)}) schedule: ${loop.schedule}`);
   return loop;
@@ -192,20 +192,22 @@ export function updateLoop(
   const loop = loops.find(l => l.id === loopId);
   if (!loop) return null;
 
-  // Validate new cron expression if provided
-  if (updates.schedule && !cron.validate(updates.schedule)) {
+  // Validate new cron expression if provided (skip for manual loops)
+  const effectiveType = updates.scheduleType ?? loop.scheduleType;
+  if (effectiveType !== 'manual' && updates.schedule && !cron.validate(updates.schedule)) {
     throw new Error(`Invalid cron expression: ${updates.schedule}`);
   }
 
   const scheduleChanged = updates.schedule && updates.schedule !== loop.schedule;
   const enabledChanged = updates.enabled !== undefined && updates.enabled !== loop.enabled;
+  const typeChanged = updates.scheduleType !== undefined && updates.scheduleType !== loop.scheduleType;
 
   Object.assign(loop, updates, { updatedAt: new Date().toISOString() });
   saveLoopsToDisk();
 
-  if (scheduleChanged || enabledChanged) {
+  if (scheduleChanged || enabledChanged || typeChanged) {
     unscheduleLoop(loopId);
-    if (loop.enabled) scheduleLoop(loop);
+    if (loop.enabled && loop.scheduleType !== 'manual') scheduleLoop(loop);
   }
 
   console.log(`[Scheduler] Updated loop "${loop.name}" (${loop.id.slice(0, 8)})`);
@@ -226,8 +228,9 @@ export function deleteLoop(loopId: string): boolean {
   return true;
 }
 
-export function listLoops(): Loop[] {
-  return loops.map(l => ({ ...l }));
+export function listLoops(workDir?: string): Loop[] {
+  const filtered = workDir ? loops.filter(l => l.workDir === workDir) : loops;
+  return filtered.map(l => ({ ...l }));
 }
 
 export function getLoop(loopId: string): Loop | null {
