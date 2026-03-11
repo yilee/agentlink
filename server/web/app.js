@@ -23,6 +23,7 @@ import { TEMPLATES, TEMPLATE_KEYS, buildFullLeadPrompt } from './modules/teamTem
 import { createLoop } from './modules/loop.js';
 import { LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS, buildCronExpression, formatSchedule } from './modules/loopTemplates.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
+import { createI18n } from './modules/i18n.js';
 
 // ── App ─────────────────────────────────────────────────────────────────────
 const App = {
@@ -267,6 +268,25 @@ const App = {
     }
     applyTheme();
 
+    // ── i18n ──
+    const { t, locale, setLocale, toggleLocale, localeLabel } = createI18n();
+
+    // Map internal English status values to translated display strings
+    const STATUS_KEYS = {
+      'No Session': 'status.noSession',
+      'Connecting...': 'status.connecting',
+      'Connected': 'status.connected',
+      'Waiting': 'status.waiting',
+      'Reconnecting...': 'status.reconnecting',
+      'Disconnected': 'status.disconnected',
+      'Authentication Required': 'status.authRequired',
+      'Locked': 'status.locked',
+    };
+    const displayStatus = computed(() => {
+      const key = STATUS_KEYS[status.value];
+      return key ? t(key) : status.value;
+    });
+
     // ── Scroll management ──
     const { onScroll: onMessageListScroll, scrollToBottom, cleanup: cleanupScroll } = createScrollManager('.message-list');
 
@@ -296,8 +316,9 @@ const App = {
       // Multi-session parallel
       currentConversationId, conversationCache, processingConversations,
       switchConversation,
+      // i18n
+      t,
     });
-
     const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
@@ -310,6 +331,8 @@ const App = {
       // Multi-session parallel
       currentConversationId, processingConversations, conversationCache,
       switchConversation,
+      // i18n
+      t,
     });
 
     // Now wire up the forwarding function
@@ -534,21 +557,23 @@ const App = {
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       getRenderedContent, copyMessage, toggleTool,
       isPrevAssistant: _isPrevAssistant,
-      toggleContextSummary, formatTimestamp, formatUsage,
-      getToolIcon, getToolSummary, isEditTool, getEditDiffHtml, getFormattedToolInput, autoResize,
+      toggleContextSummary, formatTimestamp, formatUsage: (u) => formatUsage(u, t),
+      getToolIcon, getToolSummary: (msg) => getToolSummary(msg, t), isEditTool, getEditDiffHtml: (msg) => getEditDiffHtml(msg, t), getFormattedToolInput: (msg) => getFormattedToolInput(msg, t), autoResize,
       // AskUserQuestion
       selectQuestionOption,
       submitQuestionAnswer: _submitQuestionAnswer,
       hasQuestionAnswer, getQuestionResponseSummary,
       // Theme
       theme, toggleTheme,
+      // i18n
+      t, locale, toggleLocale, localeLabel, displayStatus,
       // Sidebar
       sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
       toggleSidebar: sidebar.toggleSidebar,
       resumeSession: sidebar.resumeSession,
       newConversation: sidebar.newConversation,
       requestSessionList: sidebar.requestSessionList,
-      formatRelativeTime,
+      formatRelativeTime: (ts) => formatRelativeTime(ts, t),
       groupedSessions: sidebar.groupedSessions,
       isSessionProcessing: sidebar.isSessionProcessing,
       processingConversations,
@@ -574,9 +599,9 @@ const App = {
       // Team rename/delete
       renamingTeamId, renameTeamText,
       deleteTeamConfirmOpen, deleteTeamConfirmTitle, pendingDeleteTeamId,
-      startTeamRename(t) {
-        renamingTeamId.value = t.teamId;
-        renameTeamText.value = t.title || '';
+      startTeamRename(tm) {
+        renamingTeamId.value = tm.teamId;
+        renameTeamText.value = tm.title || '';
       },
       confirmTeamRename() {
         const tid = renamingTeamId.value;
@@ -590,9 +615,9 @@ const App = {
         renamingTeamId.value = null;
         renameTeamText.value = '';
       },
-      requestDeleteTeam(t) {
-        pendingDeleteTeamId.value = t.teamId;
-        deleteTeamConfirmTitle.value = t.title || t.teamId.slice(0, 8);
+      requestDeleteTeam(tm) {
+        pendingDeleteTeamId.value = tm.teamId;
+        deleteTeamConfirmTitle.value = tm.title || tm.teamId.slice(0, 8);
         deleteTeamConfirmOpen.value = true;
       },
       confirmDeleteTeam() {
@@ -938,7 +963,7 @@ const App = {
       loopLastRunDisplay(l) {
         if (!l.lastExecution) return '';
         const exec = l.lastExecution;
-        const ago = formatRelativeTime(exec.startedAt);
+        const ago = formatRelativeTime(exec.startedAt, t);
         const icon = exec.status === 'success' ? 'OK' : exec.status === 'error' ? 'ERR' : exec.status;
         return ago + ' ' + icon;
       },
@@ -966,41 +991,42 @@ const App = {
     <div class="layout">
       <header class="top-bar">
         <div class="top-bar-left">
-          <button class="sidebar-toggle" @click="toggleSidebar" title="Toggle sidebar">
+          <button class="sidebar-toggle" @click="toggleSidebar" :title="t('header.toggleSidebar')">
             <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
           </button>
           <h1>AgentLink</h1>
         </div>
         <div class="top-bar-info">
-          <span :class="['badge', status.toLowerCase()]">{{ status }}</span>
+          <span :class="['badge', status.toLowerCase()]">{{ displayStatus }}</span>
           <span v-if="latency !== null && status === 'Connected'" class="latency" :class="{ good: latency < 100, ok: latency >= 100 && latency < 500, bad: latency >= 500 }">{{ latency }}ms</span>
           <span v-if="agentName" class="agent-label">{{ agentName }}</span>
           <div class="team-mode-toggle">
-            <button :class="['team-mode-btn', { active: viewMode === 'chat' }]" @click="viewMode = 'chat'">Chat</button>
-            <button :class="['team-mode-btn', { active: viewMode === 'team' }]" @click="viewMode = 'team'">Team</button>
-            <button :class="['team-mode-btn', { active: viewMode === 'loop' }]" @click="viewMode = 'loop'">Loop</button>
+            <button :class="['team-mode-btn', { active: viewMode === 'chat' }]" @click="viewMode = 'chat'">{{ t('header.chat') }}</button>
+            <button :class="['team-mode-btn', { active: viewMode === 'team' }]" @click="viewMode = 'team'">{{ t('header.team') }}</button>
+            <button :class="['team-mode-btn', { active: viewMode === 'loop' }]" @click="viewMode = 'loop'">{{ t('header.loop') }}</button>
           </div>
           <select class="team-mode-select" :value="viewMode" @change="viewMode = $event.target.value">
-            <option value="chat">Chat</option>
-            <option value="team">Team</option>
-            <option value="loop">Loop</option>
+            <option value="chat">{{ t('header.chat') }}</option>
+            <option value="team">{{ t('header.team') }}</option>
+            <option value="loop">{{ t('header.loop') }}</option>
           </select>
-          <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+          <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? t('header.lightMode') : t('header.darkMode')">
             <svg v-if="theme === 'dark'" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
             <svg v-else viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
           </button>
+          <button class="theme-toggle" @click="toggleLocale" :title="localeLabel">{{ localeLabel }}</button>
         </div>
       </header>
 
       <div v-if="status === 'No Session' || (status !== 'Connected' && status !== 'Connecting...' && status !== 'Reconnecting...' && messages.length === 0)" class="center-card">
         <div class="status-card">
           <p class="status">
-            <span class="label">Status:</span>
-            <span :class="['badge', status.toLowerCase()]">{{ status }}</span>
+            <span class="label">{{ t('statusCard.status') }}</span>
+            <span :class="['badge', status.toLowerCase()]">{{ displayStatus }}</span>
           </p>
-          <p v-if="agentName" class="info"><span class="label">Agent:</span> {{ agentName }}</p>
-          <p v-if="workDir" class="info"><span class="label">Directory:</span> {{ workDir }}</p>
-          <p v-if="sessionId" class="info muted"><span class="label">Session:</span> {{ sessionId }}</p>
+          <p v-if="agentName" class="info"><span class="label">{{ t('statusCard.agent') }}</span> {{ agentName }}</p>
+          <p v-if="workDir" class="info"><span class="label">{{ t('statusCard.directory') }}</span> {{ workDir }}</p>
+          <p v-if="sessionId" class="info muted"><span class="label">{{ t('statusCard.session') }}</span> {{ sessionId }}</p>
           <p v-if="error" class="error-msg">{{ error }}</p>
         </div>
       </div>
@@ -1015,16 +1041,16 @@ const App = {
             <div class="file-panel-mobile-header">
               <button class="file-panel-mobile-back" @click="sidebarView = 'sessions'">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                Sessions
+                {{ t('sidebar.sessions') }}
               </button>
-              <button class="file-panel-btn" @click="fileBrowser.refreshTree()" title="Refresh">
+              <button class="file-panel-btn" @click="fileBrowser.refreshTree()" :title="t('sidebar.refresh')">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
               </button>
             </div>
             <div class="file-panel-breadcrumb" :title="workDir">{{ workDir }}</div>
-            <div v-if="fileTreeLoading" class="file-panel-loading">Loading...</div>
+            <div v-if="fileTreeLoading" class="file-panel-loading">{{ t('filePanel.loading') }}</div>
             <div v-else-if="!fileTreeRoot || !fileTreeRoot.children || fileTreeRoot.children.length === 0" class="file-panel-empty">
-              No files found.
+              {{ t('filePanel.noFiles') }}
             </div>
             <div v-else class="file-tree">
               <template v-for="item in flattenedTree" :key="item.node.path">
@@ -1042,7 +1068,7 @@ const App = {
                   <span class="file-tree-name" :title="item.node.path">{{ item.node.name }}</span>
                   <span v-if="item.node.loading" class="file-tree-spinner"></span>
                 </div>
-                <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">(empty)</div>
+                <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ t('filePanel.empty') }}</div>
                 <div v-if="item.node.error" class="file-tree-error" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ item.node.error }}</div>
               </template>
             </div>
@@ -1053,13 +1079,13 @@ const App = {
             <div class="file-preview-mobile-header">
               <button class="file-panel-mobile-back" @click="filePreview.closePreview()">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                Files
+                {{ t('sidebar.files') }}
               </button>
               <div class="preview-header-actions">
                 <button v-if="previewFile?.content && filePreview.isMarkdownFile(previewFile.fileName)"
                         class="preview-md-toggle" :class="{ active: previewMarkdownRendered }"
                         @click="previewMarkdownRendered = !previewMarkdownRendered"
-                        :title="previewMarkdownRendered ? 'Show source' : 'Render markdown'">
+                        :title="previewMarkdownRendered ? t('preview.showSource') : t('preview.renderMarkdown')">
                   <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3zM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5z"/></svg>
                 </button>
                 <span v-if="previewFile" class="file-preview-mobile-size">
@@ -1068,10 +1094,10 @@ const App = {
               </div>
             </div>
             <div class="file-preview-mobile-filename" :title="previewFile?.filePath">
-              {{ previewFile?.fileName || 'Preview' }}
+              {{ previewFile?.fileName || t('preview.preview') }}
             </div>
             <div class="preview-panel-body">
-              <div v-if="previewLoading" class="preview-loading">Loading...</div>
+              <div v-if="previewLoading" class="preview-loading">{{ t('preview.loading') }}</div>
               <div v-else-if="previewFile?.error" class="preview-error">
                 {{ previewFile.error }}
               </div>
@@ -1086,11 +1112,11 @@ const App = {
               <div v-else-if="previewFile?.content" class="preview-text-container">
                 <pre class="preview-code"><code v-html="filePreview.highlightCode(previewFile.content, previewFile.fileName)"></code></pre>
                 <div v-if="previewFile.truncated" class="preview-truncated-notice">
-                  File truncated — showing first 100 KB of {{ filePreview.formatFileSize(previewFile.totalSize) }}
+                  {{ t('preview.fileTruncated', { size: filePreview.formatFileSize(previewFile.totalSize) }) }}
                 </div>
               </div>
               <div v-else-if="previewFile && !previewFile.content && !previewFile.error" class="preview-binary-info">
-                <p>Binary file — {{ previewFile.mimeType }}</p>
+                <p>{{ t('preview.binaryFile') }} — {{ previewFile.mimeType }}</p>
                 <p>{{ filePreview.formatFileSize(previewFile.totalSize) }}</p>
               </div>
             </div>
@@ -1105,7 +1131,7 @@ const App = {
                 <span>{{ hostname }}</span>
               </div>
               <div class="sidebar-workdir-header">
-                <div class="sidebar-workdir-label">Working Directory</div>
+                <div class="sidebar-workdir-label">{{ t('sidebar.workingDirectory') }}</div>
               </div>
               <div class="sidebar-workdir-path-row" @click.stop="toggleWorkdirMenu()">
                 <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
@@ -1114,19 +1140,19 @@ const App = {
               <div v-if="workdirMenuOpen" class="workdir-menu">
                 <div class="workdir-menu-item" @click.stop="workdirMenuBrowse()">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13h8v2H8v-2z"/></svg>
-                  <span>Browse files</span>
+                  <span>{{ t('sidebar.browseFiles') }}</span>
                 </div>
                 <div class="workdir-menu-item" @click.stop="workdirMenuChangeDir()">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                  <span>Change directory</span>
+                  <span>{{ t('sidebar.changeDirectory') }}</span>
                 </div>
                 <div class="workdir-menu-item" @click.stop="workdirMenuCopyPath()">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                  <span>Copy path</span>
+                  <span>{{ t('sidebar.copyPath') }}</span>
                 </div>
               </div>
               <div v-if="filteredWorkdirHistory.length > 0" class="workdir-history">
-                <div class="workdir-history-label">Recent Directories</div>
+                <div class="workdir-history-label">{{ t('sidebar.recentDirectories') }}</div>
                 <div class="workdir-history-list">
                   <div
                     v-for="path in filteredWorkdirHistory" :key="path"
@@ -1135,7 +1161,7 @@ const App = {
                     :title="path"
                   >
                     <span class="workdir-history-path">{{ path }}</span>
-                    <button class="workdir-history-delete" @click.stop="removeFromWorkdirHistory(path)" title="Remove from history">
+                    <button class="workdir-history-delete" @click.stop="removeFromWorkdirHistory(path)" :title="t('sidebar.removeFromHistory')">
                       <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                     </button>
                   </div>
@@ -1147,12 +1173,12 @@ const App = {
           <!-- Chat History section -->
           <div class="sidebar-section sidebar-sessions" :style="{ flex: chatsCollapsed ? '0 0 auto' : '1 1 0', minHeight: chatsCollapsed ? 'auto' : '0' }">
             <div class="sidebar-section-header" @click="chatsCollapsed = !chatsCollapsed" style="cursor: pointer;">
-              <span>Chat History</span>
+              <span>{{ t('sidebar.chatHistory') }}</span>
               <span class="sidebar-section-header-actions">
-                <button class="sidebar-refresh-btn" @click.stop="requestSessionList" title="Refresh" :disabled="loadingSessions">
+                <button class="sidebar-refresh-btn" @click.stop="requestSessionList" :title="t('sidebar.refresh')" :disabled="loadingSessions">
                   <svg :class="{ spinning: loadingSessions }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </button>
-                <button class="sidebar-collapse-btn" :title="chatsCollapsed ? 'Expand' : 'Collapse'">
+                <button class="sidebar-collapse-btn" :title="chatsCollapsed ? t('sidebar.expand') : t('sidebar.collapse')">
                   <svg :class="{ collapsed: chatsCollapsed }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
                 </button>
               </span>
@@ -1161,14 +1187,14 @@ const App = {
             <div v-show="!chatsCollapsed" class="sidebar-section-collapsible">
             <button class="new-conversation-btn" @click="newConversation">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-              New conversation
+              {{ t('sidebar.newConversation') }}
             </button>
 
             <div v-if="loadingSessions && historySessions.length === 0" class="sidebar-loading">
-              Loading sessions...
+              {{ t('sidebar.loadingSessions') }}
             </div>
             <div v-else-if="historySessions.length === 0" class="sidebar-empty">
-              No previous sessions found.
+              {{ t('sidebar.noSessions') }}
             </div>
             <div v-else class="session-list">
               <div v-for="group in groupedSessions" :key="group.label" class="session-group">
@@ -1189,8 +1215,8 @@ const App = {
                       @keydown.escape.stop="cancelRename"
                       @vue:mounted="$event.el.focus()"
                     />
-                    <button class="session-rename-ok" @click.stop="confirmRename" title="Confirm">&#10003;</button>
-                    <button class="session-rename-cancel" @click.stop="cancelRename" title="Cancel">&times;</button>
+                    <button class="session-rename-ok" @click.stop="confirmRename" :title="t('sidebar.confirm')">&#10003;</button>
+                    <button class="session-rename-cancel" @click.stop="cancelRename" :title="t('sidebar.cancel')">&times;</button>
                   </div>
                   <div v-else class="session-title">
                     <svg v-if="s.title && s.title.startsWith('You are a team lead')" class="session-team-icon" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
@@ -1202,7 +1228,7 @@ const App = {
                       <button
                         class="session-rename-btn"
                         @click.stop="startRename(s)"
-                        title="Rename session"
+                        :title="t('sidebar.renameSession')"
                       >
                         <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                       </button>
@@ -1210,7 +1236,7 @@ const App = {
                         v-if="currentClaudeSessionId !== s.sessionId"
                         class="session-delete-btn"
                         @click.stop="deleteSession(s)"
-                        title="Delete session"
+                        :title="t('sidebar.deleteSession')"
                       >
                         <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                       </button>
@@ -1225,12 +1251,12 @@ const App = {
           <!-- Teams section -->
           <div class="sidebar-section sidebar-teams" :style="{ flex: teamsCollapsed ? '0 0 auto' : '1 1 0', minHeight: teamsCollapsed ? 'auto' : '0' }">
             <div class="sidebar-section-header" @click="teamsCollapsed = !teamsCollapsed" style="cursor: pointer;">
-              <span>Teams History</span>
+              <span>{{ t('sidebar.teamsHistory') }}</span>
               <span class="sidebar-section-header-actions">
-                <button class="sidebar-refresh-btn" @click.stop="requestTeamsList" title="Refresh" :disabled="loadingTeams">
+                <button class="sidebar-refresh-btn" @click.stop="requestTeamsList" :title="t('sidebar.refresh')" :disabled="loadingTeams">
                   <svg :class="{ spinning: loadingTeams }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </button>
-                <button class="sidebar-collapse-btn" :title="teamsCollapsed ? 'Expand' : 'Collapse'">
+                <button class="sidebar-collapse-btn" :title="teamsCollapsed ? t('sidebar.expand') : t('sidebar.collapse')">
                   <svg :class="{ collapsed: teamsCollapsed }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
                 </button>
               </span>
@@ -1239,18 +1265,18 @@ const App = {
             <div v-show="!teamsCollapsed" class="sidebar-section-collapsible">
             <button class="new-conversation-btn" @click="newTeam" :disabled="isTeamActive">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-              New team
+              {{ t('sidebar.newTeam') }}
             </button>
 
             <div class="team-history-list">
               <div
-                v-for="t in teamsList" :key="t.teamId"
-                :class="['team-history-item', { active: displayTeam && displayTeam.teamId === t.teamId }]"
-                @click="renamingTeamId !== t.teamId && viewHistoricalTeam(t.teamId)"
-                :title="t.title"
+                v-for="tm in teamsList" :key="tm.teamId"
+                :class="['team-history-item', { active: displayTeam && displayTeam.teamId === tm.teamId }]"
+                @click="renamingTeamId !== tm.teamId && viewHistoricalTeam(tm.teamId)"
+                :title="tm.title"
               >
                 <div class="team-history-info">
-                  <div v-if="renamingTeamId === t.teamId" class="session-rename-row">
+                  <div v-if="renamingTeamId === tm.teamId" class="session-rename-row">
                     <input
                       class="session-rename-input"
                       v-model="renameTeamText"
@@ -1259,19 +1285,19 @@ const App = {
                       @keydown.escape.stop="cancelTeamRename"
                       @vue:mounted="$event.el.focus()"
                     />
-                    <button class="session-rename-ok" @click.stop="confirmTeamRename" title="Confirm">&#10003;</button>
-                    <button class="session-rename-cancel" @click.stop="cancelTeamRename" title="Cancel">&times;</button>
+                    <button class="session-rename-ok" @click.stop="confirmTeamRename" :title="t('sidebar.confirm')">&#10003;</button>
+                    <button class="session-rename-cancel" @click.stop="cancelTeamRename" :title="t('sidebar.cancel')">&times;</button>
                   </div>
-                  <div v-else class="team-history-title">{{ t.title || 'Untitled team' }}</div>
-                  <div v-if="renamingTeamId !== t.teamId" class="team-history-meta">
-                    <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + t.status]">{{ t.status }}</span>
-                    <span v-if="t.taskCount" class="team-history-tasks">{{ t.taskCount }} tasks</span>
-                    <span v-if="t.totalCost" class="team-history-tasks">{{'$' + t.totalCost.toFixed(2) }}</span>
+                  <div v-else class="team-history-title">{{ tm.title || t('sidebar.untitledTeam') }}</div>
+                  <div v-if="renamingTeamId !== tm.teamId" class="team-history-meta">
+                    <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + tm.status]">{{ tm.status }}</span>
+                    <span v-if="tm.taskCount" class="team-history-tasks">{{ tm.taskCount }} {{ t('sidebar.tasks') }}</span>
+                    <span v-if="tm.totalCost" class="team-history-tasks">{{'$' + tm.totalCost.toFixed(2) }}</span>
                     <span class="session-actions">
-                      <button class="session-rename-btn" @click.stop="startTeamRename(t)" title="Rename team">
+                      <button class="session-rename-btn" @click.stop="startTeamRename(tm)" :title="t('sidebar.renameTeam')">
                         <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                       </button>
-                      <button class="session-delete-btn" @click.stop="requestDeleteTeam(t)" title="Delete team">
+                      <button class="session-delete-btn" @click.stop="requestDeleteTeam(tm)" :title="t('sidebar.deleteTeam')">
                         <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                       </button>
                     </span>
@@ -1285,12 +1311,12 @@ const App = {
           <!-- Loops section -->
           <div class="sidebar-section sidebar-loops" :style="{ flex: loopsCollapsed ? '0 0 auto' : '1 1 0', minHeight: loopsCollapsed ? 'auto' : '0' }">
             <div class="sidebar-section-header" @click="loopsCollapsed = !loopsCollapsed" style="cursor: pointer;">
-              <span>Loops</span>
+              <span>{{ t('sidebar.loops') }}</span>
               <span class="sidebar-section-header-actions">
-                <button class="sidebar-refresh-btn" @click.stop="requestLoopsList" title="Refresh" :disabled="loadingLoops">
+                <button class="sidebar-refresh-btn" @click.stop="requestLoopsList" :title="t('sidebar.refresh')" :disabled="loadingLoops">
                   <svg :class="{ spinning: loadingLoops }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </button>
-                <button class="sidebar-collapse-btn" :title="loopsCollapsed ? 'Expand' : 'Collapse'">
+                <button class="sidebar-collapse-btn" :title="loopsCollapsed ? t('sidebar.expand') : t('sidebar.collapse')">
                   <svg :class="{ collapsed: loopsCollapsed }" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
                 </button>
               </span>
@@ -1299,11 +1325,11 @@ const App = {
             <div v-show="!loopsCollapsed" class="sidebar-section-collapsible">
             <button class="new-conversation-btn" @click="newLoop">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-              New loop
+              {{ t('sidebar.newLoop') }}
             </button>
 
             <div v-if="loopsList.length === 0 && !loadingLoops" class="sidebar-empty">
-              No loops configured.
+              {{ t('sidebar.noLoops') }}
             </div>
             <div v-else class="loop-history-list">
               <div
@@ -1322,18 +1348,18 @@ const App = {
                       @keydown.escape.stop="cancelLoopRename"
                       @vue:mounted="$event.el.focus()"
                     />
-                    <button class="session-rename-ok" @click.stop="confirmLoopRename" title="Confirm">&#10003;</button>
-                    <button class="session-rename-cancel" @click.stop="cancelLoopRename" title="Cancel">&times;</button>
+                    <button class="session-rename-ok" @click.stop="confirmLoopRename" :title="t('sidebar.confirm')">&#10003;</button>
+                    <button class="session-rename-cancel" @click.stop="cancelLoopRename" :title="t('sidebar.cancel')">&times;</button>
                   </div>
-                  <div v-else class="team-history-title">{{ l.name || 'Untitled loop' }}</div>
+                  <div v-else class="team-history-title">{{ l.name || t('sidebar.untitledLoop') }}</div>
                   <div v-if="renamingLoopId !== l.id" class="team-history-meta">
-                    <span :class="['team-status-badge', 'team-status-badge-sm', l.enabled ? 'team-status-running' : 'team-status-completed']">{{ l.enabled ? 'active' : 'paused' }}</span>
+                    <span :class="['team-status-badge', 'team-status-badge-sm', l.enabled ? 'team-status-running' : 'team-status-completed']">{{ l.enabled ? t('sidebar.active') : t('sidebar.paused') }}</span>
                     <span v-if="l.scheduleType" class="team-history-tasks">{{ formatSchedule(l.scheduleType, l.scheduleConfig || {}, l.schedule) }}</span>
                     <span class="session-actions">
-                      <button class="session-rename-btn" @click.stop="startLoopRename(l)" title="Rename loop">
+                      <button class="session-rename-btn" @click.stop="startLoopRename(l)" :title="t('sidebar.renameLoop')">
                         <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                       </button>
-                      <button class="session-delete-btn" @click.stop="requestDeleteLoop(l)" title="Delete loop">
+                      <button class="session-delete-btn" @click.stop="requestDeleteLoop(l)" :title="t('sidebar.deleteLoop')">
                         <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                       </button>
                     </span>
@@ -1345,9 +1371,9 @@ const App = {
           </div>
 
           <div v-if="serverVersion || agentVersion" class="sidebar-version-footer">
-            <span v-if="serverVersion">server {{ serverVersion }}</span>
+            <span v-if="serverVersion">{{ t('sidebar.server') }} {{ serverVersion }}</span>
             <span v-if="serverVersion && agentVersion" class="sidebar-version-sep">/</span>
-            <span v-if="agentVersion">agent {{ agentVersion }}</span>
+            <span v-if="agentVersion">{{ t('sidebar.agent') }} {{ agentVersion }}</span>
           </div>
           </template>
         </aside>
@@ -1357,20 +1383,20 @@ const App = {
         <div v-if="filePanelOpen && !isMobile" class="file-panel" :style="{ width: filePanelWidth + 'px' }">
           <div class="file-panel-resize-handle" @mousedown="fileBrowser.onResizeStart($event)" @touchstart="fileBrowser.onResizeStart($event)"></div>
           <div class="file-panel-header">
-            <span class="file-panel-title">Files</span>
+            <span class="file-panel-title">{{ t('filePanel.files') }}</span>
             <div class="file-panel-actions">
-              <button class="file-panel-btn" @click="fileBrowser.refreshTree()" title="Refresh">
+              <button class="file-panel-btn" @click="fileBrowser.refreshTree()" :title="t('sidebar.refresh')">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
               </button>
-              <button class="file-panel-btn" @click="filePanelOpen = false" title="Close">
+              <button class="file-panel-btn" @click="filePanelOpen = false" :title="t('sidebar.close')">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
               </button>
             </div>
           </div>
           <div class="file-panel-breadcrumb" :title="workDir">{{ workDir }}</div>
-          <div v-if="fileTreeLoading" class="file-panel-loading">Loading...</div>
+          <div v-if="fileTreeLoading" class="file-panel-loading">{{ t('filePanel.loading') }}</div>
           <div v-else-if="!fileTreeRoot || !fileTreeRoot.children || fileTreeRoot.children.length === 0" class="file-panel-empty">
-            No files found.
+            {{ t('filePanel.noFiles') }}
           </div>
           <div v-else class="file-tree">
             <template v-for="item in flattenedTree" :key="item.node.path">
@@ -1388,7 +1414,7 @@ const App = {
                 <span class="file-tree-name" :title="item.node.path">{{ item.node.name }}</span>
                 <span v-if="item.node.loading" class="file-tree-spinner"></span>
               </div>
-              <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">(empty)</div>
+              <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ t('filePanel.empty') }}</div>
               <div v-if="item.node.error" class="file-tree-error" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ item.node.error }}</div>
             </template>
           </div>
@@ -1406,13 +1432,13 @@ const App = {
               <div class="team-create-inner">
                 <div class="team-create-header">
                   <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" opacity="0.5" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-                  <h2>Launch Agent Team</h2>
+                  <h2>{{ t('team.launchAgentTeam') }}</h2>
                 </div>
-                <p class="team-create-desc">Select a template, review the lead prompt, and describe your task.</p>
+                <p class="team-create-desc">{{ t('team.selectTemplateDesc') }}</p>
 
                 <!-- Template selector -->
                 <div class="team-tpl-section">
-                  <label class="team-tpl-label">Template</label>
+                  <label class="team-tpl-label">{{ t('team.template') }}</label>
                   <select class="team-tpl-select" :value="selectedTemplate" @change="onTemplateChange($event.target.value)">
                     <option v-for="key in TEMPLATE_KEYS" :key="key" :value="key">{{ TEMPLATES[key].label }}</option>
                   </select>
@@ -1423,7 +1449,7 @@ const App = {
                 <div class="team-lead-prompt-section">
                   <div class="team-lead-prompt-header" @click="leadPromptExpanded = !leadPromptExpanded">
                     <svg class="team-lead-prompt-arrow" :class="{ expanded: leadPromptExpanded }" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
-                    <span class="team-lead-prompt-title">Lead Prompt</span>
+                    <span class="team-lead-prompt-title">{{ t('team.leadPrompt') }}</span>
                     <span v-if="!leadPromptExpanded" class="team-lead-prompt-preview">{{ leadPromptPreview() }}</span>
                   </div>
                   <div v-if="leadPromptExpanded" class="team-lead-prompt-body">
@@ -1433,18 +1459,18 @@ const App = {
                       rows="10"
                     ></textarea>
                     <div class="team-lead-prompt-actions">
-                      <button class="team-lead-prompt-reset" @click="resetLeadPrompt()" title="Reset to template default">Reset</button>
+                      <button class="team-lead-prompt-reset" @click="resetLeadPrompt()" :title="t('team.reset')">{{ t('team.reset') }}</button>
                     </div>
                   </div>
                 </div>
 
                 <!-- Task description -->
                 <div class="team-tpl-section">
-                  <label class="team-tpl-label">Task Description</label>
+                  <label class="team-tpl-label">{{ t('team.taskDescription') }}</label>
                   <textarea
                     v-model="teamInstruction"
                     class="team-create-textarea"
-                    placeholder="Describe the task for the team... e.g. 'Review the authentication module for security issues and fix any vulnerabilities found.'"
+                    :placeholder="t('team.taskPlaceholder')"
                     rows="4"
                   ></textarea>
                 </div>
@@ -1452,14 +1478,14 @@ const App = {
                 <div class="team-create-actions">
                   <button class="team-create-launch" :disabled="!teamInstruction.trim()" @click="launchTeamFromPanel()">
                     <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-                    Launch Team
+                    {{ t('team.launchTeam') }}
                   </button>
-                  <button class="team-create-cancel" @click="backToChat()">Back to Chat</button>
+                  <button class="team-create-cancel" @click="backToChat()">{{ t('team.backToChat') }}</button>
                 </div>
 
                 <!-- Example instructions -->
                 <div class="team-examples-section">
-                  <div class="team-examples-header">Examples</div>
+                  <div class="team-examples-header">{{ t('team.examples') }}</div>
                   <div class="team-examples-list">
                     <div class="team-example-card" v-for="(ex, i) in teamExamples" :key="i">
                       <div class="team-example-icon" v-html="ex.icon"></div>
@@ -1467,27 +1493,27 @@ const App = {
                         <div class="team-example-title">{{ ex.title }}</div>
                         <div class="team-example-text">{{ ex.text }}</div>
                       </div>
-                      <button class="team-example-try" @click="onTemplateChange(ex.template); teamInstruction = ex.text">Try it</button>
+                      <button class="team-example-try" @click="onTemplateChange(ex.template); teamInstruction = ex.text">{{ t('team.tryIt') }}</button>
                     </div>
                   </div>
                 </div>
 
                 <!-- Historical teams -->
                 <div v-if="teamsList.length > 0" class="team-history-section">
-                  <div class="team-history-section-header">Previous Teams</div>
+                  <div class="team-history-section-header">{{ t('team.previousTeams') }}</div>
                   <div class="team-history-list">
                     <div
-                      v-for="t in teamsList" :key="t.teamId"
+                      v-for="tm in teamsList" :key="tm.teamId"
                       class="team-history-item"
-                      @click="viewHistoricalTeam(t.teamId)"
-                      :title="t.title"
+                      @click="viewHistoricalTeam(tm.teamId)"
+                      :title="tm.title"
                     >
                       <div class="team-history-info">
-                        <div class="team-history-title">{{ t.title || 'Untitled team' }}</div>
+                        <div class="team-history-title">{{ tm.title || t('sidebar.untitledTeam') }}</div>
                         <div class="team-history-meta">
-                          <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + t.status]">{{ t.status }}</span>
-                          <span v-if="t.taskCount" class="team-history-tasks">{{ t.taskCount }} tasks</span>
-                          <span v-if="t.totalCost" class="team-history-tasks">{{'$' + t.totalCost.toFixed(2) }}</span>
+                          <span :class="['team-status-badge', 'team-status-badge-sm', 'team-status-' + tm.status]">{{ tm.status }}</span>
+                          <span v-if="tm.taskCount" class="team-history-tasks">{{ tm.taskCount }} {{ t('sidebar.tasks') }}</span>
+                          <span v-if="tm.totalCost" class="team-history-tasks">{{'$' + tm.totalCost.toFixed(2) }}</span>
                         </div>
                       </div>
                     </div>
@@ -1503,15 +1529,15 @@ const App = {
                 <div class="team-dash-header-top">
                   <span :class="['team-status-badge', 'team-status-' + displayTeam.status]">{{ displayTeam.status }}</span>
                   <div class="team-dash-header-right">
-                    <button v-if="isTeamRunning" class="team-dissolve-btn" @click="dissolveTeam()">Dissolve Team</button>
-                    <button v-if="!isTeamActive" class="team-new-btn" @click="newTeam()">New Team</button>
-                    <button v-if="!isTeamActive" class="team-back-btn" @click="backToChat()">Back to Chat</button>
+                    <button v-if="isTeamRunning" class="team-dissolve-btn" @click="dissolveTeam()">{{ t('team.dissolveTeam') }}</button>
+                    <button v-if="!isTeamActive" class="team-new-btn" @click="newTeam()">{{ t('team.newTeam') }}</button>
+                    <button v-if="!isTeamActive" class="team-back-btn" @click="backToChat()">{{ t('team.backToChat') }}</button>
                   </div>
                 </div>
                 <div class="team-dash-instruction" :class="{ expanded: instructionExpanded }">
-                  <div class="team-dash-instruction-text">{{ displayTeam.config?.instruction || displayTeam.title || 'Agent Team' }}</div>
+                  <div class="team-dash-instruction-text">{{ displayTeam.config?.instruction || displayTeam.title || t('team.agentTeam') }}</div>
                   <button v-if="(displayTeam.config?.instruction || '').length > 120" class="team-dash-instruction-toggle" @click="instructionExpanded = !instructionExpanded">
-                    {{ instructionExpanded ? 'Show less' : 'Show more' }}
+                    {{ instructionExpanded ? t('team.showLess') : t('team.showMore') }}
                   </button>
                 </div>
               </div>
@@ -1519,7 +1545,7 @@ const App = {
               <!-- Lead status bar (clickable to view lead detail) -->
               <div v-if="displayTeam.leadStatus && (displayTeam.status === 'planning' || displayTeam.status === 'running' || displayTeam.status === 'summarizing')" class="team-lead-bar team-lead-bar-clickable" @click="viewAgent('lead')">
                 <span class="team-lead-dot"></span>
-                <span class="team-lead-label">Lead</span>
+                <span class="team-lead-label">{{ t('team.lead') }}</span>
                 <span class="team-lead-text">{{ displayTeam.leadStatus }}</span>
               </div>
 
@@ -1533,14 +1559,14 @@ const App = {
                   <div class="team-kanban-section">
                     <div class="team-kanban-section-header" @click="kanbanExpanded = !kanbanExpanded">
                       <span class="team-kanban-section-toggle">{{ kanbanExpanded ? '\u25BC' : '\u25B6' }}</span>
-                      <span class="team-kanban-section-title">Tasks</span>
-                      <span class="team-kanban-section-summary">{{ doneTasks.length }}/{{ displayTeam.tasks.length }} done</span>
+                      <span class="team-kanban-section-title">{{ t('team.tasks') }}</span>
+                      <span class="team-kanban-section-summary">{{ doneTasks.length }}/{{ displayTeam.tasks.length }} {{ t('team.done') }}</span>
                     </div>
                     <div v-show="kanbanExpanded" class="team-kanban">
                       <div class="team-kanban-col">
                         <div class="team-kanban-col-header">
                           <span class="team-kanban-col-dot pending"></span>
-                          Pending
+                          {{ t('team.pending') }}
                           <span class="team-kanban-col-count">{{ pendingTasks.length }}</span>
                         </div>
                         <div class="team-kanban-col-body">
@@ -1548,13 +1574,13 @@ const App = {
                             <div class="team-task-title">{{ task.title }}</div>
                             <div v-if="task.description" class="team-task-desc team-task-desc-clamp" @click.stop="$event.target.classList.toggle('team-task-desc-expanded')">{{ task.description }}</div>
                           </div>
-                          <div v-if="pendingTasks.length === 0" class="team-kanban-empty">No tasks</div>
+                          <div v-if="pendingTasks.length === 0" class="team-kanban-empty">{{ t('team.noTasks') }}</div>
                         </div>
                       </div>
                       <div class="team-kanban-col">
                         <div class="team-kanban-col-header">
                           <span class="team-kanban-col-dot active"></span>
-                          Active
+                          {{ t('team.activeCol') }}
                           <span class="team-kanban-col-count">{{ activeTasks.length }}</span>
                         </div>
                         <div class="team-kanban-col-body">
@@ -1566,13 +1592,13 @@ const App = {
                               {{ getTaskAgent(task).name || task.assignee || task.assignedTo }}
                             </div>
                           </div>
-                          <div v-if="activeTasks.length === 0" class="team-kanban-empty">No tasks</div>
+                          <div v-if="activeTasks.length === 0" class="team-kanban-empty">{{ t('team.noTasks') }}</div>
                         </div>
                       </div>
                       <div class="team-kanban-col">
                         <div class="team-kanban-col-header">
                           <span class="team-kanban-col-dot done"></span>
-                          Done
+                          {{ t('team.doneCol') }}
                           <span class="team-kanban-col-count">{{ doneTasks.length }}</span>
                         </div>
                         <div class="team-kanban-col-body">
@@ -1584,13 +1610,13 @@ const App = {
                               {{ getTaskAgent(task).name || task.assignee || task.assignedTo }}
                             </div>
                           </div>
-                          <div v-if="doneTasks.length === 0" class="team-kanban-empty">No tasks</div>
+                          <div v-if="doneTasks.length === 0" class="team-kanban-empty">{{ t('team.noTasks') }}</div>
                         </div>
                       </div>
                       <div v-if="failedTasks.length > 0" class="team-kanban-col">
                         <div class="team-kanban-col-header">
                           <span class="team-kanban-col-dot failed"></span>
-                          Failed
+                          {{ t('team.failed') }}
                           <span class="team-kanban-col-count">{{ failedTasks.length }}</span>
                         </div>
                         <div class="team-kanban-col-body">
@@ -1605,7 +1631,7 @@ const App = {
 
                   <!-- Agent cards (horizontal) -->
                   <div class="team-agents-bar">
-                    <div class="team-agents-bar-header">Agents</div>
+                    <div class="team-agents-bar-header">{{ t('team.agents') }}</div>
                     <div class="team-agents-bar-list">
                       <div
                         v-for="agent in (displayTeam.agents || [])" :key="agent.id"
@@ -1620,15 +1646,15 @@ const App = {
                         <div v-if="getLatestAgentActivity(agent.id)" class="team-agent-card-activity">{{ getLatestAgentActivity(agent.id) }}</div>
                       </div>
                       <div v-if="!displayTeam.agents || displayTeam.agents.length === 0" class="team-agents-empty">
-                        <span v-if="displayTeam.status === 'planning'">Planning tasks...</span>
-                        <span v-else>No agents</span>
+                        <span v-if="displayTeam.status === 'planning'">{{ t('team.planningTasks') }}</span>
+                        <span v-else>{{ t('team.noAgents') }}</span>
                       </div>
                     </div>
                   </div>
 
                   <!-- Activity feed -->
                   <div v-if="displayTeam.feed && displayTeam.feed.length > 0" class="team-feed">
-                    <div class="team-feed-header">Activity</div>
+                    <div class="team-feed-header">{{ t('team.activity') }}</div>
                     <div class="team-feed-list">
                       <div v-for="(entry, fi) in displayTeam.feed" :key="fi" class="team-feed-entry">
                         <span v-if="entry.agentId" class="team-agent-dot" :style="{ background: getAgentColor(entry.agentId) }"></span>
@@ -1642,26 +1668,26 @@ const App = {
                   <!-- Completion stats -->
                   <div v-if="displayTeam.status === 'completed' || displayTeam.status === 'failed'" class="team-stats-bar">
                     <div class="team-stat">
-                      <span class="team-stat-label">Tasks</span>
+                      <span class="team-stat-label">{{ t('team.tasksStat') }}</span>
                       <span class="team-stat-value">{{ doneTasks.length }}/{{ displayTeam.tasks.length }}</span>
                     </div>
                     <div v-if="displayTeam.durationMs" class="team-stat">
-                      <span class="team-stat-label">Duration</span>
+                      <span class="team-stat-label">{{ t('team.duration') }}</span>
                       <span class="team-stat-value">{{ Math.round(displayTeam.durationMs / 1000) }}s</span>
                     </div>
                     <div v-if="displayTeam.totalCost" class="team-stat">
-                      <span class="team-stat-label">Cost</span>
+                      <span class="team-stat-label">{{ t('team.cost') }}</span>
                       <span class="team-stat-value">{{ '$' + displayTeam.totalCost.toFixed(2) }}</span>
                     </div>
                     <div class="team-stat">
-                      <span class="team-stat-label">Agents</span>
+                      <span class="team-stat-label">{{ t('team.agentsStat') }}</span>
                       <span class="team-stat-value">{{ (displayTeam.agents || []).length }}</span>
                     </div>
                   </div>
 
                   <!-- Completion summary -->
                   <div v-if="displayTeam.status === 'completed' && displayTeam.summary" class="team-summary">
-                    <div class="team-summary-header">Summary</div>
+                    <div class="team-summary-header">{{ t('team.summary') }}</div>
                     <div class="team-summary-body markdown-body" v-html="getRenderedContent({ role: 'assistant', content: displayTeam.summary })"></div>
                   </div>
 
@@ -1670,16 +1696,16 @@ const App = {
                     <textarea
                       v-model="teamInstruction"
                       class="team-new-launcher-input"
-                      placeholder="Launch another team task..."
+                      :placeholder="t('team.launchAnotherPlaceholder')"
                       rows="2"
                       @keydown.enter.ctrl="launchTeamFromPanel()"
                     ></textarea>
                     <div class="team-new-launcher-actions">
                       <button class="team-create-launch" :disabled="!teamInstruction.trim()" @click="launchTeamFromPanel()">
                         <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-                        New Team
+                        {{ t('team.newTeam') }}
                       </button>
-                      <button class="team-create-cancel" @click="backToChat()">Back to Chat</button>
+                      <button class="team-create-cancel" @click="backToChat()">{{ t('team.backToChat') }}</button>
                     </div>
                   </div>
                 </div>
@@ -1689,7 +1715,7 @@ const App = {
                   <div class="team-agent-detail-header" :style="{ borderBottom: '2px solid ' + getAgentColor(activeAgentView) }">
                     <button class="team-agent-back-btn" @click="viewDashboard()">
                       <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                      Dashboard
+                      {{ t('team.dashboard') }}
                     </button>
                     <span :class="['team-agent-dot', { working: findAgent(activeAgentView)?.status === 'working' || findAgent(activeAgentView)?.status === 'starting' }]" :style="{ background: getAgentColor(activeAgentView) }"></span>
                     <span class="team-agent-detail-name" :style="{ color: getAgentColor(activeAgentView) }">{{ findAgent(activeAgentView)?.name || activeAgentView }}</span>
@@ -1698,12 +1724,12 @@ const App = {
                   <div class="team-agent-messages">
                     <div class="team-agent-messages-inner">
                       <div v-if="getAgentMessages(activeAgentView).length === 0" class="team-agent-empty-msg">
-                        No messages yet.
+                        {{ t('team.noMessages') }}
                       </div>
                       <template v-for="(msg, mi) in getAgentMessages(activeAgentView)" :key="msg.id">
                         <!-- Agent user/prompt message -->
                         <div v-if="msg.role === 'user' && msg.content" class="team-agent-prompt">
-                          <div class="team-agent-prompt-label">Task Prompt</div>
+                          <div class="team-agent-prompt-label">{{ t('team.taskPrompt') }}</div>
                           <div class="team-agent-prompt-body markdown-body" v-html="getRenderedContent(msg)"></div>
                         </div>
                         <!-- System notice (e.g. completion message) -->
@@ -1760,14 +1786,14 @@ const App = {
 
                 <div v-if="loadingExecution" class="loop-loading">
                   <div class="history-loading-spinner"></div>
-                  <span>Loading execution...</span>
+                  <span>{{ t('loop.loadingExecution') }}</span>
                 </div>
 
                 <div v-else class="loop-exec-messages">
-                  <div v-if="executionMessages.length === 0" class="team-agent-empty-msg">No messages recorded for this execution.</div>
+                  <div v-if="executionMessages.length === 0" class="team-agent-empty-msg">{{ t('loop.noExecMessages') }}</div>
                   <template v-for="(msg, mi) in executionMessages" :key="msg.id">
                     <div v-if="msg.role === 'user' && msg.content" class="team-agent-prompt">
-                      <div class="team-agent-prompt-label">Loop Prompt</div>
+                      <div class="team-agent-prompt-label">{{ t('loop.loopPrompt') }}</div>
                       <div class="team-agent-prompt-body markdown-body" v-html="getRenderedContent(msg)"></div>
                     </div>
                     <div v-else-if="msg.role === 'assistant'" :class="['message', 'message-assistant']">
@@ -1804,34 +1830,34 @@ const App = {
                 <div class="loop-detail-header">
                   <button class="team-agent-back-btn" @click="backToLoopsList()">
                     <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                    Back to Loops
+                    {{ t('loop.backToLoops') }}
                   </button>
                 </div>
                 <div class="loop-detail-info">
                   <h2 class="loop-detail-name">{{ selectedLoop.name }}</h2>
                   <div class="loop-detail-meta">
                     <span class="loop-detail-schedule">{{ loopScheduleDisplay(selectedLoop) }}</span>
-                    <span :class="['loop-status-badge', selectedLoop.enabled ? 'loop-status-enabled' : 'loop-status-disabled']">{{ selectedLoop.enabled ? 'Enabled' : 'Disabled' }}</span>
+                    <span :class="['loop-status-badge', selectedLoop.enabled ? 'loop-status-enabled' : 'loop-status-disabled']">{{ selectedLoop.enabled ? t('loop.enabled') : t('loop.disabled') }}</span>
                   </div>
                   <div class="loop-detail-actions">
-                    <button class="loop-action-btn" @click="startEditingLoop(selectedLoop); selectedLoop = null">Edit</button>
-                    <button class="loop-action-btn loop-action-run" @click="runNow(selectedLoop.id)" :disabled="isLoopRunning(selectedLoop.id)">Run Now</button>
-                    <button class="loop-action-btn" @click="toggleLoop(selectedLoop.id)">{{ selectedLoop.enabled ? 'Disable' : 'Enable' }}</button>
+                    <button class="loop-action-btn" @click="startEditingLoop(selectedLoop); selectedLoop = null">{{ t('loop.edit') }}</button>
+                    <button class="loop-action-btn loop-action-run" @click="runNow(selectedLoop.id)" :disabled="isLoopRunning(selectedLoop.id)">{{ t('loop.runNow') }}</button>
+                    <button class="loop-action-btn" @click="toggleLoop(selectedLoop.id)">{{ selectedLoop.enabled ? t('loop.disable') : t('loop.enable') }}</button>
                   </div>
                 </div>
 
                 <div class="loop-detail-prompt-section">
-                  <div class="loop-detail-prompt-label">Prompt</div>
+                  <div class="loop-detail-prompt-label">{{ t('loop.prompt') }}</div>
                   <div class="loop-detail-prompt-text">{{ selectedLoop.prompt }}</div>
                 </div>
 
                 <div class="loop-exec-history-section">
-                  <div class="loop-exec-history-header">Execution History</div>
+                  <div class="loop-exec-history-header">{{ t('loop.executionHistory') }}</div>
                   <div v-if="loadingExecutions" class="loop-loading">
                     <div class="history-loading-spinner"></div>
-                    <span>Loading executions...</span>
+                    <span>{{ t('loop.loadingExecutions') }}</span>
                   </div>
-                  <div v-else-if="executionHistory.length === 0" class="loop-exec-empty">No executions yet.</div>
+                  <div v-else-if="executionHistory.length === 0" class="loop-exec-empty">{{ t('loop.noExecutions') }}</div>
                   <div v-else class="loop-exec-list">
                     <div v-for="exec in executionHistory" :key="exec.id" class="loop-exec-item">
                       <div class="loop-exec-item-left">
@@ -1843,21 +1869,21 @@ const App = {
                           <template v-else>?</template>
                         </span>
                         <span class="loop-exec-time">{{ formatExecTime(exec.startedAt) }}</span>
-                        <span v-if="exec.status === 'running'" class="loop-exec-running-label">Running...</span>
+                        <span v-if="exec.status === 'running'" class="loop-exec-running-label">{{ t('loop.running') }}</span>
                         <span v-else-if="exec.durationMs" class="loop-exec-duration">{{ formatDuration(exec.durationMs) }}</span>
                         <span v-if="exec.error" class="loop-exec-error-text" :title="exec.error">{{ exec.error.length > 40 ? exec.error.slice(0, 40) + '...' : exec.error }}</span>
-                        <span v-if="exec.trigger === 'manual'" class="loop-exec-trigger-badge">manual</span>
+                        <span v-if="exec.trigger === 'manual'" class="loop-exec-trigger-badge">{{ t('loop.manualBadge') }}</span>
                       </div>
                       <div class="loop-exec-item-right">
-                        <button v-if="exec.status === 'running'" class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">View</button>
-                        <button v-if="exec.status === 'running'" class="loop-action-btn loop-action-cancel" @click="cancelLoopExecution(selectedLoop.id)">Cancel</button>
-                        <button v-if="exec.status !== 'running'" class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">View</button>
+                        <button v-if="exec.status === 'running'" class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">{{ t('loop.view') }}</button>
+                        <button v-if="exec.status === 'running'" class="loop-action-btn loop-action-cancel" @click="cancelLoopExecution(selectedLoop.id)">{{ t('loop.cancelExec') }}</button>
+                        <button v-if="exec.status !== 'running'" class="loop-action-btn" @click="viewExecution(selectedLoop.id, exec.id)">{{ t('loop.view') }}</button>
                       </div>
                     </div>
                     <!-- Load more executions -->
                     <div v-if="hasMoreExecutions && !loadingExecutions" class="loop-load-more">
                       <button class="loop-action-btn" :disabled="loadingMoreExecutions" @click="loadMoreExecutions()">
-                        {{ loadingMoreExecutions ? 'Loading...' : 'Load more' }}
+                        {{ loadingMoreExecutions ? t('filePanel.loading') : t('loop.loadMore') }}
                       </button>
                     </div>
                   </div>
@@ -1870,13 +1896,13 @@ const App = {
               <div class="team-create-inner">
                 <div class="team-create-header">
                   <svg viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" opacity="0.5" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
-                  <h2>{{ editingLoopId ? 'Edit Loop' : 'Create a Scheduled Loop' }}</h2>
+                  <h2>{{ editingLoopId ? t('loop.editLoop') : t('loop.createLoop') }}</h2>
                 </div>
-                <p class="team-create-desc">Configure recurring tasks that run on a schedule. Select a template or create your own.</p>
+                <p class="team-create-desc">{{ t('loop.createDesc') }}</p>
 
                 <!-- Template cards -->
                 <div v-if="!editingLoopId" class="team-examples-section" style="margin-top: 0;">
-                  <div class="team-examples-header">Templates</div>
+                  <div class="team-examples-header">{{ t('loop.templates') }}</div>
                   <div class="team-examples-list">
                     <div v-for="key in LOOP_TEMPLATE_KEYS" :key="key"
                          :class="['team-example-card', { 'loop-template-selected': loopSelectedTemplate === key }]"
@@ -1890,50 +1916,50 @@ const App = {
                         <div class="team-example-title">{{ LOOP_TEMPLATES[key].label }}</div>
                         <div class="team-example-text">{{ LOOP_TEMPLATES[key].description }}</div>
                       </div>
-                      <button class="team-example-try" @click="selectLoopTemplate(key)">Try it</button>
+                      <button class="team-example-try" @click="selectLoopTemplate(key)">{{ t('team.tryIt') }}</button>
                     </div>
                   </div>
                 </div>
 
                 <!-- Name field -->
                 <div class="team-tpl-section">
-                  <label class="team-tpl-label">Name</label>
+                  <label class="team-tpl-label">{{ t('loop.name') }}</label>
                   <input
                     v-model="loopName"
                     type="text"
                     class="loop-name-input"
-                    placeholder="e.g. Daily Code Review"
+                    :placeholder="t('loop.namePlaceholder')"
                   />
                 </div>
 
                 <!-- Prompt field -->
                 <div class="team-tpl-section">
-                  <label class="team-tpl-label">Prompt</label>
+                  <label class="team-tpl-label">{{ t('loop.prompt') }}</label>
                   <textarea
                     v-model="loopPrompt"
                     class="team-create-textarea"
-                    placeholder="Describe what the Loop should do each time it runs..."
+                    :placeholder="t('loop.promptPlaceholder')"
                     rows="5"
                   ></textarea>
                 </div>
 
                 <!-- Schedule selector -->
                 <div class="team-tpl-section">
-                  <label class="team-tpl-label">Schedule</label>
+                  <label class="team-tpl-label">{{ t('loop.schedule') }}</label>
                   <div class="loop-schedule-options">
                     <label class="loop-schedule-radio">
                       <input type="radio" v-model="loopScheduleType" value="manual" />
-                      <span>Manual</span>
-                      <span v-if="loopScheduleType === 'manual'" class="loop-schedule-detail" style="opacity:0.6">run only when triggered</span>
+                      <span>{{ t('loop.manual') }}</span>
+                      <span v-if="loopScheduleType === 'manual'" class="loop-schedule-detail" style="opacity:0.6">{{ t('loop.manualDetail') }}</span>
                     </label>
                     <label class="loop-schedule-radio">
                       <input type="radio" v-model="loopScheduleType" value="hourly" />
-                      <span>Every hour</span>
+                      <span>{{ t('loop.everyHour') }}</span>
                       <span v-if="loopScheduleType === 'hourly'" class="loop-schedule-detail">at minute {{ padTwo(loopScheduleMinute) }}</span>
                     </label>
                     <label class="loop-schedule-radio">
                       <input type="radio" v-model="loopScheduleType" value="daily" />
-                      <span>Every day</span>
+                      <span>{{ t('loop.everyDay') }}</span>
                       <span v-if="loopScheduleType === 'daily'" class="loop-schedule-detail">
                         at
                         <input type="number" v-model.number="loopScheduleHour" min="0" max="23" class="loop-time-input" />
@@ -1943,7 +1969,7 @@ const App = {
                     </label>
                     <label class="loop-schedule-radio">
                       <input type="radio" v-model="loopScheduleType" value="cron" />
-                      <span>Advanced (cron)</span>
+                      <span>{{ t('loop.advancedCron') }}</span>
                       <span v-if="loopScheduleType === 'cron'" class="loop-schedule-detail">
                         <input type="text" v-model="loopCronExpr" class="loop-cron-input" placeholder="0 9 * * *" />
                       </span>
@@ -1954,14 +1980,14 @@ const App = {
                 <!-- Action buttons -->
                 <div class="team-create-actions">
                   <button v-if="editingLoopId" class="team-create-launch" :disabled="!loopName.trim() || !loopPrompt.trim()" @click="saveLoopEdits()">
-                    Save Changes
+                    {{ t('loop.saveChanges') }}
                   </button>
                   <button v-else class="team-create-launch" :disabled="!loopName.trim() || !loopPrompt.trim()" @click="createLoopFromPanel()">
                     <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
-                    Create Loop
+                    {{ t('loop.createLoopBtn') }}
                   </button>
-                  <button v-if="editingLoopId" class="team-create-cancel" @click="cancelEditingLoop()">Cancel</button>
-                  <button class="team-create-cancel" @click="backToChat()">Back to Chat</button>
+                  <button v-if="editingLoopId" class="team-create-cancel" @click="cancelEditingLoop()">{{ t('loop.cancel') }}</button>
+                  <button class="team-create-cancel" @click="backToChat()">{{ t('loop.backToChat') }}</button>
                 </div>
 
                 <!-- Error message -->
@@ -1973,7 +1999,7 @@ const App = {
 
                 <!-- Active Loops list -->
                 <div v-if="loopsList.length > 0" class="loop-active-section">
-                  <div class="loop-active-header">Active Loops</div>
+                  <div class="loop-active-header">{{ t('loop.activeLoops') }}</div>
                   <div class="loop-active-list">
                     <div v-for="l in loopsList" :key="l.id" class="loop-active-item">
                       <div class="loop-active-item-info" @click="viewLoop(l.id)">
@@ -1986,14 +2012,14 @@ const App = {
                           <span v-if="l.lastExecution" class="loop-active-item-last">
                             Last: {{ loopLastRunDisplay(l) }}
                           </span>
-                          <span v-if="isLoopRunning(l.id)" class="loop-exec-running-label">Running...</span>
+                          <span v-if="isLoopRunning(l.id)" class="loop-exec-running-label">{{ t('loop.running') }}</span>
                         </div>
                       </div>
                       <div class="loop-active-item-actions">
-                        <button class="loop-action-btn loop-action-sm" @click="startEditingLoop(l)" title="Edit">Edit</button>
-                        <button class="loop-action-btn loop-action-sm loop-action-run" @click="runNow(l.id)" :disabled="isLoopRunning(l.id)" title="Run now">Run</button>
-                        <button class="loop-action-btn loop-action-sm" @click="toggleLoop(l.id)" :title="l.enabled ? 'Disable' : 'Enable'">{{ l.enabled ? 'Pause' : 'Resume' }}</button>
-                        <button v-if="!l.enabled" class="loop-action-btn loop-action-sm loop-action-delete" @click="requestDeleteLoop(l)" title="Delete">Del</button>
+                        <button class="loop-action-btn loop-action-sm" @click="startEditingLoop(l)" :title="t('loop.edit')">{{ t('loop.edit') }}</button>
+                        <button class="loop-action-btn loop-action-sm loop-action-run" @click="runNow(l.id)" :disabled="isLoopRunning(l.id)" :title="t('loop.runNow')">{{ t('loop.run') }}</button>
+                        <button class="loop-action-btn loop-action-sm" @click="toggleLoop(l.id)" :title="l.enabled ? t('loop.disable') : t('loop.enable')">{{ l.enabled ? t('loop.pause') : t('loop.resume') }}</button>
+                        <button v-if="!l.enabled" class="loop-action-btn loop-action-sm loop-action-delete" @click="requestDeleteLoop(l)" :title="t('loop.deleteLoop')">{{ t('loop.del') }}</button>
                       </div>
                     </div>
                   </div>
@@ -2004,18 +2030,18 @@ const App = {
             <!-- Running Loop notification banner -->
             <div v-if="hasRunningLoop && !selectedLoop" class="loop-running-banner">
               <span class="loop-running-banner-dot"></span>
-              <span>{{ firstRunningLoop.name }} is running...</span>
-              <button class="loop-action-btn loop-action-sm" @click="viewLoop(firstRunningLoop.loopId)">View</button>
+              <span>{{ firstRunningLoop.name }} {{ t('loop.isRunning') }}</span>
+              <button class="loop-action-btn loop-action-sm" @click="viewLoop(firstRunningLoop.loopId)">{{ t('loop.view') }}</button>
             </div>
 
             <!-- Loop delete confirm dialog -->
             <div v-if="loopDeleteConfirmOpen" class="modal-overlay" @click.self="cancelDeleteLoop()">
               <div class="modal-dialog">
-                <div class="modal-title">Delete Loop</div>
-                <div class="modal-body">Are you sure you want to delete <strong>{{ loopDeleteConfirmName }}</strong>? This cannot be undone.</div>
+                <div class="modal-title">{{ t('loop.deleteLoop') }}</div>
+                <div class="modal-body" v-html="t('loop.deleteConfirm', { name: loopDeleteConfirmName })"></div>
                 <div class="modal-actions">
-                  <button class="modal-confirm-btn" @click="confirmDeleteLoop()">Delete</button>
-                  <button class="modal-cancel-btn" @click="cancelDeleteLoop()">Cancel</button>
+                  <button class="modal-confirm-btn" @click="confirmDeleteLoop()">{{ t('loop.delete') }}</button>
+                  <button class="modal-cancel-btn" @click="cancelDeleteLoop()">{{ t('loop.cancel') }}</button>
                 </div>
               </div>
             </div>
@@ -2029,25 +2055,25 @@ const App = {
                 <div class="empty-state-icon">
                   <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" opacity="0.4" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
                 </div>
-                <p>Connected to <strong>{{ agentName }}</strong></p>
+                <p>{{ t('chat.connectedTo') }} <strong>{{ agentName }}</strong></p>
                 <p class="muted">{{ workDir }}</p>
-                <p class="muted" style="margin-top: 0.5rem;">Send a message to start.</p>
+                <p class="muted" style="margin-top: 0.5rem;">{{ t('chat.sendToStart') }}</p>
               </div>
 
               <div v-if="loadingHistory" class="history-loading">
                 <div class="history-loading-spinner"></div>
-                <span>Loading conversation history...</span>
+                <span>{{ t('chat.loadingHistory') }}</span>
               </div>
 
               <div v-if="hasMoreMessages" class="load-more-wrapper">
-                <button class="load-more-btn" @click="loadMoreMessages">Load earlier messages</button>
+                <button class="load-more-btn" @click="loadMoreMessages">{{ t('chat.loadEarlier') }}</button>
               </div>
 
               <div v-for="(msg, msgIdx) in visibleMessages" :key="msg.id" :class="['message', 'message-' + msg.role]">
 
                 <!-- User message -->
                 <template v-if="msg.role === 'user'">
-                  <div class="message-role-label user-label">You</div>
+                  <div class="message-role-label user-label">{{ t('chat.you') }}</div>
                   <div class="message-bubble user-bubble" :title="formatTimestamp(msg.timestamp)">
                     <div class="message-content">{{ msg.content }}</div>
                     <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
@@ -2064,10 +2090,10 @@ const App = {
 
                 <!-- Assistant message (markdown) -->
                 <template v-else-if="msg.role === 'assistant'">
-                  <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">Claude</div>
+                  <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">{{ t('chat.claude') }}</div>
                   <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]" :title="formatTimestamp(msg.timestamp)">
                     <div class="message-actions">
-                      <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? 'Copied!' : 'Copy'">
+                      <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? t('chat.copied') : t('chat.copy')">
                         <svg v-if="!msg.copied" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
                         <svg v-else viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                       </button>
@@ -2093,7 +2119,7 @@ const App = {
                   <div v-show="msg.expanded" class="tool-expand team-agent-tool-expand">
                     <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
                     <div v-if="msg.toolOutput" class="team-agent-tool-result">
-                      <div class="team-agent-tool-result-label">Agent Result</div>
+                      <div class="team-agent-tool-result-label">{{ t('team.agentResult') }}</div>
                       <div class="team-agent-tool-result-content markdown-body" v-html="getRenderedContent({ role: 'assistant', content: msg.toolOutput })"></div>
                     </div>
                   </div>
@@ -2143,7 +2169,7 @@ const App = {
                         <input
                           type="text"
                           v-model="msg.customTexts[qi]"
-                          placeholder="Or type a custom response..."
+                          :placeholder="t('chat.customResponse')"
                           @input="msg.selectedAnswers[qi] = q.multiSelect ? [] : null"
                           @keydown.enter="hasQuestionAnswer(msg) && submitQuestionAnswer(msg)"
                         />
@@ -2151,7 +2177,7 @@ const App = {
                     </div>
                     <div class="ask-question-actions">
                       <button class="ask-question-submit" :disabled="!hasQuestionAnswer(msg)" @click="submitQuestionAnswer(msg)">
-                        Submit
+                        {{ t('chat.submit') }}
                       </button>
                     </div>
                   </div>
@@ -2165,8 +2191,8 @@ const App = {
                 <div v-else-if="msg.role === 'context-summary'" class="context-summary-wrapper">
                   <div class="context-summary-bar" @click="toggleContextSummary(msg)">
                     <svg class="context-summary-icon" viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Zm7 2.25v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 9a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
-                    <span class="context-summary-label">Context continued from previous conversation</span>
-                    <span class="context-summary-toggle">{{ msg.contextExpanded ? 'Hide' : 'Show' }}</span>
+                    <span class="context-summary-label">{{ t('chat.contextContinued') }}</span>
+                    <span class="context-summary-toggle">{{ msg.contextExpanded ? t('chat.hide') : t('chat.show') }}</span>
                   </div>
                   <div v-if="msg.contextExpanded" class="context-summary-body">
                     <div class="markdown-body" v-html="getRenderedContent({ role: 'assistant', content: msg.content })"></div>
@@ -2211,7 +2237,7 @@ const App = {
                   <svg viewBox="0 0 24 24" width="11" height="11"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
                   {{ qm.attachments.length }}
                 </span>
-                <button class="queue-item-remove" @click="removeQueuedMessage(qm.id)" title="Remove from queue">&times;</button>
+                <button class="queue-item-remove" @click="removeQueuedMessage(qm.id)" :title="t('input.removeFromQueue')">&times;</button>
               </div>
             </div>
             <div v-if="usageStats" class="usage-bar">{{ formatUsage(usageStats) }}</div>
@@ -2228,7 +2254,7 @@ const App = {
                 @input="autoResize"
                 @paste="handlePaste"
                 :disabled="status !== 'Connected' || isCompacting"
-                :placeholder="isCompacting ? 'Context compacting in progress...' : 'Send a message · Enter to send'"
+                :placeholder="isCompacting ? t('input.compacting') : t('input.placeholder')"
                 rows="1"
               ></textarea>
               <div v-if="attachments.length > 0" class="attachment-bar">
@@ -2241,17 +2267,17 @@ const App = {
                     <div class="attachment-name">{{ att.name }}</div>
                     <div class="attachment-size">{{ formatFileSize(att.size) }}</div>
                   </div>
-                  <button class="attachment-remove" @click="removeAttachment(i)" title="Remove">&times;</button>
+                  <button class="attachment-remove" @click="removeAttachment(i)" :title="t('input.remove')">&times;</button>
                 </div>
               </div>
               <div class="input-bottom-row">
-                <button class="attach-btn" @click="triggerFileInput" :disabled="status !== 'Connected' || isCompacting || attachments.length >= 5" title="Attach files">
+                <button class="attach-btn" @click="triggerFileInput" :disabled="status !== 'Connected' || isCompacting || attachments.length >= 5" :title="t('input.attachFiles')">
                   <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
                 </button>
-                <button v-if="isProcessing && !hasInput" @click="cancelExecution" class="send-btn stop-btn" title="Stop generation">
+                <button v-if="isProcessing && !hasInput" @click="cancelExecution" class="send-btn stop-btn" :title="t('input.stopGeneration')">
                   <svg viewBox="0 0 24 24" width="14" height="14"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
                 </button>
-                <button v-else @click="sendMessage" :disabled="!canSend" class="send-btn" title="Send">
+                <button v-else @click="sendMessage" :disabled="!canSend" class="send-btn" :title="t('input.send')">
                   <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                 </button>
               </div>
@@ -2267,21 +2293,21 @@ const App = {
                @touchstart="filePreview.onResizeStart($event)"></div>
           <div class="preview-panel-header">
             <span class="preview-panel-filename" :title="previewFile?.filePath">
-              {{ previewFile?.fileName || 'Preview' }}
+              {{ previewFile?.fileName || t('preview.preview') }}
             </span>
             <button v-if="previewFile?.content && filePreview.isMarkdownFile(previewFile.fileName)"
                     class="preview-md-toggle" :class="{ active: previewMarkdownRendered }"
                     @click="previewMarkdownRendered = !previewMarkdownRendered"
-                    :title="previewMarkdownRendered ? 'Show source' : 'Render markdown'">
+                    :title="previewMarkdownRendered ? t('preview.showSource') : t('preview.renderMarkdown')">
               <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3zM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5z"/></svg>
             </button>
             <span v-if="previewFile" class="preview-panel-size">
               {{ filePreview.formatFileSize(previewFile.totalSize) }}
             </span>
-            <button class="preview-panel-close" @click="filePreview.closePreview()" title="Close preview">&times;</button>
+            <button class="preview-panel-close" @click="filePreview.closePreview()" :title="t('preview.closePreview')">&times;</button>
           </div>
           <div class="preview-panel-body">
-            <div v-if="previewLoading" class="preview-loading">Loading...</div>
+            <div v-if="previewLoading" class="preview-loading">{{ t('preview.loading') }}</div>
             <div v-else-if="previewFile?.error" class="preview-error">
               {{ previewFile.error }}
             </div>
@@ -2296,14 +2322,14 @@ const App = {
             <div v-else-if="previewFile?.content" class="preview-text-container">
               <pre class="preview-code"><code v-html="filePreview.highlightCode(previewFile.content, previewFile.fileName)"></code></pre>
               <div v-if="previewFile.truncated" class="preview-truncated-notice">
-                File truncated — showing first 100 KB of {{ filePreview.formatFileSize(previewFile.totalSize) }}
+                {{ t('preview.fileTruncated', { size: filePreview.formatFileSize(previewFile.totalSize) }) }}
               </div>
             </div>
             <div v-else-if="previewFile && !previewFile.content && !previewFile.error" class="preview-binary-info">
               <div class="preview-binary-icon">
                 <svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" opacity="0.4" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
               </div>
-              <p>Binary file</p>
+              <p>{{ t('preview.binaryFile') }}</p>
               <p class="preview-binary-meta">{{ previewFile.mimeType }}</p>
               <p class="preview-binary-meta">{{ filePreview.formatFileSize(previewFile.totalSize) }}</p>
             </div>
@@ -2317,20 +2343,19 @@ const App = {
       <div class="folder-picker-overlay" v-if="folderPickerOpen" @click.self="folderPickerOpen = false">
         <div class="folder-picker-dialog">
           <div class="folder-picker-header">
-            <span>Select Working Directory</span>
+            <span>{{ t('folderPicker.title') }}</span>
             <button class="folder-picker-close" @click="folderPickerOpen = false">&times;</button>
           </div>
           <div class="folder-picker-nav">
-            <button class="folder-picker-up" @click="folderPickerNavigateUp" :disabled="!folderPickerPath" title="Go to parent directory">
+            <button class="folder-picker-up" @click="folderPickerNavigateUp" :disabled="!folderPickerPath" :title="t('folderPicker.parentDir')">
               <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             </button>
-            <input class="folder-picker-path-input" type="text" v-model="folderPickerPath" @keydown.enter="folderPickerGoToPath" placeholder="Enter path..." spellcheck="false" />
+            <input class="folder-picker-path-input" type="text" v-model="folderPickerPath" @keydown.enter="folderPickerGoToPath" :placeholder="t('folderPicker.pathPlaceholder')" spellcheck="false" />
           </div>
           <div class="folder-picker-list">
             <div v-if="folderPickerLoading" class="folder-picker-loading">
               <div class="history-loading-spinner"></div>
-              <span>Loading...</span>
-            </div>
+              <span>{{ t('preview.loading') }}</span>            </div>
             <template v-else>
               <div
                 v-for="entry in folderPickerEntries" :key="entry.name"
@@ -2341,12 +2366,12 @@ const App = {
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
                 <span>{{ entry.name }}</span>
               </div>
-              <div v-if="folderPickerEntries.length === 0" class="folder-picker-empty">No subdirectories found.</div>
+              <div v-if="folderPickerEntries.length === 0" class="folder-picker-empty">{{ t('folderPicker.noSubdirs') }}</div>
             </template>
           </div>
           <div class="folder-picker-footer">
-            <button class="folder-picker-cancel" @click="folderPickerOpen = false">Cancel</button>
-            <button class="folder-picker-confirm" @click="confirmFolderPicker" :disabled="!folderPickerPath">Open</button>
+            <button class="folder-picker-cancel" @click="folderPickerOpen = false">{{ t('folderPicker.cancel') }}</button>
+            <button class="folder-picker-confirm" @click="confirmFolderPicker" :disabled="!folderPickerPath">{{ t('folderPicker.open') }}</button>
           </div>
         </div>
       </div>
@@ -2354,15 +2379,15 @@ const App = {
       <!-- Delete Session Confirmation Dialog -->
       <div class="folder-picker-overlay" v-if="deleteConfirmOpen" @click.self="cancelDeleteSession">
         <div class="delete-confirm-dialog">
-          <div class="delete-confirm-header">Delete Session</div>
+          <div class="delete-confirm-header">{{ t('dialog.deleteSession') }}</div>
           <div class="delete-confirm-body">
-            <p>Are you sure you want to delete this session?</p>
+            <p>{{ t('dialog.deleteSessionConfirm') }}</p>
             <p class="delete-confirm-title">{{ deleteConfirmTitle }}</p>
-            <p class="delete-confirm-warning">This action cannot be undone.</p>
+            <p class="delete-confirm-warning">{{ t('dialog.cannotUndo') }}</p>
           </div>
           <div class="delete-confirm-footer">
-            <button class="folder-picker-cancel" @click="cancelDeleteSession">Cancel</button>
-            <button class="delete-confirm-btn" @click="confirmDeleteSession">Delete</button>
+            <button class="folder-picker-cancel" @click="cancelDeleteSession">{{ t('dialog.cancel') }}</button>
+            <button class="delete-confirm-btn" @click="confirmDeleteSession">{{ t('dialog.delete') }}</button>
           </div>
         </div>
       </div>
@@ -2370,15 +2395,15 @@ const App = {
       <!-- Delete Team Confirmation Dialog -->
       <div class="folder-picker-overlay" v-if="deleteTeamConfirmOpen" @click.self="cancelDeleteTeam">
         <div class="delete-confirm-dialog">
-          <div class="delete-confirm-header">Delete Team</div>
+          <div class="delete-confirm-header">{{ t('dialog.deleteTeam') }}</div>
           <div class="delete-confirm-body">
-            <p>Are you sure you want to delete this team?</p>
+            <p>{{ t('dialog.deleteTeamConfirm') }}</p>
             <p class="delete-confirm-title">{{ deleteTeamConfirmTitle }}</p>
-            <p class="delete-confirm-warning">This action cannot be undone.</p>
+            <p class="delete-confirm-warning">{{ t('dialog.cannotUndo') }}</p>
           </div>
           <div class="delete-confirm-footer">
-            <button class="folder-picker-cancel" @click="cancelDeleteTeam">Cancel</button>
-            <button class="delete-confirm-btn" @click="confirmDeleteTeam">Delete</button>
+            <button class="folder-picker-cancel" @click="cancelDeleteTeam">{{ t('dialog.cancel') }}</button>
+            <button class="delete-confirm-btn" @click="confirmDeleteTeam">{{ t('dialog.delete') }}</button>
           </div>
         </div>
       </div>
@@ -2388,23 +2413,23 @@ const App = {
         <div class="auth-dialog">
           <div class="auth-dialog-header">
             <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-            <span>Session Protected</span>
+            <span>{{ t('auth.sessionProtected') }}</span>
           </div>
           <div class="auth-dialog-body">
-            <p>This session requires a password to access.</p>
+            <p>{{ t('auth.passwordRequired') }}</p>
             <input
               type="password"
               class="auth-password-input"
               v-model="authPassword"
               @keydown.enter="submitPassword"
-              placeholder="Enter password..."
+              :placeholder="t('auth.passwordPlaceholder')"
               autofocus
             />
             <p v-if="authError" class="auth-error">{{ authError }}</p>
             <p v-if="authAttempts" class="auth-attempts">{{ authAttempts }}</p>
           </div>
           <div class="auth-dialog-footer">
-            <button class="auth-submit-btn" @click="submitPassword" :disabled="!authPassword.trim()">Unlock</button>
+            <button class="auth-submit-btn" @click="submitPassword" :disabled="!authPassword.trim()">{{ t('auth.unlock') }}</button>
           </div>
         </div>
       </div>
@@ -2414,11 +2439,11 @@ const App = {
         <div class="auth-dialog auth-dialog-locked">
           <div class="auth-dialog-header">
             <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-            <span>Access Locked</span>
+            <span>{{ t('auth.accessLocked') }}</span>
           </div>
           <div class="auth-dialog-body">
             <p>{{ authError }}</p>
-            <p class="auth-locked-hint">Close this tab and try again later.</p>
+            <p class="auth-locked-hint">{{ t('auth.tryAgainLater') }}</p>
           </div>
         </div>
       </div>
@@ -2427,7 +2452,7 @@ const App = {
       <Transition name="fade">
         <div v-if="workdirSwitching" class="workdir-switching-overlay">
           <div class="workdir-switching-spinner"></div>
-          <div class="workdir-switching-text">Switching directory...</div>
+          <div class="workdir-switching-text">{{ t('workdir.switching') }}</div>
         </div>
       </Transition>
 
@@ -2439,15 +2464,15 @@ const App = {
       >
         <div class="file-context-item" @click="fileBrowser.askClaudeRead()">
           <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM5 15h14v2H5zm0-4h14v2H5zm0-4h14v2H5z"/></svg>
-          Ask Claude to read
+          {{ t('contextMenu.askClaudeRead') }}
         </div>
         <div class="file-context-item" @click="fileBrowser.copyPath()">
           <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-          {{ fileContextMenu.copied ? 'Copied!' : 'Copy path' }}
+          {{ fileContextMenu.copied ? t('contextMenu.copied') : t('contextMenu.copyPath') }}
         </div>
         <div class="file-context-item" @click="fileBrowser.insertPath()">
           <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
-          Insert path to input
+          {{ t('contextMenu.insertPath') }}
         </div>
       </div>
     </div>

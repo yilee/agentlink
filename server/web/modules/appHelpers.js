@@ -73,12 +73,14 @@ export function formatTokens(n) {
  * @param {object|null} u - Usage stats from turn_completed
  * @returns {string}
  */
-export function formatUsage(u) {
+export function formatUsage(u, t) {
   if (!u) return '';
   const pct = u.contextWindow ? Math.round(u.inputTokens / u.contextWindow * 100) : 0;
   const ctx = formatTokens(u.inputTokens) + ' / ' + formatTokens(u.contextWindow) + ' (' + pct + '%)';
   const cost = '$' + u.totalCost.toFixed(2);
   const model = u.model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-1m$/, '');
   const dur = (u.durationMs / 1000).toFixed(1) + 's';
-  return 'Context ' + ctx + '  \u00b7  Cost ' + cost + '  \u00b7  ' + model + '  \u00b7  ' + dur;
+  const contextLabel = t ? t('usage.context') : 'Context';
+  const costLabel = t ? t('usage.cost') : 'Cost';
+  return contextLabel + ' ' + ctx + '  \u00b7  ' + costLabel + ' ' + cost + '  \u00b7  ' + model + '  \u00b7  ' + dur;
 }
