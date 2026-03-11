@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AgentLink — Claude Code 开源版远程控制</title>
-<meta name="description" content="Claude Code 开源版远程控制。在手机、平板或任何浏览器上远程操控你开发机器上的 Claude，端到端加密，无需注册。">
-<meta name="keywords" content="Claude Code, Claude Code开源版远程控制, 远程控制, 浏览器 IDE, AI 编程助手, AgentLink, 端到端加密, 自建部署, 移动编程">
+<meta name="description" content="Claude Code 开源版远程控制。对话、多 Agent 协作、定时任务三大模式，手机或任何浏览器即可操控，端到端加密，无需注册。">
+<meta name="keywords" content="Claude Code, Claude Code开源版远程控制, 远程控制, 浏览器 IDE, AI 编程助手, AgentLink, 端到端加密, 自建部署, 移动编程, 多Agent协作, 定时任务">
 <link rel="canonical" href="https://msclaude.ai/zh">
 <link rel="alternate" hreflang="en" href="https://msclaude.ai/">
 <link rel="alternate" hreflang="zh" href="https://msclaude.ai/zh">
@@ -13,7 +13,7 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="AgentLink — Claude Code 开源版远程控制">
-<meta property="og:description" content="Claude Code 开源版远程控制。在手机、平板或任何浏览器上远程操控你开发机器上的 Claude，端到端加密，无需注册。">
+<meta property="og:description" content="Claude Code 开源版远程控制。对话、多 Agent 协作、定时任务三大模式，手机或任何浏览器即可操控，端到端加密，无需注册。">
 <meta property="og:url" content="https://msclaude.ai/zh">
 <meta property="og:image" content="https://msclaude.ai/iPad.png">
 <meta property="og:site_name" content="AgentLink">
@@ -22,7 +22,7 @@
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="AgentLink — Claude Code 开源版远程控制">
-<meta name="twitter:description" content="Claude Code 开源版远程控制。在手机、平板或任何浏览器上远程操控你开发机器上的 Claude，端到端加密，无需注册。">
+<meta name="twitter:description" content="Claude Code 开源版远程控制。对话、多 Agent 协作、定时任务三大模式，手机或任何浏览器即可操控，端到端加密，无需注册。">
 <meta name="twitter:image" content="https://msclaude.ai/iPad.png">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <script type="application/ld+json">
@@ -30,7 +30,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "AgentLink",
-  "description": "Claude Code 开源版远程控制。在手机、平板或任何浏览器上远程操控你开发机器上的 Claude，端到端加密，无需注册。",
+  "description": "Claude Code 开源版远程控制。对话、多 Agent 协作、定时任务三大模式，手机或任何浏览器即可操控，端到端加密，无需注册。",
   "url": "https://msclaude.ai/zh",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Windows, macOS, Linux",
@@ -537,11 +537,8 @@
   }
 
   .device-ipad img {
-    border-radius: 4.2%;
-    box-shadow:
-      0 40px 100px rgba(0,0,0,0.5),
-      0 15px 50px rgba(0,0,0,0.3),
-      0 0 80px rgba(59,130,246,0.08);
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .device-iphone {
@@ -562,6 +559,106 @@
       0 45px 100px rgba(0,0,0,0.55),
       0 15px 50px rgba(0,0,0,0.35),
       0 0 80px rgba(245,158,11,0.08);
+  }
+
+  /* ── iPad Carousel ── */
+  .ipad-carousel {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 4.2%;
+    box-shadow:
+      0 40px 100px rgba(0,0,0,0.5),
+      0 15px 50px rgba(0,0,0,0.3),
+      0 0 80px rgba(59,130,246,0.08);
+  }
+
+  .carousel-track {
+    position: relative;
+    width: 100%;
+  }
+
+  .carousel-slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+  }
+
+  .carousel-slide.active {
+    position: relative;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .carousel-slide img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .carousel-dots {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 5;
+  }
+
+  .carousel-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.4);
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.3s ease, transform 0.3s ease;
+  }
+
+  .carousel-dot.active {
+    background: rgba(255,255,255,0.9);
+    transform: scale(1.2);
+  }
+
+  .carousel-dot:hover {
+    background: rgba(255,255,255,0.7);
+  }
+
+  .carousel-label {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 8px 14px;
+    border-radius: 10px;
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  .carousel-label-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.02em;
+  }
+
+  .carousel-label-desc {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.75);
+    font-weight: 400;
   }
 
   /* ── Divider ── */
@@ -981,6 +1078,11 @@
       align-self: auto;
     }
     .device-iphone:hover { transform: translateY(-3%); }
+    .carousel-dots { bottom: 8px; gap: 6px; }
+    .carousel-dot { width: 6px; height: 6px; }
+    .carousel-label { top: 8px; left: 8px; padding: 5px 10px; border-radius: 8px; }
+    .carousel-label-title { font-size: 0.8rem; }
+    .carousel-label-desc { font-size: 0.62rem; }
     .terminal { margin: 0 1rem; max-width: calc(100vw - 2rem); }
     .terminal-body { padding: 1rem; font-size: 0.75rem; overflow-x: auto; }
     .terminal-line { gap: 0.4rem; white-space: nowrap; }
@@ -995,18 +1097,6 @@
     .workflow-step { gap: 1rem; }
     .step-marker { width: 40px; height: 40px; border-radius: 12px; font-size: 1rem; }
     .workflow-steps::before { left: 19px; }
-  }
-
-  /* ── Scroll animations ── */
-  .reveal {
-    opacity: 0;
-    transform: translateY(30px);
-    transition: opacity 0.8s ease, transform 0.8s ease;
-  }
-
-  .reveal.visible {
-    opacity: 1;
-    transform: translateY(0);
   }
 
   .sr-only {
@@ -1064,7 +1154,7 @@
     <span class="line"><em>开源版远程控制。</em></span>
   </h1>
   <p class="hero-sub">
-    在开发机器上启动 Agent，出门遛弯期间用<strong>手机或 iPad 继续写代码</strong> &mdash;
+    在开发机器上启动 Agent，出门遛弯期间用<strong>手机对话、组建 Agent 团队、或跑定时任务</strong> &mdash;
     不用装 App，不用注册账号，打开浏览器就能用。
   </p>
   <div class="cta-group">
@@ -1103,99 +1193,63 @@
 </section>
 
 <!-- Device Showcase -->
-<section class="showcase reveal">
+<section class="showcase">
   <div class="device device-ipad">
-    <picture>
-      <source srcset="/iPad.webp" type="image/webp">
-      <img src="/iPad.png" alt="AgentLink 网页端在 iPad 上运行 Claude Code" loading="eager">
-    </picture>
+    <div class="ipad-carousel">
+      <div class="carousel-track">
+        <div class="carousel-slide active">
+          <img src="/images/chat-iPad.webp" alt="AgentLink 聊天模式 iPad 界面" loading="eager">
+          <div class="carousel-label">
+            <span class="carousel-label-title">Chat</span>
+            <span class="carousel-label-desc">远程与 Claude Code 结对编程</span>
+          </div>
+        </div>
+        <div class="carousel-slide">
+          <img src="/images/team-iPad.webp" alt="AgentLink 团队模式 iPad 界面" loading="eager">
+          <div class="carousel-label">
+            <span class="carousel-label-title">Teams</span>
+            <span class="carousel-label-desc">并行编排多个 Agent 协同工作</span>
+          </div>
+        </div>
+        <div class="carousel-slide">
+          <img src="/images/loop-iPad.webp" alt="AgentLink 循环模式 iPad 界面" loading="eager">
+          <div class="carousel-label">
+            <span class="carousel-label-title">Loop</span>
+            <span class="carousel-label-desc">通过 Cron 定时调度自动化任务</span>
+          </div>
+        </div>
+      </div>
+      <div class="carousel-dots">
+        <button class="carousel-dot active" data-index="0" aria-label="聊天模式"></button>
+        <button class="carousel-dot" data-index="1" aria-label="团队模式"></button>
+        <button class="carousel-dot" data-index="2" aria-label="循环模式"></button>
+      </div>
+    </div>
   </div>
   <div class="device device-iphone">
-    <picture>
-      <source srcset="/iPhone.webp" type="image/webp">
-      <img src="/iPhone.png" alt="AgentLink 手机端界面" loading="eager">
-    </picture>
+    <img src="/images/chat-iPhone.webp" alt="AgentLink 手机端界面" loading="eager">
   </div>
 </section>
 
 <div class="section-divider"></div>
 
 <!-- Philosophy -->
-<section class="philosophy reveal">
+<section class="philosophy">
   <div class="philosophy-label">为什么做这个</div>
   <h2>写代码不应该<em>被绑在电脑前。</em></h2>
   <p>
     Claude Code 很强，但只能在终端里用。AgentLink 把它变成一个可以随身携带的体验 &mdash;
-    一行命令，一个链接，在手机或 iPad 上继续你的工作。不需要账号，不需要配置，端到端加密。
+    一行命令，一个链接，在手机上对话、启动 Agent 团队、或调度定时任务。不需要账号，不需要配置，端到端加密。
   </p>
 </section>
 
 <div class="section-divider"></div>
 
 <!-- Bento Features -->
-<section class="bento reveal" id="features">
+<section class="bento" id="features">
   <h2 class="sr-only">功能</h2>
 
-  <!-- E2E Encryption — wide -->
-  <div class="bento-card wide">
-    <div class="bento-visual">
-      <div class="encrypt-visual">
-        <div class="encrypt-block">你的代码</div>
-        <div class="encrypt-arrow">&rarr;</div>
-        <div class="encrypt-block locked">x9f#k2$mQ...</div>
-        <div class="encrypt-arrow">&rarr;</div>
-        <div class="encrypt-block">你的代码</div>
-      </div>
-    </div>
-    <h3>端到端加密</h3>
-    <p>XSalsa20-Poly1305 加密。中继服务器只是个盲转发器 &mdash; 看不到你的代码、提示词或任何数据。</p>
-  </div>
-
-  <!-- Zero Config -->
-  <div class="bento-card">
-    <div class="bento-visual">
-      <div class="bento-icon purple">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-      </div>
-    </div>
-    <h3>开箱即用</h3>
-    <p>不用注册账号，不用配置环境。安装、启动、打开链接，三步搞定。</p>
-  </div>
-
-  <!-- 多 Agent 协作 -->
-  <div class="bento-card">
-    <div class="bento-visual">
-      <div class="bento-icon blue">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-      </div>
-    </div>
-    <h3>多 Agent 协作</h3>
-    <p>启动多个 Claude 子 Agent 并行处理复杂任务，实时看板面板、活动动态、团队历史记录。</p>
-  </div>
-
-  <!-- Multi Session -->
-  <div class="bento-card">
-    <div class="bento-visual">
-      <div class="bento-icon blue">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="8" height="8" rx="1.5"></rect><rect x="14" y="3" width="8" height="8" rx="1.5"></rect><rect x="2" y="13" width="8" height="8" rx="1.5"></rect><rect x="14" y="13" width="8" height="8" rx="1.5"></rect></svg>
-      </div>
-    </div>
-    <h3>多会话并行</h3>
-    <p>同时跑多个对话，自由切换，互不干扰。</p>
-  </div>
-
-  <!-- Any Device -->
-  <div class="bento-card">
-    <div class="bento-visual">
-      <div class="bento-icon cyan">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-      </div>
-    </div>
-    <h3>任何设备</h3>
-    <p>手机、平板、笔记本 &mdash; 有浏览器就行，随时切到你的 Claude。</p>
-  </div>
-
-  <!-- Chat | Team | Loop — wide -->
+  <!-- Row 1: Chat | Team | Loop (wide) + Any Device -->
   <div class="bento-card wide">
     <div class="bento-visual">
       <div class="mode-toggle">
@@ -1226,7 +1280,31 @@
     <p>和 Claude 交互对话、启动 Agent 团队处理复杂任务、或用 Cron 调度定时 Loop 任务 &mdash; 全在同一个浏览器标签页里。</p>
   </div>
 
-  <!-- Self-hostable -->
+  <div class="bento-card">
+    <div class="bento-visual">
+      <div class="bento-icon cyan">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+      </div>
+    </div>
+    <h3>任何设备</h3>
+    <p>手机、平板、笔记本 &mdash; 有浏览器就行，随时切到你的 Claude。</p>
+  </div>
+
+  <!-- Row 2: E2E Encryption (wide) + Self-Hostable -->
+  <div class="bento-card wide">
+    <div class="bento-visual">
+      <div class="encrypt-visual">
+        <div class="encrypt-block">你的代码</div>
+        <div class="encrypt-arrow">&rarr;</div>
+        <div class="encrypt-block locked">x9f#k2$mQ...</div>
+        <div class="encrypt-arrow">&rarr;</div>
+        <div class="encrypt-block">你的代码</div>
+      </div>
+    </div>
+    <h3>端到端加密</h3>
+    <p>XSalsa20-Poly1305 加密。中继服务器只是个盲转发器 &mdash; 看不到你的代码、提示词或任何数据。</p>
+  </div>
+
   <div class="bento-card">
     <div class="bento-visual">
       <div class="bento-icon green">
@@ -1237,33 +1315,42 @@
     <p>一条命令启动你自己的中继服务器。你的基础设施，你的规则。</p>
   </div>
 
-  <!-- Password Protection -->
+  <!-- Row 3: Multi-Agent Teams + Multi Session + Zero Config -->
   <div class="bento-card">
     <div class="bento-visual">
-      <div class="bento-icon amber">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      <div class="bento-icon blue">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
       </div>
     </div>
-    <h3>密码保护</h3>
-    <p>加个 <code style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:0.8rem">--password</code> 参数锁住会话，自带暴力破解防护。</p>
+    <h3>多 Agent 协作</h3>
+    <p>启动多个 Claude 子 Agent 并行处理复杂任务，实时看板面板、活动动态、团队历史记录。</p>
   </div>
 
-  <!-- File Preview -->
-  <div class="bento-card wide">
+  <div class="bento-card">
     <div class="bento-visual">
-      <div class="bento-icon rose">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+      <div class="bento-icon blue">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="8" height="8" rx="1.5"></rect><rect x="14" y="3" width="8" height="8" rx="1.5"></rect><rect x="2" y="13" width="8" height="8" rx="1.5"></rect><rect x="14" y="13" width="8" height="8" rx="1.5"></rect></svg>
       </div>
     </div>
-    <h3>文件浏览器</h3>
-    <p>浏览项目目录树，代码语法高亮预览，直接在浏览器里导航你的代码库。</p>
+    <h3>多会话并行</h3>
+    <p>同时跑多个对话，自由切换，互不干扰。</p>
+  </div>
+
+  <div class="bento-card">
+    <div class="bento-visual">
+      <div class="bento-icon purple">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+      </div>
+    </div>
+    <h3>开箱即用</h3>
+    <p>不用注册账号，不用配置环境。安装、启动、打开链接，三步搞定。</p>
   </div>
 </section>
 
 <div class="section-divider"></div>
 
 <!-- How It Works -->
-<section class="workflow reveal" id="how-it-works">
+<section class="workflow" id="how-it-works">
   <div class="workflow-label">使用方式</div>
   <h2>三步，就这么简单。</h2>
   <div class="workflow-steps">
@@ -1284,8 +1371,8 @@
     <div class="workflow-step">
       <div class="step-marker">03</div>
       <div class="step-content">
-        <h3>开始干活</h3>
-        <p>多个对话并行运行，随时切换项目。完整的会话历史随时可以恢复，工作不会丢。</p>
+        <h3>对话、协作、自动化</h3>
+        <p>交互式编程、启动 Agent 团队处理复杂任务、或设置定时 Loop 任务 &mdash; 同一个链接，完整历史随时恢复。</p>
       </div>
     </div>
   </div>
@@ -1323,16 +1410,79 @@ function showToast() {
   setTimeout(() => toast.classList.remove('show'), 1800);
 }
 
-// Scroll reveal
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
+// iPad carousel
+(function() {
+  const slides = document.querySelectorAll('.carousel-slide');
+  const dots = document.querySelectorAll('.carousel-dot');
+  if (!slides.length) return;
+  let current = 0;
+  let interval;
+
+  function goTo(i) {
+    slides[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current = (i + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    dots[current].classList.add('active');
+  }
+
+  function startAuto() {
+    interval = setInterval(() => goTo(current + 1), 4000);
+  }
+
+  function resetAuto() {
+    clearInterval(interval);
+    startAuto();
+  }
+
+  dots.forEach(dot => {
+    dot.addEventListener('click', () => {
+      goTo(Number(dot.dataset.index));
+      resetAuto();
+    });
+  });
+
+  // Touch/swipe support
+  const track = document.querySelector('.ipad-carousel');
+  let startX = 0, startY = 0, dragging = false;
+
+  track.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dragging = true;
+  }, { passive: true });
+
+  track.addEventListener('touchend', e => {
+    if (!dragging) return;
+    dragging = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      goTo(dx < 0 ? current + 1 : current - 1);
+      resetAuto();
+    }
+  }, { passive: true });
+
+  // Mouse drag support for desktop
+  track.addEventListener('mousedown', e => {
+    startX = e.clientX;
+    dragging = true;
+    track.style.cursor = 'grabbing';
+  });
+
+  document.addEventListener('mouseup', e => {
+    if (!dragging) return;
+    dragging = false;
+    track.style.cursor = '';
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 50) {
+      goTo(dx < 0 ? current + 1 : current - 1);
+      resetAuto();
     }
   });
-}, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
 
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  startAuto();
+})();
 </script>
 
 </body>
