@@ -21,6 +21,10 @@ Claude Code's auto memory stores learned facts (project conventions, user prefer
 - Parsing individual `##` sections as separate entries (treat each file as a unit)
 - Real-time sync with Claude's writes (read-on-open is sufficient)
 
+### Prerequisites
+
+- **i18n system** — The web UI now uses a lightweight `t()` translation function (see `docs/i18n-design.md`). All user-facing strings in the memory feature must use `t()` with keys defined in both `server/web/locales/en.json` and `server/web/locales/zh.json`.
+
 ---
 
 ## 2. Claude Auto Memory Background
@@ -58,14 +62,14 @@ Introduced in Claude Code 2.1.59. Auto memory is enabled by default and can be d
 
 ### 3.1 Entry Point: Working Directory Menu
 
-Add a fourth item "Memory" to the existing working directory dropdown menu:
+Add a fourth item to the existing working directory dropdown menu (after "Copy path"):
 
 ```
 ┌────────────────────┐
-│ 📁 Browse files    │
-│ 📂 Change directory│
-│ 📋 Copy path       │
-│ 🧠 Memory          │  ← new
+│ 📁 Browse files    │  ← t('sidebar.browseFiles')
+│ 📂 Change directory│  ← t('sidebar.changeDirectory')
+│ 📋 Copy path       │  ← t('sidebar.copyPath')
+│ 🧠 Memory          │  ← t('sidebar.memory')  — new
 └────────────────────┘
 ```
 
@@ -77,14 +81,14 @@ Reuse the existing file browser panel (`.file-panel`) pattern but with a dedicat
 
 ```
 ┌──────────────────────┐
-│  Memory         ✕  ↻ │  ← header with close & refresh
+│  Memory         ✕  ↻ │  ← header: t('memory.title'), close & refresh
 │──────────────────────│
 │  📄 MEMORY.md        │  ← click to preview
 │  📄 debugging.md     │
 │  📄 patterns.md      │
 │──────────────────────│
-│  (empty state: "No   │
-│   memory files yet") │
+│  (empty state:       │
+│   t('memory.noFiles'))│
 └──────────────────────┘
 ```
 
@@ -134,7 +138,7 @@ Clicking **Edit** switches to edit mode:
 |--------|----------|
 | **Save** | Send `update_memory` to agent, show brief success feedback, return to preview |
 | **Cancel** | Discard changes, return to preview |
-| **Delete** | Confirmation dialog ("Delete MEMORY.md? This cannot be undone."), then send `delete_memory` |
+| **Delete** | Confirmation dialog (t('memory.deleteConfirm', { name })), then send `delete_memory` |
 | **Escape key** | Same as Cancel |
 | **Close (✕)** | If unsaved changes, prompt "Discard changes?"; otherwise close |
 
@@ -376,7 +380,7 @@ Add to the `workdir-menu` div, after "Copy path":
   <svg viewBox="0 0 24 24" width="14" height="14">
     <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
   </svg>
-  <span>Memory</span>
+  <span>{{ t('sidebar.memory') }}</span>
 </div>
 ```
 
@@ -402,17 +406,17 @@ Replace/overlay the file browser panel when `memoryPanelOpen` is true:
 <Transition name="file-panel">
 <div v-if="memoryPanelOpen && !isMobile" class="file-panel">
   <div class="file-panel-header">
-    <span class="file-panel-title">Memory</span>
-    <button class="file-panel-btn" @click="refreshMemory()" title="Refresh">
+    <span class="file-panel-title">{{ t('memory.title') }}</span>
+    <button class="file-panel-btn" @click="refreshMemory()" :title="t('sidebar.refresh')">
       <svg :class="{ spinning: memoryLoading }" ...>...</svg>
     </button>
-    <button class="file-panel-btn" @click="memoryPanelOpen = false" title="Close">&times;</button>
+    <button class="file-panel-btn" @click="memoryPanelOpen = false" :title="t('sidebar.close')">&times;</button>
   </div>
   <div class="file-tree">
-    <div v-if="memoryLoading" class="file-tree-loading">Loading...</div>
+    <div v-if="memoryLoading" class="file-tree-loading">{{ t('memory.loading') }}</div>
     <div v-else-if="memoryFiles.length === 0" class="memory-empty">
-      No memory files yet.<br>
-      Claude will create them automatically as it learns about your project.
+      {{ t('memory.noFiles') }}<br>
+      {{ t('memory.noFilesHint') }}
     </div>
     <div v-else v-for="file in memoryFiles" :key="file.name"
          class="file-tree-item" style="padding-left: 12px"
@@ -433,7 +437,7 @@ The preview panel template gains additional controls when `isMemoryFile`:
 **Header modification** (add Edit button):
 ```html
 <button v-if="isMemoryFile(previewFile?.filePath) && !memoryEditing"
-        class="preview-edit-btn" @click="startMemoryEdit()" title="Edit">
+        class="preview-edit-btn" @click="startMemoryEdit()" :title="t('memory.edit')">
   <svg viewBox="0 0 24 24" width="14" height="14">
     <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
   </svg>
@@ -446,13 +450,13 @@ The preview panel template gains additional controls when `isMemoryFile`:
   <textarea class="memory-edit-textarea" v-model="memoryEditContent"
             @keydown.escape="cancelMemoryEdit()"></textarea>
   <div class="memory-edit-actions">
-    <button class="memory-delete-btn" @click="confirmDeleteMemory()" title="Delete file">
-      <svg ...><!-- trash icon --></svg> Delete
+    <button class="memory-delete-btn" @click="confirmDeleteMemory()" :title="t('memory.deleteFile')">
+      <svg ...><!-- trash icon --></svg> {{ t('memory.deleteFile') }}
     </button>
     <span style="flex:1"></span>
-    <button class="modal-cancel-btn" @click="cancelMemoryEdit()">Cancel</button>
+    <button class="modal-cancel-btn" @click="cancelMemoryEdit()">{{ t('sidebar.cancel') }}</button>
     <button class="modal-confirm-btn" :disabled="memorySaving" @click="saveMemoryEdit()">
-      {{ memorySaving ? 'Saving...' : 'Save' }}
+      {{ memorySaving ? t('memory.saving') : t('memory.save') }}
     </button>
   </div>
 </div>
@@ -608,7 +612,74 @@ case 'memory_deleted':
 
 ---
 
-## 8. Edge Cases
+## 8. Internationalization (i18n)
+
+All user-facing strings use the `t()` function from `modules/i18n.js`. The memory feature follows the same pattern as existing UI — `t()` is available directly in the Vue template scope (returned from `createI18n()` at app initialization).
+
+Note: `createFileBrowser` and `createFilePreview` do **not** receive `t` as a dependency; translations in those panel templates use `t()` directly from the app scope. The memory feature follows the same pattern.
+
+### 8.1 New Translation Keys
+
+Add the following keys to `server/web/locales/en.json` and `server/web/locales/zh.json`:
+
+**`en.json` additions:**
+
+```json
+{
+  "sidebar.memory": "Memory",
+
+  "memory.title": "Memory",
+  "memory.loading": "Loading...",
+  "memory.noFiles": "No memory files yet.",
+  "memory.noFilesHint": "Claude will create them automatically as it learns about your project.",
+  "memory.edit": "Edit",
+  "memory.editing": "Editing: {name}",
+  "memory.save": "Save",
+  "memory.saving": "Saving...",
+  "memory.deleteFile": "Delete this file",
+  "memory.deleteConfirm": "Delete {name}? This cannot be undone.",
+  "memory.discardChanges": "Discard unsaved changes?"
+}
+```
+
+**`zh.json` additions:**
+
+```json
+{
+  "sidebar.memory": "记忆",
+
+  "memory.title": "记忆",
+  "memory.loading": "加载中...",
+  "memory.noFiles": "暂无记忆文件。",
+  "memory.noFilesHint": "Claude 会在了解项目的过程中自动创建记忆文件。",
+  "memory.edit": "编辑",
+  "memory.editing": "编辑中：{name}",
+  "memory.save": "保存",
+  "memory.saving": "保存中...",
+  "memory.deleteFile": "删除此文件",
+  "memory.deleteConfirm": "删除 {name}？此操作无法撤销。",
+  "memory.discardChanges": "放弃未保存的更改？"
+}
+```
+
+### 8.2 Reused Existing Keys
+
+The following existing keys are reused (no new entries needed):
+
+| Key | Usage |
+|-----|-------|
+| `sidebar.refresh` | Memory panel refresh button title |
+| `sidebar.close` | Memory panel close button title |
+| `sidebar.cancel` | Edit mode Cancel button |
+| `dialog.cancel` | Delete confirmation Cancel button |
+| `dialog.delete` | Delete confirmation Delete button |
+| `dialog.cannotUndo` | Delete confirmation secondary text |
+
+---
+
+## 9. Edge Cases
+
+> Note: Error messages from the agent (`memory_updated.error`, `memory_deleted.error`) are technical strings (e.g. "Permission denied", "File not found") and are not translated — they originate from the OS/filesystem.
 
 | Scenario | Behavior |
 |----------|----------|
@@ -623,7 +694,7 @@ case 'memory_deleted':
 
 ---
 
-## 9. Security Considerations
+## 10. Security Considerations
 
 - **Path traversal:** Agent validates filename contains no `/`, `\`, or `..` before any write/delete operation
 - **Write scope:** Writes are constrained to the memory directory (`~/.claude/projects/<folder>/memory/`). No arbitrary filesystem writes.
@@ -631,7 +702,7 @@ case 'memory_deleted':
 
 ---
 
-## 10. Files Changed
+## 11. Files Changed
 
 | File | Change |
 |------|--------|
@@ -640,17 +711,20 @@ case 'memory_deleted':
 | `agent/src/connection.ts` | Add `list_memory`, `update_memory`, `delete_memory` to message dispatch |
 | `server/web/app.js` | Add memory state refs, menu item, memory file list template, edit mode in preview panel, message routing, methods |
 | `server/web/style.css` | Memory empty state, edit mode textarea, edit actions bar, edit/delete buttons |
+| `server/web/locales/en.json` | Add `sidebar.memory` and `memory.*` translation keys |
+| `server/web/locales/zh.json` | Add `sidebar.memory` and `memory.*` translation keys (Chinese) |
 
 ---
 
-## 11. Implementation Order
+## 12. Implementation Order
 
 1. **Agent: `memory.ts`** — list, update, delete functions with path security
 2. **Agent: `history.ts`** — export `pathToProjectFolder`
 3. **Agent: `connection.ts`** — add 3 message handlers
-4. **Web: `app.js` state** — add refs for memory panel, editing, files
-5. **Web: `app.js` template** — menu item, memory file list in sidebar, edit mode in preview panel
-6. **Web: `app.js` methods** — open/edit/save/cancel/delete/refresh handlers
-7. **Web: `app.js` message routing** — handle `memory_list`, `memory_updated`, `memory_deleted`
-8. **Web: `style.css`** — all memory-related styles
-9. **Build & test** — manual E2E: view list, preview, edit, save, delete, empty state, workdir change
+4. **Web: locale files** — add `sidebar.memory` and `memory.*` keys to `en.json` and `zh.json`
+5. **Web: `app.js` state** — add refs for memory panel, editing, files
+6. **Web: `app.js` template** — menu item, memory file list in sidebar, edit mode in preview panel (all strings via `t()`)
+7. **Web: `app.js` methods** — open/edit/save/cancel/delete/refresh handlers
+8. **Web: `app.js` message routing** — handle `memory_list`, `memory_updated`, `memory_deleted`
+9. **Web: `style.css`** — all memory-related styles
+10. **Build & test** — manual E2E: view list, preview, edit, save, delete, empty state, workdir change, language switching
