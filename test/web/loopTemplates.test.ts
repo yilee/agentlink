@@ -13,7 +13,7 @@ import {
 describe('loopTemplates', () => {
   describe('LOOP_TEMPLATES', () => {
     it('has all expected template keys', () => {
-      expect(LOOP_TEMPLATE_KEYS).toEqual(['competitive-intel', 'knowledge-base', 'custom']);
+      expect(LOOP_TEMPLATE_KEYS).toEqual(['competitive-intel', 'knowledge-base', 'daily-summary']);
     });
 
     it('all template keys exist in the templates object', () => {
@@ -24,21 +24,15 @@ describe('loopTemplates', () => {
       }
     });
 
-    it('non-custom templates have name and prompt', () => {
-      const nonCustomKeys = LOOP_TEMPLATE_KEYS.filter(k => k !== 'custom');
-      for (const key of nonCustomKeys) {
+    it('all templates have name and prompt', () => {
+      for (const key of LOOP_TEMPLATE_KEYS) {
         expect(LOOP_TEMPLATES[key].name).toBeTruthy();
         expect(LOOP_TEMPLATES[key].prompt).toBeTruthy();
       }
     });
 
-    it('custom template has empty name and prompt', () => {
-      expect(LOOP_TEMPLATES.custom.name).toBe('');
-      expect(LOOP_TEMPLATES.custom.prompt).toBe('');
-    });
-
     it('all templates have valid scheduleType', () => {
-      const validTypes = ['hourly', 'daily', 'weekly', 'cron'];
+      const validTypes = ['manual', 'hourly', 'daily', 'weekly', 'cron'];
       for (const key of LOOP_TEMPLATE_KEYS) {
         expect(validTypes).toContain(LOOP_TEMPLATES[key].scheduleType);
       }
@@ -46,6 +40,10 @@ describe('loopTemplates', () => {
   });
 
   describe('buildCronExpression', () => {
+    it('returns empty string for manual', () => {
+      expect(buildCronExpression('manual', {})).toBe('');
+    });
+
     it('builds hourly expression', () => {
       expect(buildCronExpression('hourly', { minute: 15 })).toBe('15 * * * *');
     });
@@ -92,6 +90,10 @@ describe('loopTemplates', () => {
   });
 
   describe('formatSchedule', () => {
+    it('formats manual', () => {
+      expect(formatSchedule('manual', {}, '')).toBe('Manual only');
+    });
+
     it('formats hourly', () => {
       expect(formatSchedule('hourly', {}, '')).toBe('Every hour');
     });
