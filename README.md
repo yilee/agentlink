@@ -27,6 +27,17 @@ agentlink-client start --daemon
 # Open the URL in any browser — done.
 ```
 
+## Three Modes
+
+### Chat
+Remote pair-programming with Claude Code. Send prompts from any browser, get real-time streaming responses with tool calls, markdown, and code blocks rendered live.
+
+### Teams
+Orchestrate multiple Claude agents in parallel. A Lead agent plans and delegates tasks to subagents, then synthesizes results — with a live kanban dashboard tracking progress.
+
+### Loop
+Schedule recurring prompts with cron expressions. Automate code reviews, dependency checks, report generation, and other routine tasks that run on your local codebase.
+
 ## Why AgentLink?
 
 - **Access from anywhere.** Phone, tablet, another machine — just open the URL.
@@ -36,24 +47,6 @@ agentlink-client start --daemon
 - **Real-time streaming.** Tool calls, markdown, code blocks — all rendered live as Claude works.
 - **Multi-agent Teams.** Spawn parallel Claude subagents from the browser. A Lead agent plans, delegates tasks, and synthesizes results — with a live kanban dashboard.
 - **End-to-end encryption.** All WebSocket traffic is encrypted with XSalsa20-Poly1305 (TweetNaCl).
-
-## Features
-
-- Dark/light theme with localStorage persistence
-- File upload (drag-drop, paste, paperclip button)
-- Interactive `AskUserQuestion` cards from Claude
-- Session history grouped by time (Today / Yesterday / This week / Earlier)
-- Working directory history (quick switch between recent directories)
-- Change working directory from the browser (folder picker)
-- Context compaction status display
-- Command output rendering (`/cost`, `/help`, etc.)
-- Password protection (`--password` flag)
-- Mobile responsive (optimized for phones and tablets)
-- Auto-update in daemon mode (`--no-auto-update` to disable)
-- Auto-start on boot (`service install` — systemd/launchd/Windows Startup)
-- In-place upgrade (`agentlink-client upgrade`)
-- Multi-agent Teams mode (Lead + parallel subagents, kanban task board, activity feed, team history)
-- Markdown Preview Tool (`tools/markdown-preview.html` — split-pane live preview with syntax highlighting)
 
 ## How It Works
 

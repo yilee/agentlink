@@ -27,6 +27,17 @@ agentlink-client start --daemon
 # 在任意浏览器中打开链接，开始使用
 ```
 
+## 三大模式
+
+### Chat
+远程与 Claude Code 结对编程。在任意浏览器发送提示，实时流式展示工具调用、Markdown 和代码块。
+
+### Teams
+并行编排多个 Claude Agent 协同工作。Lead Agent 负责规划和分发任务，子 Agent 并行执行，实时看板面板同步展示进度。
+
+### Loop
+通过 Cron 表达式定时调度自动化任务。自动执行代码审查、依赖检查、报告生成等在本地代码库上运行的例行工作。
+
 ## 为什么选择 AgentLink？
 
 - **随时随地访问** —— 手机、平板、另一台电脑，打开链接即可使用，无需任何额外配置。
@@ -36,24 +47,6 @@ agentlink-client start --daemon
 - **实时流式输出** —— 工具调用、Markdown、代码块，Claude 工作时实时渲染。
 - **多 Agent 协作** —— 在浏览器中启动多个 Claude 子 Agent 并行工作。Lead Agent 负责规划、分发任务并汇总结果，实时看板面板同步展示进度。
 - **端到端加密** —— 所有 WebSocket 通信使用 XSalsa20-Poly1305 (TweetNaCl) 加密。
-
-## 功能一览
-
-- 深色/浅色主题切换，自动记忆偏好
-- 文件上传（拖拽、粘贴、按钮）
-- Claude 交互式提问卡片（AskUserQuestion）
-- 会话历史按时间分组（今天 / 昨天 / 本周 / 更早）
-- 工作目录历史记录，快速切换
-- 在浏览器中切换工作目录（文件夹选择器）
-- 上下文压缩状态显示
-- 命令输出渲染（`/cost`、`/help` 等）
-- 密码保护（`--password` 参数）
-- 移动端适配（手机和平板优化）
-- 守护进程模式下自动更新（`--no-auto-update` 可关闭）
-- 开机自启（`service install` —— 支持 systemd / launchd / Windows 启动项）
-- 原地升级（`agentlink-client upgrade`）
-- 多 Agent Teams 模式（Lead + 并行子 Agent、看板任务面板、活动动态、团队历史记录）
-- Markdown 实时预览工具（`tools/markdown-preview.html` —— 分栏实时预览，代码语法高亮）
 
 ## 工作原理
 
