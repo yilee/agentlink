@@ -54,8 +54,8 @@
   "sidebar.active": "活跃",
   "sidebar.paused": "暂停",
   "sidebar.tasks": "个任务",
-  "sidebar.server": "服务器",
-  "sidebar.agent": "代理",
+  "sidebar.server": "server",
+  "sidebar.agent": "agent",
 
   "filePanel.files": "文件",
   "filePanel.loading": "加载中...",
