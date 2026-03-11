@@ -592,6 +592,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     }
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
+      send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
   }
 }
 
