@@ -378,12 +378,12 @@ const App = {
 
     // Team module
     const team = createTeam({
-      wsSend, scrollToBottom,
+      wsSend, scrollToBottom, loadingTeams,
     });
     setTeam(team);
     // Loop module
     const loop = createLoop({
-      wsSend, scrollToBottom,
+      wsSend, scrollToBottom, loadingLoops,
     });
     setLoop(loop);
     sidebar.setOnSwitchToChat(() => {
@@ -872,7 +872,6 @@ const App = {
       viewDashboard: team.viewDashboard,
       viewHistoricalTeam: team.viewHistoricalTeam,
       requestTeamsList() {
-        loadingTeams.value = true;
         team.requestTeamsList();
       },
       deleteTeamById: team.deleteTeamById,
@@ -1015,7 +1014,6 @@ const App = {
         renameLoopText.value = '';
       },
       requestLoopsList() {
-        loadingLoops.value = true;
         loop.requestLoopsList();
       },
       newLoop() {

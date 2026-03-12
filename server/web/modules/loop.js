@@ -10,7 +10,7 @@ import { buildHistoryBatch } from './backgroundRouting.js';
  * @param {Function} deps.scrollToBottom
  */
 export function createLoop(deps) {
-  const { wsSend, scrollToBottom } = deps;
+  const { wsSend, scrollToBottom, loadingLoops } = deps;
 
   // ── Reactive state ──────────────────────────────────
 
@@ -96,6 +96,7 @@ export function createLoop(deps) {
   }
 
   function requestLoopsList() {
+    if (loadingLoops) loadingLoops.value = true;
     wsSend({ type: 'list_loops' });
   }
 

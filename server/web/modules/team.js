@@ -16,7 +16,7 @@ const AGENT_COLORS = [
  * @param {Function} deps.scrollToBottom
  */
 export function createTeam(deps) {
-  const { wsSend, scrollToBottom } = deps;
+  const { wsSend, scrollToBottom, loadingTeams } = deps;
 
   // ── Reactive state ──
 
@@ -100,6 +100,7 @@ export function createTeam(deps) {
   }
 
   function requestTeamsList() {
+    if (loadingTeams) loadingTeams.value = true;
     wsSend({ type: 'list_teams' });
   }
 
