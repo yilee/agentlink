@@ -409,6 +409,7 @@ export async function handleBtwQuestion(
     '--resume', sessionId,
     '--no-session-persistence',
     '--output-format', 'stream-json',
+    '--verbose',
   ];
 
   const { command, prefixArgs, spawnOpts } = resolveClaudeCommand();

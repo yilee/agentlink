@@ -218,6 +218,7 @@ describe('handleBtwQuestion', () => {
     expect(args).toContain('--no-session-persistence');
     expect(args).toContain('--output-format');
     expect(args).toContain('stream-json');
+    expect(args).toContain('--verbose');
   });
 
   it('uses lastClaudeSessionId when claudeSessionId is null', async () => {
