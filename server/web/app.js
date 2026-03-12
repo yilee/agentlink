@@ -2490,11 +2490,13 @@ const App = {
                 <div class="btw-body">
                   <div class="btw-question">{{ btwState.question }}</div>
                   <div v-if="btwState.error" class="btw-error">{{ btwState.error }}</div>
-                  <div v-else-if="btwState.answer" class="btw-answer markdown-body" v-html="renderMarkdown(btwState.answer)"></div>
-                  <div v-else class="btw-loading">
-                    <span class="btw-loading-dots"><span></span><span></span><span></span></span>
-                    <span class="btw-loading-text">{{ t('btw.thinking') }}</span>
-                  </div>
+                  <template v-else>
+                    <div v-if="btwState.answer" class="btw-answer markdown-body" v-html="renderMarkdown(btwState.answer)"></div>
+                    <div v-if="!btwState.done" class="btw-loading">
+                      <span class="btw-loading-dots"><span></span><span></span><span></span></span>
+                      <span v-if="!btwState.answer" class="btw-loading-text">{{ t('btw.thinking') }}</span>
+                    </div>
+                  </template>
                 </div>
                 <div v-if="btwState.done && !btwState.error" class="btw-hint">
                   {{ isMobile ? t('btw.tapDismiss') : t('btw.escDismiss') }}
