@@ -7,7 +7,7 @@ import { handleListDirectory, handleReadFile, handleChangeWorkDir } from './dire
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, handleBtwQuestion, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { listMemoryFiles, updateMemoryFile, deleteMemoryFile } from './memory.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
@@ -588,6 +588,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const { filename } = msg as unknown as { filename: string };
       const result = deleteMemoryFile(state.workDir, filename);
       send({ type: 'memory_deleted', filename, ...result });
+      break;
+    }
+    case 'btw_question': {
+      const { question, conversationId } = msg as unknown as { question: string; conversationId?: string };
+      handleBtwQuestion(question, conversationId, state.workDir, send);
       break;
     }
     default:
