@@ -56,6 +56,7 @@ export function createConnection(deps) {
   let reconnectAttempts = 0;
   let reconnectTimer = null;
   let pingTimer = null;
+  let idleCheckTimer = null;
   const toolMsgMap = new Map(); // toolId -> message (for fast tool_result lookup)
 
   // ── toolMsgMap save/restore for conversation switching ──
@@ -90,6 +91,22 @@ export function createConnection(deps) {
     latency.value = null;
   }
 
+  // Idle-check: if isProcessing stays true with no claude_output for 15s,
+  // poll the agent to reconcile stale state (guards against lost turn_completed).
+  const IDLE_CHECK_MS = 15000;
+  function resetIdleCheck() {
+    if (idleCheckTimer) { clearTimeout(idleCheckTimer); idleCheckTimer = null; }
+    if (isProcessing.value) {
+      idleCheckTimer = setTimeout(() => {
+        idleCheckTimer = null;
+        if (isProcessing.value) wsSend({ type: 'query_active_conversations' });
+      }, IDLE_CHECK_MS);
+    }
+  }
+  function clearIdleCheck() {
+    if (idleCheckTimer) { clearTimeout(idleCheckTimer); idleCheckTimer = null; }
+  }
+
   function getSessionId() {
     const match = window.location.pathname.match(/^\/s\/([^/]+)/);
     return match ? match[1] : null;
@@ -118,6 +135,7 @@ export function createConnection(deps) {
     // (e.g. after reconnect before active_conversations response), self-correct
     if (!isProcessing.value) {
       isProcessing.value = true;
+      resetIdleCheck();
       if (currentConversationId && currentConversationId.value) {
         processingConversations.value[currentConversationId.value] = true;
       }
@@ -387,6 +405,7 @@ export function createConnection(deps) {
         if (team && msg.activeTeam) {
           team.handleActiveTeamRestore(msg.activeTeam);
         }
+        resetIdleCheck();
       } else if (msg.type === 'error') {
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
@@ -399,6 +418,7 @@ export function createConnection(deps) {
         isProcessing.value = false;
         isCompacting.value = false;
         loadingSessions.value = false;
+        clearIdleCheck();
         if (currentConversationId && currentConversationId.value) {
           processingConversations.value[currentConversationId.value] = false;
         }
@@ -409,6 +429,7 @@ export function createConnection(deps) {
         _dequeueNext();
       } else if (msg.type === 'claude_output') {
         handleClaudeOutput(msg, scheduleHighlight);
+        resetIdleCheck();
       } else if (msg.type === 'session_started') {
         // Claude session ID captured — update and refresh sidebar
         currentClaudeSessionId.value = msg.claudeSessionId;
@@ -446,6 +467,7 @@ export function createConnection(deps) {
         finalizeStreamingMsg(scheduleHighlight);
         isProcessing.value = false;
         isCompacting.value = false;
+        clearIdleCheck();
         toolMsgMap.clear();
         if (msg.usage) usageStats.value = msg.usage;
         if (currentConversationId && currentConversationId.value) {
@@ -607,6 +629,7 @@ export function createConnection(deps) {
     ws.onclose = () => {
       sessionKey = null;
       stopPing();
+      clearIdleCheck();
       const wasConnected = status.value === 'Connected' || status.value === 'Connecting...';
       isProcessing.value = false;
       isCompacting.value = false;
