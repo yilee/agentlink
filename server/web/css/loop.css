@@ -644,6 +644,20 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+.preview-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.preview-refresh-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
 .preview-edit-btn {
   display: inline-flex;
   align-items: center;
