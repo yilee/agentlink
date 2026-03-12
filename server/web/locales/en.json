@@ -171,7 +171,7 @@
   "chat.customResponse": "Or type a custom response...",
 
   "input.placeholder": "Send a message · Enter to send",
-  "input.compacting": "Context compacting in progress...",
+  "input.compacting": "Compacting context... (type /btw to ask a side question)",
   "input.removeFromQueue": "Remove from queue",
   "input.attachFiles": "Attach files",
   "input.stopGeneration": "Stop generation",
@@ -269,6 +269,7 @@
   "slash.btw": "Ask a side question (won't affect conversation)",
   "btw.title": "Side Question",
   "btw.dismiss": "Dismiss",
+  "btw.thinking": "Thinking...",
   "btw.escDismiss": "Press Esc to dismiss",
   "btw.tapDismiss": "Tap to dismiss"
 }

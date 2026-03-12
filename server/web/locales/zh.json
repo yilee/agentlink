@@ -171,7 +171,7 @@
   "chat.customResponse": "或输入自定义回复...",
 
   "input.placeholder": "发送消息 · 按 Enter 发送",
-  "input.compacting": "上下文压缩中...",
+  "input.compacting": "上下文压缩中... (输入 /btw 可提旁问)",
   "input.removeFromQueue": "从队列中移除",
   "input.attachFiles": "附加文件",
   "input.stopGeneration": "停止生成",
@@ -269,6 +269,7 @@
   "slash.btw": "快速旁问（不影响对话）",
   "btw.title": "旁问",
   "btw.dismiss": "关闭",
+  "btw.thinking": "思考中...",
   "btw.escDismiss": "按 Esc 关闭",
   "btw.tapDismiss": "点击关闭"
 }

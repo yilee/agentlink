@@ -455,12 +455,11 @@ const App = {
 
     // ── Send message ──
     function sendMessage() {
-      if (!canSend.value) return;
-
       const text = inputText.value.trim();
 
-      // Side question — /btw <question>
+      // Side question — /btw <question> (allowed even during compaction)
       if (text === '/btw' || text.startsWith('/btw ')) {
+        if (status.value !== 'Connected') return;
         const question = text.startsWith('/btw ') ? text.slice(5).trim() : '';
         if (!question) return;
         btwState.value = { question, answer: '', done: false, error: null };
@@ -470,6 +469,8 @@ const App = {
         wsSend({ type: 'btw_question', question, conversationId: currentConversationId.value, claudeSessionId: currentClaudeSessionId.value });
         return;
       }
+
+      if (!canSend.value) return;
 
       const files = attachments.value.slice();
       inputText.value = '';
@@ -2491,7 +2492,8 @@ const App = {
                   <div v-if="btwState.error" class="btw-error">{{ btwState.error }}</div>
                   <div v-else-if="btwState.answer" class="btw-answer markdown-body" v-html="renderMarkdown(btwState.answer)"></div>
                   <div v-else class="btw-loading">
-                    <span class="typing-dots"><span></span><span></span><span></span></span>
+                    <span class="btw-loading-dots"><span></span><span></span><span></span></span>
+                    <span class="btw-loading-text">{{ t('btw.thinking') }}</span>
                   </div>
                 </div>
                 <div v-if="btwState.done && !btwState.error" class="btw-hint">
@@ -2544,7 +2546,7 @@ const App = {
                 @keydown="handleKeydown"
                 @input="autoResize"
                 @paste="handlePaste"
-                :disabled="status !== 'Connected' || isCompacting"
+                :disabled="status !== 'Connected'"
                 :placeholder="isCompacting ? t('input.compacting') : t('input.placeholder')"
                 rows="1"
               ></textarea>
@@ -2566,7 +2568,7 @@ const App = {
                   <button class="attach-btn" @click="triggerFileInput" :disabled="status !== 'Connected' || isCompacting || attachments.length >= 5" :title="t('input.attachFiles')">
                     <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
                   </button>
-                  <button class="slash-btn" @click="openSlashMenu" :disabled="status !== 'Connected' || isCompacting" :title="t('input.slashCommands')">
+                  <button class="slash-btn" @click="openSlashMenu" :disabled="status !== 'Connected'" :title="t('input.slashCommands')">
                     <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 21 11 3h2L9 21H7Z"/></svg>
                   </button>
                 </div>
