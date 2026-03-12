@@ -352,10 +352,18 @@ export function createTeam(deps) {
    * Handle active_conversations response that includes activeTeam.
    * Called on initial connect + reconnect to restore team state.
    */
-  function handleActiveTeamRestore(activeTeam) {
+  function handleActiveTeamRestore(activeTeam, currentWorkDir) {
     if (!activeTeam) return;
+    // Skip if the active team belongs to a different workdir
+    if (currentWorkDir && activeTeam.workDir && activeTeam.workDir !== currentWorkDir) return;
+
+    const wasAlreadyLoaded = teamState.value !== null;
     teamState.value = activeTeam;
-    viewMode.value = 'team';
+    // Only switch to team view on first restore (initial connect / reconnect),
+    // not on idle-check polls — otherwise the user gets yanked out of chat.
+    if (!wasAlreadyLoaded) {
+      viewMode.value = 'team';
+    }
     // Re-initialize agent message lists (messages lost on reconnect)
     if (!agentMessages.value['lead']) {
       agentMessages.value['lead'] = [];

@@ -403,7 +403,7 @@ export function createConnection(deps) {
 
         // Restore active team state on reconnect
         if (team && msg.activeTeam) {
-          team.handleActiveTeamRestore(msg.activeTeam);
+          team.handleActiveTeamRestore(msg.activeTeam, workDir.value);
         }
         resetIdleCheck();
       } else if (msg.type === 'error') {
@@ -614,7 +614,14 @@ export function createConnection(deps) {
         });
         // Clear old history immediately so UI doesn't show stale data
         historySessions.value = [];
-        if (team) team.teamsList.value = [];
+        if (team) {
+          team.teamsList.value = [];
+          team.teamState.value = null;
+          team.historicalTeam.value = null;
+          if (team.viewMode.value === 'team') {
+            team.viewMode.value = 'chat';
+          }
+        }
         if (loop) loop.loopsList.value = [];
         memoryFiles.value = [];
         memoryDir.value = null;
