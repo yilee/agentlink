@@ -177,6 +177,7 @@
   "input.stopGeneration": "Stop generation",
   "input.send": "Send",
   "input.remove": "Remove",
+  "input.slashCommands": "Slash commands",
 
   "folderPicker.title": "Select Working Directory",
   "folderPicker.pathPlaceholder": "Enter path...",

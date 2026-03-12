@@ -84,6 +84,12 @@
   padding: 0.1rem 0.25rem 0;
 }
 
+.input-bottom-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .send-btn {
   background: var(--accent);
   color: #fff;
@@ -544,6 +550,31 @@
 }
 
 .attach-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Slash command button ── */
+.slash-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.slash-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.slash-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }

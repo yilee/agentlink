@@ -67,6 +67,7 @@ const App = {
     const usageStats = ref(null);
     const inputRef = ref(null);
     const slashMenuIndex = ref(0);
+    const slashMenuOpen = ref(false);
 
     // Sidebar state
     const sidebarOpen = ref(window.innerWidth > 768);
@@ -425,10 +426,12 @@ const App = {
 
     // ── Slash command menu ──
     const slashMenuVisible = computed(() => {
+      if (slashMenuOpen.value) return true;
       const txt = inputText.value;
       return txt.startsWith('/') && !/\s/.test(txt.slice(1));
     });
     const filteredSlashCommands = computed(() => {
+      if (slashMenuOpen.value && !inputText.value.startsWith('/')) return SLASH_COMMANDS;
       const txt = inputText.value.toLowerCase();
       return SLASH_COMMANDS.filter(c => c.command.startsWith(txt));
     });
@@ -524,9 +527,22 @@ const App = {
     }
 
     function selectSlashCommand(cmd) {
+      slashMenuOpen.value = false;
       inputText.value = cmd.command;
       sendMessage();
     }
+
+    function openSlashMenu() {
+      slashMenuOpen.value = !slashMenuOpen.value;
+      slashMenuIndex.value = 0;
+    }
+
+    function _slashMenuClickOutside(e) {
+      if (slashMenuOpen.value && !e.target.closest('.slash-btn') && !e.target.closest('.slash-menu')) {
+        slashMenuOpen.value = false;
+      }
+    }
+    document.addEventListener('click', _slashMenuClickOutside);
 
     function handleKeydown(e) {
       // Slash menu key handling
@@ -554,6 +570,7 @@ const App = {
         }
         if (e.key === 'Escape') {
           e.preventDefault();
+          slashMenuOpen.value = false;
           inputText.value = '';
           return;
         }
@@ -617,6 +634,7 @@ const App = {
       closeWs(); streaming.cleanup(); cleanupScroll(); cleanupHighlight();
       window.removeEventListener('resize', _resizeHandler);
       document.removeEventListener('click', _workdirMenuClickHandler);
+      document.removeEventListener('click', _slashMenuClickOutside);
       document.removeEventListener('keydown', _workdirMenuKeyHandler);
     });
 
@@ -625,7 +643,7 @@ const App = {
       serverVersion, agentVersion, latency,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
       inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages, usageStats,
-      slashMenuVisible, filteredSlashCommands, slashMenuIndex, selectSlashCommand,
+      slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen, selectSlashCommand, openSlashMenu,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       getRenderedContent, copyMessage, toggleTool,
       isPrevAssistant: _isPrevAssistant,
@@ -2483,9 +2501,14 @@ const App = {
                 </div>
               </div>
               <div class="input-bottom-row">
-                <button class="attach-btn" @click="triggerFileInput" :disabled="status !== 'Connected' || isCompacting || attachments.length >= 5" :title="t('input.attachFiles')">
-                  <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
-                </button>
+                <div class="input-bottom-left">
+                  <button class="attach-btn" @click="triggerFileInput" :disabled="status !== 'Connected' || isCompacting || attachments.length >= 5" :title="t('input.attachFiles')">
+                    <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                  </button>
+                  <button class="slash-btn" @click="openSlashMenu" :disabled="status !== 'Connected' || isCompacting" :title="t('input.slashCommands')">
+                    <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 21 11 3h2L9 21H7Z"/></svg>
+                  </button>
+                </div>
                 <button v-if="isProcessing && !hasInput" @click="cancelExecution" class="send-btn stop-btn" :title="t('input.stopGeneration')">
                   <svg viewBox="0 0 24 24" width="14" height="14"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
                 </button>
