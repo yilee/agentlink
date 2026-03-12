@@ -460,8 +460,8 @@ const App = {
       const text = inputText.value.trim();
 
       // Side question — /btw <question>
-      if (text.startsWith('/btw ')) {
-        const question = text.slice(5).trim();
+      if (text === '/btw' || text.startsWith('/btw ')) {
+        const question = text.startsWith('/btw ') ? text.slice(5).trim() : '';
         if (!question) return;
         btwState.value = { question, answer: '', done: false, error: null };
         btwPending.value = true;
@@ -575,13 +575,7 @@ const App = {
     document.addEventListener('click', _slashMenuClickOutside);
 
     function handleKeydown(e) {
-      // Btw overlay dismiss
-      if (e.key === 'Escape' && btwState.value) {
-        dismissBtw();
-        e.preventDefault();
-        return;
-      }
-      // Slash menu key handling
+      // Slash menu key handling (must come before btw overlay so Escape closes menu first)
       if (slashMenuVisible.value && filteredSlashCommands.value.length > 0 && !e.isComposing) {
         const len = filteredSlashCommands.value.length;
         if (e.key === 'ArrowDown') {
@@ -610,6 +604,12 @@ const App = {
           inputText.value = '';
           return;
         }
+      }
+      // Btw overlay dismiss (after slash menu so menu Escape takes priority)
+      if (e.key === 'Escape' && btwState.value) {
+        dismissBtw();
+        e.preventDefault();
+        return;
       }
 
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
