@@ -27,6 +27,8 @@ export function createConnection(deps) {
     switchConversation,
     // Memory management
     memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
+    // Side question (/btw)
+    btwState, btwPending,
     // i18n
     t,
   } = deps;
@@ -410,6 +412,15 @@ export function createConnection(deps) {
         // If foreground was processing but no longer is, dequeue pending messages
         if (wasForegroundProcessing && !isProcessing.value) _dequeueNext();
       } else if (msg.type === 'error') {
+        // Route btw-related errors to the overlay instead of the message list
+        if (btwPending && btwPending.value && msg.message && msg.message.includes('btw_question')) {
+          btwPending.value = false;
+          if (btwState && btwState.value) {
+            btwState.value.error = msg.message;
+            btwState.value.done = true;
+          }
+          return;
+        }
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
         messages.value.push({
@@ -584,6 +595,14 @@ export function createConnection(deps) {
           memoryFiles.value = memoryFiles.value.filter(f => f.name !== msg.filename);
           // Close preview if open (might be showing the deleted file)
           if (filePreview) filePreview.closePreview();
+        }
+      } else if (msg.type === 'btw_answer') {
+        if (btwPending) btwPending.value = false;
+        if (btwState && btwState.value) {
+          btwState.value.answer += msg.delta;
+          if (msg.done) {
+            btwState.value.done = true;
+          }
         }
       } else if (msg.type === 'workdir_changed') {
         workdirSwitching.value = false;

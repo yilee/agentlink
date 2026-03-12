@@ -27,6 +27,7 @@ import { createI18n } from './modules/i18n.js';
 
 // ── Slash commands ──────────────────────────────────────────────────────────
 const SLASH_COMMANDS = [
+  { command: '/btw', descKey: 'slash.btw', isPrefix: true },
   { command: '/cost', descKey: 'slash.cost' },
   { command: '/context', descKey: 'slash.context' },
   { command: '/compact', descKey: 'slash.compact' },
@@ -68,6 +69,10 @@ const App = {
     const inputRef = ref(null);
     const slashMenuIndex = ref(0);
     const slashMenuOpen = ref(false);
+
+    // Side question (/btw) state
+    const btwState = ref(null);
+    const btwPending = ref(false);
 
     // Sidebar state
     const sidebarOpen = ref(window.innerWidth > 768);
@@ -357,6 +362,8 @@ const App = {
       switchConversation,
       // Memory management
       memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
+      // Side question (/btw)
+      btwState, btwPending,
       // i18n
       t,
     });
@@ -448,9 +455,23 @@ const App = {
 
     // ── Send message ──
     function sendMessage() {
+      const text = inputText.value.trim();
+
+      // Side question — /btw <question> (allowed even during compaction)
+      if (text === '/btw' || text.startsWith('/btw ')) {
+        if (status.value !== 'Connected') return;
+        const question = text.startsWith('/btw ') ? text.slice(5).trim() : '';
+        if (!question) return;
+        btwState.value = { question, answer: '', done: false, error: null };
+        btwPending.value = true;
+        inputText.value = '';
+        if (inputRef.value) inputRef.value.style.height = 'auto';
+        wsSend({ type: 'btw_question', question, conversationId: currentConversationId.value, claudeSessionId: currentClaudeSessionId.value });
+        return;
+      }
+
       if (!canSend.value) return;
 
-      const text = inputText.value.trim();
       const files = attachments.value.slice();
       inputText.value = '';
       if (inputRef.value) inputRef.value.style.height = 'auto';
@@ -504,6 +525,11 @@ const App = {
       wsSend(cancelPayload);
     }
 
+    function dismissBtw() {
+      btwState.value = null;
+      btwPending.value = false;
+    }
+
     function dequeueNext() {
       if (queuedMessages.value.length === 0) return;
       const queued = queuedMessages.value.shift();
@@ -528,8 +554,13 @@ const App = {
 
     function selectSlashCommand(cmd) {
       slashMenuOpen.value = false;
-      inputText.value = cmd.command;
-      sendMessage();
+      if (cmd.isPrefix) {
+        inputText.value = cmd.command + ' ';
+        nextTick(() => inputRef.value?.focus());
+      } else {
+        inputText.value = cmd.command;
+        sendMessage();
+      }
     }
 
     function openSlashMenu() {
@@ -545,7 +576,7 @@ const App = {
     document.addEventListener('click', _slashMenuClickOutside);
 
     function handleKeydown(e) {
-      // Slash menu key handling
+      // Slash menu key handling (must come before btw overlay so Escape closes menu first)
       if (slashMenuVisible.value && filteredSlashCommands.value.length > 0 && !e.isComposing) {
         const len = filteredSlashCommands.value.length;
         if (e.key === 'ArrowDown') {
@@ -574,6 +605,12 @@ const App = {
           inputText.value = '';
           return;
         }
+      }
+      // Btw overlay dismiss (after slash menu so menu Escape takes priority)
+      if (e.key === 'Escape' && btwState.value) {
+        dismissBtw();
+        e.preventDefault();
+        return;
       }
 
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -645,6 +682,8 @@ const App = {
       inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages, usageStats,
       slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen, selectSlashCommand, openSlashMenu,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
+      // Side question (/btw)
+      btwState, btwPending, dismissBtw, renderMarkdown,
       getRenderedContent, copyMessage, toggleTool,
       isPrevAssistant: _isPrevAssistant,
       toggleContextSummary, formatTimestamp, formatUsage: (u) => formatUsage(u, t),
@@ -2440,6 +2479,30 @@ const App = {
           </div>
           </template>
 
+          <!-- ══ Side question overlay ══ -->
+          <Transition name="fade">
+            <div v-if="btwState" class="btw-overlay" @click.self="dismissBtw">
+              <div class="btw-panel">
+                <div class="btw-header">
+                  <span class="btw-title">{{ t('btw.title') }}</span>
+                  <button class="btw-close" @click="dismissBtw" :aria-label="t('btw.dismiss')">&#10005;</button>
+                </div>
+                <div class="btw-body">
+                  <div class="btw-question">{{ btwState.question }}</div>
+                  <div v-if="btwState.error" class="btw-error">{{ btwState.error }}</div>
+                  <div v-else-if="btwState.answer" class="btw-answer markdown-body" v-html="renderMarkdown(btwState.answer)"></div>
+                  <div v-else class="btw-loading">
+                    <span class="btw-loading-dots"><span></span><span></span><span></span></span>
+                    <span class="btw-loading-text">{{ t('btw.thinking') }}</span>
+                  </div>
+                </div>
+                <div v-if="btwState.done && !btwState.error" class="btw-hint">
+                  {{ isMobile ? t('btw.tapDismiss') : t('btw.escDismiss') }}
+                </div>
+              </div>
+            </div>
+          </Transition>
+
           <!-- Input area (shown in both chat and team create mode) -->
           <div class="input-area" v-if="viewMode === 'chat'">
             <input
@@ -2483,7 +2546,7 @@ const App = {
                 @keydown="handleKeydown"
                 @input="autoResize"
                 @paste="handlePaste"
-                :disabled="status !== 'Connected' || isCompacting"
+                :disabled="status !== 'Connected'"
                 :placeholder="isCompacting ? t('input.compacting') : t('input.placeholder')"
                 rows="1"
               ></textarea>
@@ -2505,7 +2568,7 @@ const App = {
                   <button class="attach-btn" @click="triggerFileInput" :disabled="status !== 'Connected' || isCompacting || attachments.length >= 5" :title="t('input.attachFiles')">
                     <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
                   </button>
-                  <button class="slash-btn" @click="openSlashMenu" :disabled="status !== 'Connected' || isCompacting" :title="t('input.slashCommands')">
+                  <button class="slash-btn" @click="openSlashMenu" :disabled="status !== 'Connected'" :title="t('input.slashCommands')">
                     <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 21 11 3h2L9 21H7Z"/></svg>
                   </button>
                 </div>

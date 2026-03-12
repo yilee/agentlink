@@ -380,6 +380,134 @@ export function handleUserAnswer(requestId: string, answers: Record<string, unkn
   }
 }
 
+/**
+ * Handle a /btw side question. Spawns a lightweight, ephemeral Claude query
+ * that resumes the current conversation's session for context but does not
+ * persist any changes. Streams btw_answer deltas back to the web client.
+ */
+export async function handleBtwQuestion(
+  question: string,
+  conversationId: string | undefined,
+  workDir: string,
+  send: (msg: Record<string, unknown>) => void,
+  fallbackClaudeSessionId?: string,
+): Promise<void> {
+  // 1. Find the session ID for context from the conversations map
+  const convId = conversationId || DEFAULT_CONVERSATION_ID;
+  const conv = conversations.get(convId);
+  const sessionId = conv?.claudeSessionId || conv?.lastClaudeSessionId || fallbackClaudeSessionId || null;
+
+  if (!sessionId) {
+    send({ type: 'btw_answer', delta: 'No active conversation context available.', done: true });
+    return;
+  }
+
+  const effectiveWorkDir = conv?.workDir || workDir;
+
+  // 2. Build args for a lightweight one-shot query
+  const args = [
+    '-p', question,
+    '--resume', sessionId,
+    '--no-session-persistence',
+    '--output-format', 'stream-json',
+    '--verbose',
+  ];
+
+  const { command, prefixArgs, spawnOpts } = resolveClaudeCommand();
+  const env = getCleanEnv();
+
+  console.log(`[Claude:btw] Spawning side question (session ${sessionId.slice(0, 8)}): ${question.substring(0, 80)}`);
+
+  let child: ChildProcess;
+  try {
+    child = spawn(command, [...prefixArgs, ...args], {
+      cwd: effectiveWorkDir,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env,
+      ...spawnOpts,
+      windowsHide: true,
+    });
+  } catch (err) {
+    send({ type: 'btw_answer', delta: `Failed to spawn Claude: ${(err as Error).message}`, done: true });
+    return;
+  }
+
+  // Close stdin immediately — this is a one-shot -p query, no interactive input needed
+  if (child.stdin) {
+    child.stdin.end();
+  }
+
+  // 3. Parse streaming JSON output and forward text deltas
+  const rl = createInterface({ input: child.stdout! });
+  let lastSentText = '';
+  let sentAnyDelta = false;
+
+  const stderrBuf: string[] = [];
+  child.stderr?.on('data', (data: Buffer) => {
+    stderrBuf.push(data.toString());
+  });
+
+  try {
+    for await (const line of rl) {
+      if (!line.trim()) continue;
+      let msg: ClaudeMessage;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        continue;
+      }
+
+      // Extract text deltas from assistant messages
+      if (msg.type === 'assistant' && msg.message) {
+        const message = msg.message as { content?: Array<Record<string, unknown>> };
+        const content = message.content;
+        if (!Array.isArray(content)) continue;
+
+        const fullText = content
+          .filter((b) => b.type === 'text')
+          .map((b) => (b.text as string) || '')
+          .join('');
+
+        if (fullText.length > lastSentText.length) {
+          const delta = fullText.slice(lastSentText.length);
+          lastSentText = fullText;
+          sentAnyDelta = true;
+          send({ type: 'btw_answer', delta, done: false });
+        }
+      }
+
+      // On result, mark done
+      if (msg.type === 'result') {
+        // If result contains text we haven't sent yet
+        if (typeof msg.result === 'string' && msg.result.length > lastSentText.length) {
+          const delta = msg.result.slice(lastSentText.length);
+          send({ type: 'btw_answer', delta, done: true });
+        } else {
+          send({ type: 'btw_answer', delta: '', done: true });
+        }
+        rl.close();
+        return;
+      }
+    }
+  } catch (err) {
+    const error = err as Error;
+    if (error.name !== 'AbortError') {
+      console.error(`[Claude:btw] Stream error: ${error.message}`);
+    }
+  } finally {
+    rl.close();
+  }
+
+  // If we reach here without sending done (process exited without result message)
+  if (!sentAnyDelta) {
+    const stderrText = stderrBuf.join('').trim();
+    const errorMsg = stderrText || 'Side question failed — no response received.';
+    send({ type: 'btw_answer', delta: errorMsg, done: true });
+  } else {
+    send({ type: 'btw_answer', delta: '', done: true });
+  }
+}
+
 // ── Internal ───────────────────────────────────────────────────────────────
 
 function processFilesForClaude(files: ChatFile[], workDir: string, prompt: string): unknown[] {
