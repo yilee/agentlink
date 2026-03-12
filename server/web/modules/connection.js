@@ -360,6 +360,7 @@ export function createConnection(deps) {
         }
 
         // Clear foreground
+        const wasForegroundProcessing = isProcessing.value;
         if (!activeSet.has(currentConversationId && currentConversationId.value)) {
           isProcessing.value = false;
           isCompacting.value = false;
@@ -406,6 +407,8 @@ export function createConnection(deps) {
           team.handleActiveTeamRestore(msg.activeTeam, workDir.value);
         }
         resetIdleCheck();
+        // If foreground was processing but no longer is, dequeue pending messages
+        if (wasForegroundProcessing && !isProcessing.value) _dequeueNext();
       } else if (msg.type === 'error') {
         streaming.flushReveal();
         finalizeStreamingMsg(scheduleHighlight);
