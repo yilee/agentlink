@@ -264,5 +264,11 @@
 
   "slash.cost": "Show token usage and cost",
   "slash.context": "Show context usage",
-  "slash.compact": "Compact context"
+  "slash.compact": "Compact context",
+
+  "slash.btw": "Ask a side question (won't affect conversation)",
+  "btw.title": "Side Question",
+  "btw.dismiss": "Dismiss",
+  "btw.escDismiss": "Press Esc to dismiss",
+  "btw.tapDismiss": "Tap to dismiss"
 }

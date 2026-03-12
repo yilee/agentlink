@@ -27,6 +27,7 @@ import { createI18n } from './modules/i18n.js';
 
 // ── Slash commands ──────────────────────────────────────────────────────────
 const SLASH_COMMANDS = [
+  { command: '/btw', descKey: 'slash.btw', isPrefix: true },
   { command: '/cost', descKey: 'slash.cost' },
   { command: '/context', descKey: 'slash.context' },
   { command: '/compact', descKey: 'slash.compact' },
@@ -68,6 +69,10 @@ const App = {
     const inputRef = ref(null);
     const slashMenuIndex = ref(0);
     const slashMenuOpen = ref(false);
+
+    // Side question (/btw) state
+    const btwState = ref(null);
+    const btwPending = ref(false);
 
     // Sidebar state
     const sidebarOpen = ref(window.innerWidth > 768);
@@ -357,6 +362,8 @@ const App = {
       switchConversation,
       // Memory management
       memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
+      // Side question (/btw)
+      btwState, btwPending,
       // i18n
       t,
     });
@@ -451,6 +458,19 @@ const App = {
       if (!canSend.value) return;
 
       const text = inputText.value.trim();
+
+      // Side question — /btw <question>
+      if (text.startsWith('/btw ')) {
+        const question = text.slice(5).trim();
+        if (!question) return;
+        btwState.value = { question, answer: '', done: false, error: null };
+        btwPending.value = true;
+        inputText.value = '';
+        if (inputRef.value) inputRef.value.style.height = 'auto';
+        wsSend({ type: 'btw_question', question, conversationId: currentConversationId.value });
+        return;
+      }
+
       const files = attachments.value.slice();
       inputText.value = '';
       if (inputRef.value) inputRef.value.style.height = 'auto';
@@ -504,6 +524,11 @@ const App = {
       wsSend(cancelPayload);
     }
 
+    function dismissBtw() {
+      btwState.value = null;
+      btwPending.value = false;
+    }
+
     function dequeueNext() {
       if (queuedMessages.value.length === 0) return;
       const queued = queuedMessages.value.shift();
@@ -528,8 +553,13 @@ const App = {
 
     function selectSlashCommand(cmd) {
       slashMenuOpen.value = false;
-      inputText.value = cmd.command;
-      sendMessage();
+      if (cmd.isPrefix) {
+        inputText.value = cmd.command + ' ';
+        nextTick(() => inputRef.value?.focus());
+      } else {
+        inputText.value = cmd.command;
+        sendMessage();
+      }
     }
 
     function openSlashMenu() {
@@ -545,6 +575,12 @@ const App = {
     document.addEventListener('click', _slashMenuClickOutside);
 
     function handleKeydown(e) {
+      // Btw overlay dismiss
+      if (e.key === 'Escape' && btwState.value) {
+        dismissBtw();
+        e.preventDefault();
+        return;
+      }
       // Slash menu key handling
       if (slashMenuVisible.value && filteredSlashCommands.value.length > 0 && !e.isComposing) {
         const len = filteredSlashCommands.value.length;
@@ -645,6 +681,8 @@ const App = {
       inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages, usageStats,
       slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen, selectSlashCommand, openSlashMenu,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
+      // Side question (/btw)
+      btwState, btwPending, dismissBtw, renderMarkdown,
       getRenderedContent, copyMessage, toggleTool,
       isPrevAssistant: _isPrevAssistant,
       toggleContextSummary, formatTimestamp, formatUsage: (u) => formatUsage(u, t),
@@ -2439,6 +2477,29 @@ const App = {
             </div>
           </div>
           </template>
+
+          <!-- ══ Side question overlay ══ -->
+          <Transition name="fade">
+            <div v-if="btwState" class="btw-overlay" @click.self="dismissBtw">
+              <div class="btw-panel">
+                <div class="btw-header">
+                  <span class="btw-title">{{ t('btw.title') }}</span>
+                  <button class="btw-close" @click="dismissBtw" :aria-label="t('btw.dismiss')">&#10005;</button>
+                </div>
+                <div class="btw-body">
+                  <div class="btw-question">{{ btwState.question }}</div>
+                  <div v-if="btwState.error" class="btw-error">{{ btwState.error }}</div>
+                  <div v-else-if="btwState.answer" class="btw-answer markdown-body" v-html="renderMarkdown(btwState.answer)"></div>
+                  <div v-else class="btw-loading">
+                    <span class="typing-dots"><span></span><span></span><span></span></span>
+                  </div>
+                </div>
+                <div v-if="btwState.done && !btwState.error" class="btw-hint">
+                  {{ isMobile ? t('btw.tapDismiss') : t('btw.escDismiss') }}
+                </div>
+              </div>
+            </div>
+          </Transition>
 
           <!-- Input area (shown in both chat and team create mode) -->
           <div class="input-area" v-if="viewMode === 'chat'">

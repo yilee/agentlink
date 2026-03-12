@@ -264,5 +264,11 @@
 
   "slash.cost": "显示 Token 用量和费用",
   "slash.context": "显示上下文用量",
-  "slash.compact": "压缩上下文"
+  "slash.compact": "压缩上下文",
+
+  "slash.btw": "快速旁问（不影响对话）",
+  "btw.title": "旁问",
+  "btw.dismiss": "关闭",
+  "btw.escDismiss": "按 Esc 关闭",
+  "btw.tapDismiss": "点击关闭"
 }
