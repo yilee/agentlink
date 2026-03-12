@@ -390,11 +390,12 @@ export async function handleBtwQuestion(
   conversationId: string | undefined,
   workDir: string,
   send: (msg: Record<string, unknown>) => void,
+  fallbackClaudeSessionId?: string,
 ): Promise<void> {
   // 1. Find the session ID for context from the conversations map
   const convId = conversationId || DEFAULT_CONVERSATION_ID;
   const conv = conversations.get(convId);
-  const sessionId = conv?.claudeSessionId || conv?.lastClaudeSessionId || null;
+  const sessionId = conv?.claudeSessionId || conv?.lastClaudeSessionId || fallbackClaudeSessionId || null;
 
   if (!sessionId) {
     send({ type: 'btw_answer', delta: 'No active conversation context available.', done: true });

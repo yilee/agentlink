@@ -591,8 +591,8 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       break;
     }
     case 'btw_question': {
-      const { question, conversationId } = msg as unknown as { question: string; conversationId?: string };
-      handleBtwQuestion(question, conversationId, state.workDir, send);
+      const { question, conversationId, claudeSessionId } = msg as unknown as { question: string; conversationId?: string; claudeSessionId?: string };
+      handleBtwQuestion(question, conversationId, state.workDir, send, claudeSessionId);
       break;
     }
     default:

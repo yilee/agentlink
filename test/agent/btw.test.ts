@@ -85,7 +85,7 @@ describe('handleBtwQuestion', () => {
 
   // ── No session ID available ──────────────────────────────────────────
 
-  it('sends immediate done reply when no conversation exists', async () => {
+  it('sends immediate done reply when no conversation exists and no fallback', async () => {
     const send = vi.fn();
     await handleBtwQuestion('what is this?', 'nonexistent-conv', '/tmp', send);
 
@@ -244,6 +244,26 @@ describe('handleBtwQuestion', () => {
     const args: string[] = spawnCall[1];
     expect(args).toContain('--resume');
     expect(args).toContain('last-session-456');
+  });
+
+  it('uses fallbackClaudeSessionId when conversation is not in map', async () => {
+    // No conversation exists for this ID — simulates resumed history session
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
+    const send = vi.fn();
+    const promise = handleBtwQuestion('question', 'nonexistent-conv', '/tmp', send, 'fallback-session-999');
+
+    await new Promise(r => setTimeout(r, 10));
+    btwChild.stdout.write(JSON.stringify({ type: 'result', result: '' }) + '\n');
+    btwChild.stdout.end();
+    await promise;
+
+    // Should have spawned with the fallback session ID
+    const spawnCall = mockSpawn.mock.calls[0];
+    const args: string[] = spawnCall[1];
+    expect(args).toContain('--resume');
+    expect(args).toContain('fallback-session-999');
   });
 
   // ── Error handling ───────────────────────────────────────────────────

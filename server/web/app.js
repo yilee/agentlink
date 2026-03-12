@@ -467,7 +467,7 @@ const App = {
         btwPending.value = true;
         inputText.value = '';
         if (inputRef.value) inputRef.value.style.height = 'auto';
-        wsSend({ type: 'btw_question', question, conversationId: currentConversationId.value });
+        wsSend({ type: 'btw_question', question, conversationId: currentConversationId.value, claudeSessionId: currentClaudeSessionId.value });
         return;
       }
 
