@@ -170,6 +170,7 @@ npm test                         # vitest, also: test:e2e, test:watch, test:cove
 node Q:/src/agentlink/server/dist/cli.js start [--daemon] [--ephemeral]
 node Q:/src/agentlink/agent/dist/cli.js start --server ws://localhost:3456 [--ephemeral]
 ```
+**Note:** Do NOT use `--daemon` for the agent (client) in local dev — it must run in the foreground so it can spawn interactive `claude` subprocesses with stdio.
 
 `--ephemeral` sets `AGENTLINK_NO_STATE=1` so local dev doesn't overwrite prod daemon's `~/.agentlink/*.json`. **Do NOT use `agentlink-server stop` / `agentlink-client stop` to kill ephemeral processes** — those commands target prod daemons via `~/.agentlink/*.json`. Instead, kill ephemeral processes by PID:
 ```bash
