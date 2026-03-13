@@ -6,7 +6,7 @@
  * @returns {{ onScroll, scrollToBottom, cleanup }}
  */
 export function createScrollManager(selector) {
-  let _scrollTimer = null;
+  let _rafId = null;
   let _userScrolledUp = false;
 
   function onScroll(e) {
@@ -16,16 +16,17 @@ export function createScrollManager(selector) {
 
   function scrollToBottom(force) {
     if (_userScrolledUp && !force) return;
-    if (_scrollTimer) return;
-    _scrollTimer = setTimeout(() => {
-      _scrollTimer = null;
+    if (document.hidden) return;
+    if (_rafId) return;
+    _rafId = requestAnimationFrame(() => {
+      _rafId = null;
       const el = document.querySelector(selector);
       if (el) el.scrollTop = el.scrollHeight;
-    }, 50);
+    });
   }
 
   function cleanup() {
-    if (_scrollTimer) { clearTimeout(_scrollTimer); _scrollTimer = null; }
+    if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
   }
 
   return { onScroll, scrollToBottom, cleanup };

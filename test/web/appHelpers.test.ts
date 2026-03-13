@@ -70,8 +70,19 @@ describe('appHelpers', () => {
   });
 
   describe('createScrollManager', () => {
-    beforeEach(() => { vi.useFakeTimers(); });
-    afterEach(() => { vi.useRealTimers(); });
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // Mock document.hidden and requestAnimationFrame for Node.js test env
+      (globalThis as any).document = { hidden: false, querySelector: () => null };
+      (globalThis as any).requestAnimationFrame = (cb: () => void) => setTimeout(cb, 0);
+      (globalThis as any).cancelAnimationFrame = (id: number) => clearTimeout(id);
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      delete (globalThis as any).document;
+      delete (globalThis as any).requestAnimationFrame;
+      delete (globalThis as any).cancelAnimationFrame;
+    });
 
     it('scrollToBottom schedules a timeout', () => {
       const { scrollToBottom, cleanup } = createScrollManager('.test');

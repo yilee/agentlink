@@ -666,13 +666,23 @@ const App = {
     watch(loop.loopsList, () => { loadingLoops.value = false; });
 
     // ── Lifecycle ──
-    onMounted(() => { connect(scheduleHighlight); });
+    function _onVisibilityChange() {
+      if (!document.hidden) {
+        nextTick(() => scrollToBottom(true));
+      }
+    }
+
+    onMounted(() => {
+      connect(scheduleHighlight);
+      document.addEventListener('visibilitychange', _onVisibilityChange);
+    });
     onUnmounted(() => {
       closeWs(); streaming.cleanup(); cleanupScroll(); cleanupHighlight();
       window.removeEventListener('resize', _resizeHandler);
       document.removeEventListener('click', _workdirMenuClickHandler);
       document.removeEventListener('click', _slashMenuClickOutside);
       document.removeEventListener('keydown', _workdirMenuKeyHandler);
+      document.removeEventListener('visibilitychange', _onVisibilityChange);
     });
 
     return {
