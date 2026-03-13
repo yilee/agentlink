@@ -182,6 +182,9 @@ program
       console.log(`  Session:    ${agentState.sessionId}`);
       console.log(`  URL:        ${highlightUrl(agentState.sessionUrl)}`);
       console.log(`  Started:    ${agentState.startedAt}`);
+      qrcode.generate(agentState.sessionUrl, { small: true }, (code: string) => {
+        console.log(code);
+      });
     }
   });
 

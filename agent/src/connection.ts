@@ -28,8 +28,7 @@ import {
 } from './scheduler.js';
 
 const RECONNECT_BASE_DELAY = 1000;
-const RECONNECT_MAX_DELAY = 30_000;
-const MAX_RECONNECT_ATTEMPTS = 20;
+const RECONNECT_MAX_DELAY = 10_000;
 
 interface ConnectionState {
   ws: WebSocket | null;
@@ -232,19 +231,13 @@ function buildWsUrl(config: AgentConfig): string {
 }
 
 function scheduleReconnect(config: AgentConfig): void {
-  if (state.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-    console.error('[AgentLink] Max reconnect attempts reached. Server may be down.');
-    console.error('[AgentLink] Check server status or restart the agent.');
-    process.exit(1);
-  }
-
   const delay = Math.min(
     RECONNECT_BASE_DELAY * Math.pow(1.5, state.reconnectAttempts),
     RECONNECT_MAX_DELAY
   );
   state.reconnectAttempts++;
 
-  console.log(`[AgentLink] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+  console.log(`[AgentLink] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${state.reconnectAttempts})...`);
 
   setTimeout(() => {
     state.sessionKey = null; // Reset key; new one will come from server
