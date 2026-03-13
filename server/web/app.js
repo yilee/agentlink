@@ -789,7 +789,7 @@ const App = {
       workdirMenuBrowse() {
         workdirMenuOpen.value = false;
         if (isMobile.value) { sidebarView.value = 'files'; fileBrowser.openPanel(); }
-        else { fileBrowser.togglePanel(); }
+        else { memoryPanelOpen.value = false; fileBrowser.togglePanel(); }
       },
       workdirMenuChangeDir() {
         workdirMenuOpen.value = false;
