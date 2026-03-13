@@ -50,7 +50,7 @@
   border-radius: 16px;
   padding: 0.5rem;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s;
 }
 
 .input-card:focus-within {

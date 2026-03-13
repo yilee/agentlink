@@ -439,18 +439,24 @@ const App = {
     });
     const filteredSlashCommands = computed(() => {
       if (slashMenuOpen.value && !inputText.value.startsWith('/')) return SLASH_COMMANDS;
+      if (!inputText.value.startsWith('/')) return SLASH_COMMANDS;
       const txt = inputText.value.toLowerCase();
       return SLASH_COMMANDS.filter(c => c.command.startsWith(txt));
     });
     watch(filteredSlashCommands, () => { slashMenuIndex.value = 0; });
 
     // ── Auto-resize textarea ──
+    let _autoResizeRaf = null;
     function autoResize() {
-      const ta = inputRef.value;
-      if (ta) {
-        ta.style.height = 'auto';
-        ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
-      }
+      if (_autoResizeRaf) return;
+      _autoResizeRaf = requestAnimationFrame(() => {
+        _autoResizeRaf = null;
+        const ta = inputRef.value;
+        if (ta) {
+          ta.style.height = 'auto';
+          ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
+        }
+      });
     }
 
     // ── Send message ──
