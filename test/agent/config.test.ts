@@ -50,6 +50,37 @@ describe('Agent Config', () => {
       expect(config.server).toBe('ws://first');
       expect(config.name).toBe('Agent2');
     });
+
+    it('does not clear password when saving unrelated fields', () => {
+      saveConfig({ password: 'secret123', server: 'ws://test' });
+      saveConfig({ name: 'NewAgent' });
+      const config = loadConfig();
+      expect(config.password).toBe('secret123');
+      expect(config.name).toBe('NewAgent');
+    });
+
+    it('does not clear password when saving empty object', () => {
+      saveConfig({ password: 'keep-me', autoUpdate: true });
+      saveConfig({});
+      const config = loadConfig();
+      expect(config.password).toBe('keep-me');
+      expect(config.autoUpdate).toBe(true);
+    });
+
+    it('clears password only when explicitly set to undefined', () => {
+      saveConfig({ password: 'old-pass' });
+      saveConfig({ password: undefined });
+      const config = loadConfig();
+      expect(config.password).toBeUndefined();
+    });
+
+    it('does not clear autoUpdate when saving unrelated fields', () => {
+      saveConfig({ autoUpdate: true, password: 'pass' });
+      saveConfig({ server: 'ws://new' });
+      const config = loadConfig();
+      expect(config.autoUpdate).toBe(true);
+      expect(config.password).toBe('pass');
+    });
   });
 
   describe('resolveConfig', () => {
@@ -89,6 +120,23 @@ describe('Agent Config', () => {
       saveConfig({ autoUpdate: false });
       const config = resolveConfig({ autoUpdate: true });
       expect(config.autoUpdate).toBe(true);
+    });
+
+    it('reads password from config file when not passed via CLI', () => {
+      saveConfig({ password: 'saved-pass' });
+      const config = resolveConfig({});
+      expect(config.password).toBe('saved-pass');
+    });
+
+    it('CLI password takes priority over config file', () => {
+      saveConfig({ password: 'file-pass' });
+      const config = resolveConfig({ password: 'cli-pass' });
+      expect(config.password).toBe('cli-pass');
+    });
+
+    it('password is undefined when not set anywhere', () => {
+      const config = resolveConfig({});
+      expect(config.password).toBeUndefined();
     });
   });
 

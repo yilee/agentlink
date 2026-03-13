@@ -21,6 +21,26 @@ function getNodePath(): string {
   return process.execPath;
 }
 
+/** Build extra CLI args string for password and autoUpdate (used in systemd/bat templates). */
+function buildExtraArgs(config: AgentConfig): string {
+  let args = '';
+  if (config.password) args += ` --password "${config.password}"`;
+  if (config.autoUpdate) args += ' --auto-update';
+  return args;
+}
+
+/** Build extra plist <string> entries for password and autoUpdate (used in launchd template). */
+function buildPlistExtraArgs(config: AgentConfig): string {
+  let entries = '';
+  if (config.password) {
+    entries += `        <string>--password</string>\n        <string>${config.password}</string>\n`;
+  }
+  if (config.autoUpdate) {
+    entries += `        <string>--auto-update</string>\n`;
+  }
+  return entries;
+}
+
 // ── Linux (systemd) ──
 
 function isRoot(): boolean {
@@ -46,6 +66,7 @@ function generateSystemdUnit(config: AgentConfig): string {
   const cliPath = getCliPath();
   const logDir = getLogDir();
   const nodeBinDir = dirname(nodePath);
+  const extraArgs = buildExtraArgs(config);
 
   const userSection = isRoot()
     ? ''
@@ -58,7 +79,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${nodePath} ${cliPath} start --server "${config.server}" --dir "${config.dir}" --name "${config.name}"
+ExecStart=${nodePath} ${cliPath} start --server "${config.server}" --dir "${config.dir}" --name "${config.name}"${extraArgs}
 WorkingDirectory=${config.dir}
 Restart=on-failure
 RestartSec=10
@@ -114,6 +135,8 @@ function generateLaunchdPlist(config: AgentConfig): string {
   const cliPath = getCliPath();
   const logDir = getLogDir();
 
+  const extraEntries = buildPlistExtraArgs(config);
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -131,7 +154,7 @@ function generateLaunchdPlist(config: AgentConfig): string {
         <string>${config.dir}</string>
         <string>--name</string>
         <string>${config.name}</string>
-    </array>
+${extraEntries}    </array>
     <key>WorkingDirectory</key>
     <string>${config.dir}</string>
     <key>RunAtLoad</key>
@@ -189,7 +212,8 @@ function getStartupBatPath(): string {
 function generateStartupBat(config: AgentConfig): string {
   const nodePath = getNodePath();
   const cliPath = getCliPath();
-  return `@echo off\r\n"${nodePath}" "${cliPath}" start --daemon --server "${config.server}" --dir "${config.dir}" --name "${config.name}"\r\n`;
+  const extraArgs = buildExtraArgs(config);
+  return `@echo off\r\n"${nodePath}" "${cliPath}" start --daemon --server "${config.server}" --dir "${config.dir}" --name "${config.name}"${extraArgs}\r\n`;
 }
 
 function winInstall(config: AgentConfig): void {
@@ -203,7 +227,7 @@ function winInstall(config: AgentConfig): void {
   console.log('\nStarting agent now...');
   try {
     execSync(
-      `"${getNodePath()}" "${getCliPath()}" start --daemon --server "${config.server}" --dir "${config.dir}" --name "${config.name}"`,
+      `"${getNodePath()}" "${getCliPath()}" start --daemon --server "${config.server}" --dir "${config.dir}" --name "${config.name}"${buildExtraArgs(config)}`,
       { stdio: 'inherit' },
     );
   } catch {

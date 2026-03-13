@@ -6,7 +6,7 @@ import {
   killProcess, isProcessAlive,
 } from './config.js';
 import { serviceInstall, serviceUninstall } from './service.js';
-import { spawn, execSync } from 'child_process';
+import { spawn, execSync, execFileSync } from 'child_process';
 import { openSync, existsSync, readFileSync, statSync, createReadStream } from 'fs';
 import { watchFile, unwatchFile } from 'fs';
 import { join, dirname, resolve } from 'path';
@@ -41,17 +41,19 @@ program
   .option('--auto-update', 'Enable automatic update checks (disabled by default)')
   .option('--ephemeral', 'Skip writing runtime state (for running alongside a daemon)')
   .action(async (options) => {
-    // Persist password and autoUpdate to config file so restarts preserve them
+    // Only persist config values the user explicitly passed on the CLI.
+    // Don't touch existing config.json values when flags are omitted —
+    // otherwise upgrade/auto-update/service restarts would lose password.
     const configUpdates: Record<string, unknown> = {};
     if (options.password) {
       configUpdates.password = options.password;
-    } else {
-      configUpdates.password = undefined;
     }
     if (options.autoUpdate) {
       configUpdates.autoUpdate = true;
     }
-    saveConfig(configUpdates);
+    if (Object.keys(configUpdates).length > 0) {
+      saveConfig(configUpdates);
+    }
 
     const config = resolveConfig(options);
 
@@ -174,7 +176,9 @@ program
       console.log('Agent:  not running (stale state)');
       clearRuntimeState();
     } else {
+      const config = loadConfig();
       console.log('Agent:  running');
+      console.log(`  Version:    ${pkg.version}`);
       console.log(`  PID:        ${agentState.pid}`);
       console.log(`  Name:       ${agentState.name}`);
       console.log(`  Directory:  ${agentState.dir}`);
@@ -182,6 +186,20 @@ program
       console.log(`  Session:    ${agentState.sessionId}`);
       console.log(`  URL:        ${highlightUrl(agentState.sessionUrl)}`);
       console.log(`  Started:    ${agentState.startedAt}`);
+      const startTime = new Date(agentState.startedAt).getTime();
+      if (!isNaN(startTime)) {
+        const elapsed = Date.now() - startTime;
+        const days = Math.floor(elapsed / 86400000);
+        const hours = Math.floor((elapsed % 86400000) / 3600000);
+        const mins = Math.floor((elapsed % 3600000) / 60000);
+        const parts: string[] = [];
+        if (days > 0) parts.push(`${days}d`);
+        if (hours > 0) parts.push(`${hours}h`);
+        parts.push(`${mins}m`);
+        console.log(`  Uptime:     ${parts.join(' ')}`);
+      }
+      console.log(`  AutoUpdate: ${config.autoUpdate ? 'enabled' : 'disabled'}`);
+      console.log(`  Password:   ${config.password ? '****' : '(not set)'}`);
       qrcode.generate(agentState.sessionUrl, { small: true }, (code: string) => {
         console.log(code);
       });
@@ -389,15 +407,20 @@ program
       console.log('Agent stopped.');
 
       console.log('Restarting agent...');
+      // Preserve password and auto-update from config so the new daemon keeps them
+      const savedConfig = loadConfig();
+      const restartArgs = ['start', '--daemon'];
+      if (savedConfig.password) restartArgs.push('--password', savedConfig.password);
+      if (savedConfig.autoUpdate) restartArgs.push('--auto-update');
       try {
         const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
         const newBin = process.platform === 'win32'
           ? join(npmPrefix, 'agentlink-client.cmd')
           : join(npmPrefix, 'bin', 'agentlink-client');
-        execSync(`"${newBin}" start --daemon`, { stdio: 'inherit' });
+        execFileSync(newBin, restartArgs, { stdio: 'inherit' });
       } catch {
         try {
-          execSync('agentlink-client start --daemon', { stdio: 'inherit' });
+          execFileSync('agentlink-client', restartArgs, { stdio: 'inherit' });
         } catch {
           console.error('Failed to restart agent. Start manually with: agentlink-client start --daemon');
         }

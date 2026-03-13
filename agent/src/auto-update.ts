@@ -5,7 +5,7 @@
  * through the existing agent.json sessionId restore mechanism.
  */
 
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { createRequire } from 'module';
 import { loadConfig } from './config.js';
 import { getConversation } from './claude.js';
@@ -87,10 +87,11 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
   // Restart via agentlink-client start --daemon (new binary from the updated package)
   // Preserve password and auto-update flag if configured
   const config = loadConfig();
-  const passwordArg = config.password ? ` --password ${config.password}` : '';
-  const autoUpdateArg = config.autoUpdate ? ' --auto-update' : '';
+  const restartArgs = ['start', '--daemon'];
+  if (config.password) restartArgs.push('--password', config.password);
+  if (config.autoUpdate) restartArgs.push('--auto-update');
   try {
-    execSync(`agentlink-client start --daemon${passwordArg}${autoUpdateArg}`, {
+    execFileSync('agentlink-client', restartArgs, {
       stdio: 'ignore',
       timeout: 15_000,
       windowsHide: true,
