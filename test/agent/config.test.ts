@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -19,6 +19,9 @@ const {
   loadRuntimeState,
   clearRuntimeState,
   isProcessAlive,
+  getLogDir,
+  getLogDate,
+  cleanOldLogs,
   CONFIG_DIR,
 } = await import('../../agent/src/config.js');
 
@@ -175,6 +178,47 @@ describe('Agent Config', () => {
 
     it('returns false for non-existent PID', () => {
       expect(isProcessAlive(999999)).toBe(false);
+    });
+  });
+
+  describe('Log rotation', () => {
+    it('getLogDate returns YYYY-MM-DD format', () => {
+      const date = getLogDate();
+      expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('cleanOldLogs deletes files older than N days', () => {
+      const logDir = getLogDir();
+      // Create old log files (30 days ago)
+      const old = new Date(Date.now() - 30 * 86400_000);
+      const oldDate = old.toISOString().slice(0, 10);
+      writeFileSync(join(logDir, `agent-${oldDate}.log`), 'old log');
+      writeFileSync(join(logDir, `agent-${oldDate}.err`), 'old err');
+
+      // Create today's log files
+      const today = getLogDate();
+      writeFileSync(join(logDir, `agent-${today}.log`), 'today log');
+      writeFileSync(join(logDir, `agent-${today}.err`), 'today err');
+
+      cleanOldLogs(7);
+
+      // Old files should be deleted
+      expect(existsSync(join(logDir, `agent-${oldDate}.log`))).toBe(false);
+      expect(existsSync(join(logDir, `agent-${oldDate}.err`))).toBe(false);
+      // Today's files should remain
+      expect(existsSync(join(logDir, `agent-${today}.log`))).toBe(true);
+      expect(existsSync(join(logDir, `agent-${today}.err`))).toBe(true);
+    });
+
+    it('cleanOldLogs does not delete non-matching files', () => {
+      const logDir = getLogDir();
+      writeFileSync(join(logDir, 'agent.log'), 'legacy log');
+      writeFileSync(join(logDir, 'other.txt'), 'other file');
+
+      cleanOldLogs(7);
+
+      expect(existsSync(join(logDir, 'agent.log'))).toBe(true);
+      expect(existsSync(join(logDir, 'other.txt'))).toBe(true);
     });
   });
 });

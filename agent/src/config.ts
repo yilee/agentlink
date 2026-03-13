@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, readdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
@@ -111,6 +111,37 @@ export function getLogDir(): string {
     mkdirSync(LOG_DIR, { recursive: true });
   }
   return LOG_DIR;
+}
+
+/** Return today's date as YYYY-MM-DD for log file naming. */
+export function getLogDate(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Delete log files older than `days` days from the log directory. */
+export function cleanOldLogs(days: number = 7): void {
+  const dir = getLogDir();
+  const cutoff = Date.now() - days * 86400_000;
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const name of entries) {
+    // Match agent-YYYY-MM-DD.log or agent-YYYY-MM-DD.err
+    const m = name.match(/^agent-(\d{4}-\d{2}-\d{2})\.(log|err)$/);
+    if (!m) continue;
+    const fileDate = new Date(m[1] + 'T00:00:00').getTime();
+    if (isNaN(fileDate) || fileDate >= cutoff) continue;
+    try {
+      unlinkSync(join(dir, name));
+    } catch {}
+  }
 }
 
 // ── Cross-platform process kill ──

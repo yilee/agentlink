@@ -2,12 +2,12 @@
 import { Command } from 'commander';
 import {
   resolveConfig, loadConfig, saveConfig, getConfigPath,
-  loadRuntimeState, clearRuntimeState, getLogDir,
+  loadRuntimeState, clearRuntimeState, getLogDir, getLogDate, cleanOldLogs,
   killProcess, isProcessAlive,
 } from './config.js';
 import { serviceInstall, serviceUninstall } from './service.js';
 import { spawn, execSync, execFileSync } from 'child_process';
-import { openSync, existsSync, readFileSync, statSync, createReadStream } from 'fs';
+import { openSync, existsSync, readFileSync, statSync, createReadStream, readdirSync } from 'fs';
 import { watchFile, unwatchFile } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -76,8 +76,12 @@ program
       const __filename = fileURLToPath(import.meta.url);
       const daemonScript = resolve(dirname(__filename), 'daemon.js');
       const logDir = getLogDir();
-      const logFile = join(logDir, 'agent.log');
-      const errFile = join(logDir, 'agent.err');
+      const dateTag = getLogDate();
+      const logFile = join(logDir, `agent-${dateTag}.log`);
+      const errFile = join(logDir, `agent-${dateTag}.err`);
+
+      // Clean up log files older than 7 days
+      cleanOldLogs(7);
 
       const out = openSync(logFile, 'a');
       const err = openSync(errFile, 'a');
@@ -295,9 +299,25 @@ program
   .option('--err', 'Show only stderr log')
   .action((options) => {
     const logDir = getLogDir();
-    const logFile = join(logDir, 'agent.log');
-    const errFile = join(logDir, 'agent.err');
     const lines = parseInt(options.lines, 10) || 100;
+
+    // Find the most recent dated log file, falling back to legacy name
+    function findLatestLog(ext: string): string {
+      const prefix = 'agent-';
+      const suffix = `.${ext}`;
+      try {
+        const dated = readdirSync(logDir)
+          .filter(f => f.startsWith(prefix) && f.endsWith(suffix))
+          .sort()
+          .reverse();
+        if (dated.length > 0) return join(logDir, dated[0]);
+      } catch {}
+      // Fallback to legacy non-dated file
+      return join(logDir, `agent.${ext}`);
+    }
+
+    const logFile = findLatestLog('log');
+    const errFile = findLatestLog('err');
 
     function tailLines(filePath: string, n: number): string {
       if (!existsSync(filePath)) return '';
