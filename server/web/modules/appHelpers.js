@@ -72,7 +72,7 @@ export function formatTokens(n) {
 export function formatDurationShort(ms) {
   if (!ms && ms !== 0) return '';
   const totalSecs = Math.floor(ms / 1000);
-  if (totalSecs < 60) return totalSecs + 's';
+  if (totalSecs < 60) return (ms / 1000).toFixed(1) + 's';
   const m = Math.floor(totalSecs / 60);
   const s = totalSecs % 60;
   if (m < 60) return m + 'm ' + String(s).padStart(2, '0') + 's';
