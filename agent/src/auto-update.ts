@@ -9,7 +9,7 @@ import { execSync, spawn } from 'child_process';
 import { createRequire } from 'module';
 import { join } from 'path';
 import { openSync } from 'fs';
-import { loadConfig, getLogDir, getLogDate, cleanOldLogs } from './config.js';
+import { resolveConfig, getLogDir, getLogDate, cleanOldLogs } from './config.js';
 import { getConversation } from './claude.js';
 
 const require = createRequire(import.meta.url);
@@ -89,7 +89,6 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
   // We can't use `agentlink-client start --daemon` synchronously because
   // this process is still alive and the start command rejects "already running".
   // Instead, spawn the new daemon.js directly (detached), then exit.
-  const config = loadConfig();
 
   // Resolve the new daemon.js from the freshly-installed package
   let newDaemonScript: string;
@@ -103,9 +102,10 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
     return;
   }
 
-  // Build config for the new daemon — preserve password, autoUpdate, and current settings
-  const newConfig = { ...config };
-  if (!newConfig.autoUpdate) newConfig.autoUpdate = true; // we're in auto-update, keep it on
+  // Build config for the new daemon — use resolveConfig to ensure all fields
+  // (especially dir) have proper defaults, not just what's in config.json
+  const config = resolveConfig({});
+  if (!config.autoUpdate) config.autoUpdate = true; // we're in auto-update, keep it on
 
   const logDir = getLogDir();
   const dateTag = getLogDate();
@@ -114,7 +114,7 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
   const err = openSync(join(logDir, `agent-${dateTag}.err`), 'a');
 
   console.log('[AutoUpdate] Spawning new daemon and exiting...');
-  const child = spawn(process.execPath, [newDaemonScript, JSON.stringify(newConfig)], {
+  const child = spawn(process.execPath, [newDaemonScript, JSON.stringify(config)], {
     detached: true,
     stdio: ['ignore', out, err],
     cwd: config.dir,
