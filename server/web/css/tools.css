@@ -93,6 +93,12 @@
   border-left: 1px solid var(--border);
   padding-left: 8px;
   overflow: hidden;
+  animation: toolExpand 0.15s ease-out;
+}
+
+@keyframes toolExpand {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 500px; }
 }
 
 .tool-block {
