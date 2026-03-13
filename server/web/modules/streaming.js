@@ -1,7 +1,7 @@
 // ── Progressive text streaming / reveal animation ────────────────────────────
 
-const CHARS_PER_TICK = 5;
-const TICK_MS = 16;
+const CHARS_PER_TICK = 20;
+const TICK_MS = 50;
 
 /**
  * Creates a streaming text reveal controller.
