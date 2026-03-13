@@ -5,7 +5,7 @@
  * through the existing agent.json sessionId restore mechanism.
  */
 
-import { execSync, execFileSync } from 'child_process';
+import { execSync } from 'child_process';
 import { createRequire } from 'module';
 import { loadConfig } from './config.js';
 import { getConversation } from './claude.js';
@@ -91,16 +91,23 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
   if (config.password) restartArgs.push('--password', config.password);
   if (config.autoUpdate) restartArgs.push('--auto-update');
   try {
-    execFileSync('agentlink-client', restartArgs, {
+    // On Windows, global npm bins are .cmd files — execFileSync can't run them
+    // directly. Use execSync with shell so the OS resolves the command properly.
+    execSync(['agentlink-client', ...restartArgs].map(a => `"${a}"`).join(' '), {
       stdio: 'ignore',
       timeout: 15_000,
       windowsHide: true,
     });
-  } catch {
-    console.error('[AutoUpdate] Failed to restart daemon. Manual restart needed: agentlink-client start --daemon');
+  } catch (err) {
+    // Restart failed — do NOT exit. Keep the old process alive so the user
+    // isn't left with a dead agent. The next update cycle will retry.
+    console.error(`[AutoUpdate] Failed to restart daemon: ${(err as Error).message}`);
+    console.error('[AutoUpdate] Keeping current process alive. Will retry next cycle.');
+    return;
   }
 
-  // Exit current process — new daemon is already running
+  // Only exit after confirmed successful restart
+  console.log('[AutoUpdate] New daemon started. Exiting old process.');
   process.exit(0);
 }
 

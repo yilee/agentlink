@@ -6,7 +6,7 @@ import {
   killProcess, isProcessAlive,
 } from './config.js';
 import { serviceInstall, serviceUninstall } from './service.js';
-import { spawn, execSync, execFileSync } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { openSync, existsSync, readFileSync, statSync, createReadStream, readdirSync } from 'fs';
 import { watchFile, unwatchFile } from 'fs';
 import { join, dirname, resolve } from 'path';
@@ -433,17 +433,9 @@ program
       if (savedConfig.password) restartArgs.push('--password', savedConfig.password);
       if (savedConfig.autoUpdate) restartArgs.push('--auto-update');
       try {
-        const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
-        const newBin = process.platform === 'win32'
-          ? join(npmPrefix, 'agentlink-client.cmd')
-          : join(npmPrefix, 'bin', 'agentlink-client');
-        execFileSync(newBin, restartArgs, { stdio: 'inherit' });
+        execSync(['agentlink-client', ...restartArgs].map(a => `"${a}"`).join(' '), { stdio: 'inherit' });
       } catch {
-        try {
-          execFileSync('agentlink-client', restartArgs, { stdio: 'inherit' });
-        } catch {
-          console.error('Failed to restart agent. Start manually with: agentlink-client start --daemon');
-        }
+        console.error('Failed to restart agent. Start manually with: agentlink-client start --daemon');
       }
     }
   });
