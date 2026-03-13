@@ -5,9 +5,11 @@
  * through the existing agent.json sessionId restore mechanism.
  */
 
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import { createRequire } from 'module';
-import { loadConfig } from './config.js';
+import { join } from 'path';
+import { openSync } from 'fs';
+import { loadConfig, getLogDir, getLogDate, cleanOldLogs } from './config.js';
 import { getConversation } from './claude.js';
 
 const require = createRequire(import.meta.url);
@@ -84,30 +86,43 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
   console.log(`[AutoUpdate] Updated to v${latestVersion}. Restarting daemon...`);
 
   // Don't clear agent.json — the new process will restore sessionId from it.
-  // Restart via agentlink-client start --daemon (new binary from the updated package)
-  // Preserve password and auto-update flag if configured
+  // We can't use `agentlink-client start --daemon` synchronously because
+  // this process is still alive and the start command rejects "already running".
+  // Instead, spawn the new daemon.js directly (detached), then exit.
   const config = loadConfig();
-  const restartArgs = ['start', '--daemon'];
-  if (config.password) restartArgs.push('--password', config.password);
-  if (config.autoUpdate) restartArgs.push('--auto-update');
+
+  // Resolve the new daemon.js from the freshly-installed package
+  let newDaemonScript: string;
   try {
-    // On Windows, global npm bins are .cmd files — execFileSync can't run them
-    // directly. Use execSync with shell so the OS resolves the command properly.
-    execSync(['agentlink-client', ...restartArgs].map(a => `"${a}"`).join(' '), {
-      stdio: 'ignore',
-      timeout: 15_000,
-      windowsHide: true,
-    });
+    const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8', windowsHide: true }).trim();
+    const pkgDir = join(npmPrefix, process.platform === 'win32' ? '' : 'lib', 'node_modules', '@agent-link', 'agent', 'dist');
+    newDaemonScript = join(pkgDir, 'daemon.js');
   } catch (err) {
-    // Restart failed — do NOT exit. Keep the old process alive so the user
-    // isn't left with a dead agent. The next update cycle will retry.
-    console.error(`[AutoUpdate] Failed to restart daemon: ${(err as Error).message}`);
+    console.error(`[AutoUpdate] Failed to locate new daemon script: ${(err as Error).message}`);
     console.error('[AutoUpdate] Keeping current process alive. Will retry next cycle.');
     return;
   }
 
-  // Only exit after confirmed successful restart
-  console.log('[AutoUpdate] New daemon started. Exiting old process.');
+  // Build config for the new daemon — preserve password, autoUpdate, and current settings
+  const newConfig = { ...config };
+  if (!newConfig.autoUpdate) newConfig.autoUpdate = true; // we're in auto-update, keep it on
+
+  const logDir = getLogDir();
+  const dateTag = getLogDate();
+  cleanOldLogs(7);
+  const out = openSync(join(logDir, `agent-${dateTag}.log`), 'a');
+  const err = openSync(join(logDir, `agent-${dateTag}.err`), 'a');
+
+  console.log('[AutoUpdate] Spawning new daemon and exiting...');
+  const child = spawn(process.execPath, [newDaemonScript, JSON.stringify(newConfig)], {
+    detached: true,
+    stdio: ['ignore', out, err],
+    cwd: config.dir,
+    windowsHide: true,
+  });
+  child.unref();
+
+  // Exit old process — new daemon is starting
   process.exit(0);
 }
 
