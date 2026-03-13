@@ -1,7 +1,7 @@
 /* ── Input area ── */
 .input-area {
   flex-shrink: 0;
-  padding: 0 1.5rem 1rem;
+  padding: 0 1.5rem calc(1rem + env(safe-area-inset-bottom, 0px));
   background: transparent;
   position: relative;
 }
