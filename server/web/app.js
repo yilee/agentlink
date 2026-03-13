@@ -410,6 +410,22 @@ const App = {
     let _resizeHandler = () => { isMobile.value = window.innerWidth <= 768; };
     window.addEventListener('resize', _resizeHandler);
 
+    // Fix Chrome mobile: when virtual keyboard dismisses, Chrome doesn't
+    // restore scroll position (Safari does this natively). Detect keyboard
+    // dismiss via visualViewport height increase and reset page scroll.
+    let _vvResizeHandler = null;
+    if (window.visualViewport) {
+      let _lastVVHeight = window.visualViewport.height;
+      _vvResizeHandler = () => {
+        const h = window.visualViewport.height;
+        if (h > _lastVVHeight && !document.activeElement?.matches?.('input, textarea')) {
+          window.scrollTo(0, 0);
+        }
+        _lastVVHeight = h;
+      };
+      window.visualViewport.addEventListener('resize', _vvResizeHandler);
+    }
+
     // Close workdir menu on outside click or Escape
     let _workdirMenuClickHandler = (e) => {
       if (!workdirMenuOpen.value) return;
@@ -685,6 +701,7 @@ const App = {
     onUnmounted(() => {
       closeWs(); streaming.cleanup(); cleanupScroll(); cleanupHighlight();
       window.removeEventListener('resize', _resizeHandler);
+      if (_vvResizeHandler && window.visualViewport) window.visualViewport.removeEventListener('resize', _vvResizeHandler);
       document.removeEventListener('click', _workdirMenuClickHandler);
       document.removeEventListener('click', _slashMenuClickOutside);
       document.removeEventListener('keydown', _workdirMenuKeyHandler);
