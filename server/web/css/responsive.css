@@ -44,7 +44,7 @@
 
   /* Top bar */
   .top-bar {
-    padding: 0 0.75rem;
+    padding: env(safe-area-inset-top, 0px) 0.75rem 0;
   }
 
   .agent-label {
@@ -130,7 +130,7 @@
 
   /* Input area */
   .input-area {
-    padding: 0 0.75rem 0.75rem;
+    padding: 0 0.75rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
   }
 
   .input-card {
@@ -279,11 +279,11 @@
   }
 
   .input-area {
-    padding: 0 0.5rem 0.5rem;
+    padding: 0 0.5rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .top-bar {
-    padding: 0 0.5rem;
+    padding: env(safe-area-inset-top, 0px) 0.5rem 0;
   }
 
   .folder-picker-dialog {
