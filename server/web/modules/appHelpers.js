@@ -69,6 +69,18 @@ export function formatTokens(n) {
   return String(n);
 }
 
+export function formatDurationShort(ms) {
+  if (!ms && ms !== 0) return '';
+  const totalSecs = Math.floor(ms / 1000);
+  if (totalSecs < 60) return totalSecs + 's';
+  const m = Math.floor(totalSecs / 60);
+  const s = totalSecs % 60;
+  if (m < 60) return m + 'm ' + String(s).padStart(2, '0') + 's';
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return h + 'h ' + String(rm).padStart(2, '0') + 'm';
+}
+
 /**
  * Format a usage stats object into a human-readable summary string.
  * @param {object|null} u - Usage stats from turn_completed
@@ -80,7 +92,7 @@ export function formatUsage(u, t) {
   const ctx = formatTokens(u.inputTokens) + ' / ' + formatTokens(u.contextWindow) + ' (' + pct + '%)';
   const cost = '$' + u.totalCost.toFixed(2);
   const model = u.model.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/-1m$/, '');
-  const dur = (u.durationMs / 1000).toFixed(1) + 's';
+  const dur = formatDurationShort(u.durationMs);
   const contextLabel = t ? t('usage.context') : 'Context';
   const costLabel = t ? t('usage.cost') : 'Cost';
   return contextLabel + ' ' + ctx + '  \u00b7  ' + costLabel + ' ' + cost + '  \u00b7  ' + model + '  \u00b7  ' + dur;

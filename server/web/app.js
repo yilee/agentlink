@@ -1170,10 +1170,14 @@ const App = {
       },
       formatDuration(ms) {
         if (!ms && ms !== 0) return '';
-        const secs = Math.floor(ms / 1000);
-        const m = Math.floor(secs / 60);
-        const s = secs % 60;
-        return m + 'm ' + String(s).padStart(2, '0') + 's';
+        const totalSecs = Math.floor(ms / 1000);
+        if (totalSecs < 60) return totalSecs + 's';
+        const m = Math.floor(totalSecs / 60);
+        const s = totalSecs % 60;
+        if (m < 60) return m + 'm ' + String(s).padStart(2, '0') + 's';
+        const h = Math.floor(m / 60);
+        const rm = m % 60;
+        return h + 'h ' + String(rm).padStart(2, '0') + 'm';
       },
       isLoopRunning(loopId) {
         return !!loop.runningLoops.value[loopId];
@@ -1947,7 +1951,7 @@ const App = {
                     </div>
                     <div v-if="displayTeam.durationMs" class="team-stat">
                       <span class="team-stat-label">{{ t('team.duration') }}</span>
-                      <span class="team-stat-value">{{ Math.round(displayTeam.durationMs / 1000) }}s</span>
+                      <span class="team-stat-value">{{ formatDuration(displayTeam.durationMs) }}</span>
                     </div>
                     <div v-if="displayTeam.totalCost" class="team-stat">
                       <span class="team-stat-label">{{ t('team.cost') }}</span>
