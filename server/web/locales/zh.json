@@ -245,6 +245,10 @@
   "tool.inPath": "在 {path}",
   "tool.done": "{done}/{total} 已完成",
   "tool.replaceAll": "（全部替换）",
+  "tool.enteredPlanMode": "已进入计划模式",
+  "tool.exitedPlanMode": "已退出计划模式",
+  "tool.enteringPlanMode": "正在进入计划模式...",
+  "tool.exitingPlanMode": "正在退出计划模式...",
 
   "usage.context": "上下文",
   "usage.cost": "费用",

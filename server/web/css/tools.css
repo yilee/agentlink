@@ -304,3 +304,24 @@
   margin: 0.75rem 0;
 }
 
+/* ── Plan mode divider ── */
+.plan-mode-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.plan-mode-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.plan-mode-divider-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-weight: 500;
+}
+

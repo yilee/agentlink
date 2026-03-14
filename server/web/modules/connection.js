@@ -549,6 +549,17 @@ export function createConnection(deps) {
           messages.value = buildHistoryBatch(msg.history, () => streaming.nextId());
           toolMsgMap.clear();
         }
+        // Detect plan mode: prefer agent-provided flag, fallback to history scan
+        if (msg.planMode != null) {
+          if (setPlanMode) setPlanMode(!!msg.planMode);
+        } else if (msg.history && Array.isArray(msg.history)) {
+          const lastPlanTool = findLast(msg.history, h =>
+            h.role === 'tool' && (h.toolName === 'EnterPlanMode' || h.toolName === 'ExitPlanMode')
+          );
+          if (lastPlanTool) {
+            if (setPlanMode) setPlanMode(lastPlanTool.toolName === 'EnterPlanMode');
+          }
+        }
         loadingHistory.value = false;
         // Restore live status from agent (compacting / processing)
         if (msg.isCompacting) {
@@ -615,6 +626,15 @@ export function createConnection(deps) {
         }
       } else if (msg.type === 'plan_mode_changed') {
         if (setPlanMode) setPlanMode(msg.enabled);
+        // For the immediate path (no injected turn), clear isProcessing here
+        // because turn_completed will never arrive.
+        if (msg.immediate) {
+          isProcessing.value = false;
+          if (currentConversationId.value) {
+            processingConversations.value[currentConversationId.value] = false;
+          }
+        }
+        // For the injected path, turn_completed handles isProcessing naturally.
       } else if (msg.type === 'workdir_changed') {
         workdirSwitching.value = false;
         workDir.value = msg.workDir;

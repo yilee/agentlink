@@ -2,12 +2,11 @@
  * Tests for Plan Mode support in claude.ts.
  *
  * These tests verify:
- * - setPermissionMode creates state with the correct mode
- * - setPermissionMode kills existing process
- * - setPermissionMode preserves session ID for resume
- * - startQuery uses permissionMode from existing state
- * - Default permissionMode is bypassPermissions
- * - setPermissionMode with no existing conversation is a no-op
+ * - setPermissionMode injects EnterPlanMode/ExitPlanMode when process is idle
+ * - setPermissionMode kills process when turn is active or process is dead
+ * - startQuery uses --permission-mode plan when planMode is true
+ * - Default planMode is false (bypassPermissions)
+ * - setPermissionMode with no existing conversation creates a placeholder
  *
  * Note: These tests do NOT spawn real Claude processes. They test the state
  * management logic by calling exported functions and inspecting conversations.
@@ -88,12 +87,12 @@ describe('claude.ts plan mode', () => {
     abortAll();
   });
 
-  describe('default permissionMode', () => {
-    it('defaults to bypassPermissions when creating a new conversation', () => {
+  describe('default planMode', () => {
+    it('defaults to planMode=false when creating a new conversation', () => {
       handleChat('conv-plan-1', 'hello', '/tmp');
       const conv = getConversation('conv-plan-1');
       expect(conv).not.toBeNull();
-      expect(conv?.permissionMode).toBe('bypassPermissions');
+      expect(conv?.planMode).toBe(false);
     });
 
     it('spawns claude with --permission-mode bypassPermissions by default', () => {
@@ -106,81 +105,132 @@ describe('claude.ts plan mode', () => {
     });
   });
 
-  describe('setPermissionMode', () => {
-    it('creates state with the correct mode', () => {
-      handleChat('conv-pm-1', 'hello', '/tmp');
-      setPermissionMode('conv-pm-1', 'plan');
+  describe('setPermissionMode — process idle (injects message)', () => {
+    it('injects EnterPlanMode instruction when process is idle', () => {
+      handleChat('conv-idle-1', 'hello', '/tmp');
+      const conv = getConversation('conv-idle-1')!;
+      // Simulate turn completed (idle)
+      conv.turnActive = false;
+      conv.turnResultReceived = true;
 
-      const conv = getConversation('conv-pm-1');
-      expect(conv).not.toBeNull();
-      expect(conv?.permissionMode).toBe('plan');
+      const result = setPermissionMode('conv-idle-1', 'plan');
+
+      expect(result).toBe('injected');
+      // Process should still be alive (not killed)
+      expect(conv.child).not.toBeNull();
+      expect(conv.child!.killed).toBe(false);
+      // planMode should be set
+      expect(conv.planMode).toBe(true);
+      // Turn should be active (injected message starts a new turn)
+      expect(conv.turnActive).toBe(true);
     });
 
-    it('kills existing process when switching mode', () => {
-      handleChat('conv-pm-2', 'hello', '/tmp');
-      const originalConv = getConversation('conv-pm-2');
-      const originalChild = originalConv?.child;
-      expect(originalChild).not.toBeNull();
+    it('injects ExitPlanMode instruction when switching back', () => {
+      handleChat('conv-idle-2', 'hello', '/tmp');
+      const conv = getConversation('conv-idle-2')!;
+      conv.turnActive = false;
+      conv.planMode = true; // pretend we're in plan mode
 
-      setPermissionMode('conv-pm-2', 'plan');
+      const result = setPermissionMode('conv-idle-2', 'bypassPermissions');
 
-      // The original child should have been killed (cleanupConversation removes from map
-      // and creates a new state entry, so the child reference should be null on the new state)
-      const newConv = getConversation('conv-pm-2');
+      expect(result).toBe('injected');
+      expect(conv.child).not.toBeNull();
+      expect(conv.child!.killed).toBe(false);
+      expect(conv.planMode).toBe(false);
+      expect(conv.turnActive).toBe(true);
+    });
+
+    it('preserves session ID when injecting (no process restart)', () => {
+      handleChat('conv-idle-3', 'hello', '/tmp');
+      const conv = getConversation('conv-idle-3')!;
+      conv.turnActive = false;
+      conv.claudeSessionId = 'session-preserved';
+
+      const result = setPermissionMode('conv-idle-3', 'plan');
+
+      expect(result).toBe('injected');
+      // Same conversation object, session ID preserved
+      expect(conv.claudeSessionId).toBe('session-preserved');
+    });
+  });
+
+  describe('setPermissionMode — process busy or dead (kills and recreates)', () => {
+    it('kills process when turn is active', () => {
+      handleChat('conv-busy-1', 'hello', '/tmp');
+      const conv = getConversation('conv-busy-1')!;
+      // turnActive is true after handleChat (default)
+      expect(conv.turnActive).toBe(true);
+
+      const result = setPermissionMode('conv-busy-1', 'plan');
+
+      expect(result).toBe('immediate');
+      const newConv = getConversation('conv-busy-1');
       expect(newConv).not.toBeNull();
       expect(newConv?.child).toBeNull();
       expect(newConv?.inputStream).toBeNull();
+      expect(newConv?.planMode).toBe(true);
     });
 
-    it('preserves session ID for resume', () => {
-      handleChat('conv-pm-3', 'hello', '/tmp');
-      const conv = getConversation('conv-pm-3')!;
-      // Simulate Claude returning a session ID
+    it('preserves session ID for resume when killing', () => {
+      handleChat('conv-busy-2', 'hello', '/tmp');
+      const conv = getConversation('conv-busy-2')!;
       conv.claudeSessionId = 'session-abc-123';
 
-      setPermissionMode('conv-pm-3', 'plan');
+      setPermissionMode('conv-busy-2', 'plan');
 
-      const newConv = getConversation('conv-pm-3');
+      const newConv = getConversation('conv-busy-2');
       expect(newConv).not.toBeNull();
       expect(newConv?.lastClaudeSessionId).toBe('session-abc-123');
     });
 
     it('preserves lastClaudeSessionId when claudeSessionId is null', () => {
-      handleChat('conv-pm-4', 'hello', '/tmp');
-      const conv = getConversation('conv-pm-4')!;
+      handleChat('conv-busy-3', 'hello', '/tmp');
+      const conv = getConversation('conv-busy-3')!;
       conv.claudeSessionId = null;
       conv.lastClaudeSessionId = 'session-xyz-789';
 
-      setPermissionMode('conv-pm-4', 'plan');
+      setPermissionMode('conv-busy-3', 'plan');
 
-      const newConv = getConversation('conv-pm-4');
+      const newConv = getConversation('conv-busy-3');
       expect(newConv?.lastClaudeSessionId).toBe('session-xyz-789');
     });
 
     it('preserves workDir', () => {
-      handleChat('conv-pm-5', 'hello', '/projects/myapp');
-      setPermissionMode('conv-pm-5', 'plan');
+      handleChat('conv-busy-4', 'hello', '/projects/myapp');
+      setPermissionMode('conv-busy-4', 'plan');
 
-      const conv = getConversation('conv-pm-5');
+      const conv = getConversation('conv-busy-4');
       expect(conv?.workDir).toBe('/projects/myapp');
     });
+  });
 
-    it('is a no-op when conversation does not exist', () => {
-      // Should not throw
-      setPermissionMode('nonexistent-conv', 'plan');
+  describe('setPermissionMode — no existing conversation', () => {
+    it('creates placeholder when conversation does not exist', () => {
+      const result = setPermissionMode('nonexistent-conv', 'plan');
 
-      // No conversation should be created
-      expect(getConversation('nonexistent-conv')).toBeNull();
-      expect(getConversations().size).toBe(0);
+      expect(result).toBe('immediate');
+      const conv = getConversation('nonexistent-conv');
+      expect(conv).not.toBeNull();
+      expect(conv?.planMode).toBe(true);
+    });
+
+    it('stores claudeSessionId as lastClaudeSessionId in placeholder', () => {
+      const result = setPermissionMode('restored-conv', 'bypassPermissions', 'session-from-history');
+
+      expect(result).toBe('immediate');
+      const conv = getConversation('restored-conv');
+      expect(conv).not.toBeNull();
+      expect(conv?.planMode).toBe(false);
+      expect(conv?.lastClaudeSessionId).toBe('session-from-history');
     });
 
     it('can switch from plan back to bypassPermissions', () => {
-      handleChat('conv-pm-6', 'hello', '/tmp');
-      setPermissionMode('conv-pm-6', 'plan');
-      expect(getConversation('conv-pm-6')?.permissionMode).toBe('plan');
+      handleChat('conv-switch-1', 'hello', '/tmp');
+      setPermissionMode('conv-switch-1', 'plan');
+      expect(getConversation('conv-switch-1')?.planMode).toBe(true);
 
-      setPermissionMode('conv-pm-6', 'bypassPermissions');
-      expect(getConversation('conv-pm-6')?.permissionMode).toBe('bypassPermissions');
+      setPermissionMode('conv-switch-1', 'bypassPermissions');
+      expect(getConversation('conv-switch-1')?.planMode).toBe(false);
     });
 
     it('uses undefined conversationId as default', () => {
@@ -189,20 +239,19 @@ describe('claude.ts plan mode', () => {
 
       const conv = getConversation(); // default
       expect(conv).not.toBeNull();
-      expect(conv?.permissionMode).toBe('plan');
+      expect(conv?.planMode).toBe(true);
     });
   });
 
-  describe('startQuery uses permissionMode from existing state', () => {
+  describe('startQuery uses planMode from existing state', () => {
     it('spawns claude with --permission-mode plan when mode is set', () => {
-      // 1. Create a conversation
       handleChat('conv-sq-1', 'first message', '/tmp');
       spawnMock.mockClear();
 
-      // 2. Set plan mode (kills process, creates minimal state with mode=plan)
+      // Set plan mode (kills process since turn is active)
       setPermissionMode('conv-sq-1', 'plan');
 
-      // 3. Send another message -- this triggers startQuery with the stored mode
+      // Send another message — triggers startQuery with the stored mode
       handleChat('conv-sq-1', 'second message', '/tmp');
 
       expect(spawnMock).toHaveBeenCalled();
@@ -249,4 +298,5 @@ describe('claude.ts plan mode', () => {
       expect(args[resumeIdx + 1]).toBe('session-resume-test');
     });
   });
+
 });

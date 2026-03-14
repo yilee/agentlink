@@ -256,6 +256,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'chat': {
       const chatConvId = (msg as unknown as { conversationId?: string }).conversationId;
       const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
+      console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}`);
       claudeHandleChat(
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
@@ -308,7 +309,24 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       // Include live status so the web client can restore compacting/processing state
       // In multi-session mode, look up by conversationId; in single-session mode, use default
       const currentConv = convId ? getConversation(convId) : getConversation();
-      const isSameSession = currentConv?.claudeSessionId === m.claudeSessionId;
+      const isSameSession = currentConv?.claudeSessionId === m.claudeSessionId
+        || currentConv?.lastClaudeSessionId === m.claudeSessionId;
+
+      // Determine plan mode: prefer in-memory state, fallback to history scan
+      let planMode: boolean | undefined;
+      if (isSameSession) {
+        planMode = currentConv?.planMode === true;
+      } else if (history.length > 0) {
+        // No in-memory state — scan history for the last EnterPlanMode/ExitPlanMode tool
+        for (let i = history.length - 1; i >= 0; i--) {
+          const h = history[i];
+          if (h.role === 'tool' && (h.toolName === 'EnterPlanMode' || h.toolName === 'ExitPlanMode')) {
+            planMode = h.toolName === 'EnterPlanMode';
+            break;
+          }
+        }
+      }
+
       send({
         type: 'conversation_resumed',
         conversationId: convId,
@@ -316,6 +334,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         history,
         isCompacting: isSameSession && (convId ? getIsCompacting(convId) : getIsCompacting()),
         isProcessing: isSameSession && currentConv?.turnActive === true,
+        planMode,
       });
       break;
     }
@@ -589,13 +608,29 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       break;
     }
     case 'set_plan_mode': {
-      const { enabled, conversationId } = msg as unknown as {
+      const { enabled, conversationId, claudeSessionId } = msg as unknown as {
         enabled: boolean;
         conversationId?: string;
+        claudeSessionId?: string;
       };
       const mode = enabled ? 'plan' : 'bypassPermissions';
-      setPermissionMode(conversationId, mode);
-      send({ type: 'plan_mode_changed', enabled, conversationId });
+      console.log(`[AgentLink] set_plan_mode: enabled=${enabled}, conversationId=${conversationId}`);
+      const result = setPermissionMode(conversationId, mode, claudeSessionId);
+
+      if (result === 'injected') {
+        // Process was idle — setPermissionMode already injected Enter/ExitPlanMode
+        // into the running process. Output flows through normal pipeline.
+        // Just tell UI right away.
+        send({ type: 'plan_mode_changed', enabled, conversationId });
+      } else {
+        // Immediate path — process was killed/recreated or placeholder created.
+        // If exiting plan mode on a session with history (has claudeSessionId),
+        // send "Exit plan mode now." so Claude's JSONL records the exit.
+        if (!enabled && claudeSessionId) {
+          claudeHandleChat(conversationId, 'Exit plan mode now.', state.workDir);
+        }
+        send({ type: 'plan_mode_changed', enabled, conversationId, immediate: true });
+      }
       break;
     }
     default:

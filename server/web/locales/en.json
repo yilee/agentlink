@@ -245,6 +245,10 @@
   "tool.inPath": "in {path}",
   "tool.done": "{done}/{total} done",
   "tool.replaceAll": "(replace all)",
+  "tool.enteredPlanMode": "Entered Plan Mode",
+  "tool.exitedPlanMode": "Exited Plan Mode",
+  "tool.enteringPlanMode": "Entering Plan Mode...",
+  "tool.exitingPlanMode": "Exiting Plan Mode...",
 
   "usage.context": "Context",
   "usage.cost": "Cost",

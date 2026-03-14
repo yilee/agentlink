@@ -129,6 +129,7 @@ const App = {
 
     // Plan mode state
     const planMode = ref(false);
+    const pendingPlanMode = ref(null); // 'enter' | 'exit' | null — set while toggle is in flight
 
     // File browser state
     const filePanelOpen = ref(false);
@@ -579,11 +580,18 @@ const App = {
     // ── Plan mode ──
     function togglePlanMode() {
       if (isProcessing.value) return;
-      planMode.value = !planMode.value;
-      wsSend({ type: 'set_plan_mode', enabled: planMode.value, conversationId: currentConversationId.value });
+      const newMode = !planMode.value;
+      pendingPlanMode.value = newMode ? 'enter' : 'exit';
+      isProcessing.value = true;
+      if (currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
+      wsSend({ type: 'set_plan_mode', enabled: newMode, conversationId: currentConversationId.value, claudeSessionId: currentClaudeSessionId.value });
+      nextTick(() => scrollToBottom());
     }
     function setPlanMode(enabled) {
       planMode.value = enabled;
+      pendingPlanMode.value = null;
     }
 
     function selectSlashCommand(cmd) {
@@ -727,7 +735,7 @@ const App = {
       slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen, selectSlashCommand, openSlashMenu,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       // Plan mode
-      planMode, togglePlanMode,
+      planMode, pendingPlanMode, togglePlanMode,
       // Side question (/btw)
       btwState, btwPending, dismissBtw, renderMarkdown,
       getRenderedContent, copyMessage, toggleTool,
@@ -2051,6 +2059,12 @@ const App = {
                             <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
                           </div>
                         </div>
+                        <!-- Plan mode switch indicator -->
+                        <div v-else-if="msg.role === 'tool' && (msg.toolName === 'EnterPlanMode' || msg.toolName === 'ExitPlanMode')" class="plan-mode-divider">
+                          <span class="plan-mode-divider-line"></span>
+                          <span class="plan-mode-divider-text">{{ msg.toolName === 'EnterPlanMode' ? t('tool.enteredPlanMode') : t('tool.exitedPlanMode') }}</span>
+                          <span class="plan-mode-divider-line"></span>
+                        </div>
                         <!-- Agent tool use -->
                         <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
                           <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
@@ -2108,6 +2122,11 @@ const App = {
                       <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]">
                         <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
                       </div>
+                    </div>
+                    <div v-else-if="msg.role === 'tool' && (msg.toolName === 'EnterPlanMode' || msg.toolName === 'ExitPlanMode')" class="plan-mode-divider">
+                      <span class="plan-mode-divider-line"></span>
+                      <span class="plan-mode-divider-text">{{ msg.toolName === 'EnterPlanMode' ? t('tool.enteredPlanMode') : t('tool.exitedPlanMode') }}</span>
+                      <span class="plan-mode-divider-line"></span>
                     </div>
                     <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
                       <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
@@ -2433,6 +2452,13 @@ const App = {
                   </div>
                 </div>
 
+                <!-- Plan mode switch indicator -->
+                <div v-else-if="msg.role === 'tool' && (msg.toolName === 'EnterPlanMode' || msg.toolName === 'ExitPlanMode')" class="plan-mode-divider">
+                  <span class="plan-mode-divider-line"></span>
+                  <span class="plan-mode-divider-text">{{ msg.toolName === 'EnterPlanMode' ? (t ? t('tool.enteredPlanMode') : 'Entered Plan Mode') : (t ? t('tool.exitedPlanMode') : 'Exited Plan Mode') }}</span>
+                  <span class="plan-mode-divider-line"></span>
+                </div>
+
                 <!-- Tool use block (collapsible) -->
                 <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
                   <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
@@ -2522,6 +2548,7 @@ const App = {
 
               <div v-if="isProcessing && !hasStreamingMessage" class="typing-indicator">
                 <span></span><span></span><span></span>
+                <span v-if="pendingPlanMode" class="typing-label">{{ pendingPlanMode === 'enter' ? t('tool.enteringPlanMode') : t('tool.exitingPlanMode') }}</span>
               </div>
             </div>
           </div>
@@ -2583,13 +2610,6 @@ const App = {
                 <span class="slash-menu-cmd">{{ cmd.command }}</span>
                 <span class="slash-menu-desc">{{ t(cmd.descKey) }}</span>
               </div>
-            </div>
-            <div v-if="planMode" class="plan-mode-banner">
-              <span class="plan-mode-banner-label">
-                <svg viewBox="0 0 24 24" width="12" height="12"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
-                Plan Mode — read-only, no file changes
-              </span>
-              <button class="plan-mode-banner-exit" @click="togglePlanMode" :disabled="isProcessing">Exit</button>
             </div>
             <div
               :class="['input-card', { 'drag-over': dragOver, 'plan-mode': planMode }]"
