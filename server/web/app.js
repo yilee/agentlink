@@ -406,8 +406,15 @@ const App = {
     });
     setFilePreview(filePreview);
 
-    // Track mobile state on resize
-    let _resizeHandler = () => { isMobile.value = window.innerWidth <= 768; };
+    // Track mobile state on resize (rAF-throttled)
+    let _resizeRafId = 0;
+    let _resizeHandler = () => {
+      if (_resizeRafId) return;
+      _resizeRafId = requestAnimationFrame(() => {
+        _resizeRafId = 0;
+        isMobile.value = window.innerWidth <= 768;
+      });
+    };
     window.addEventListener('resize', _resizeHandler);
 
     // Close workdir menu on outside click or Escape
