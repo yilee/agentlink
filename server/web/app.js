@@ -2041,7 +2041,7 @@ const App = {
                             </span>
                             <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                           </div>
-                          <div v-show="msg.expanded" class="tool-expand">
+                          <div v-if="msg.expanded" class="tool-expand">
                             <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
                             <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
                             <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
@@ -2098,7 +2098,7 @@ const App = {
                         </span>
                         <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                       </div>
-                      <div v-show="msg.expanded" class="tool-expand">
+                      <div v-if="msg.expanded" class="tool-expand">
                         <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
                         <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
                         <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
@@ -2402,7 +2402,7 @@ const App = {
                     </span>
                     <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                   </div>
-                  <div v-show="msg.expanded" class="tool-expand team-agent-tool-expand">
+                  <div v-if="msg.expanded" class="tool-expand team-agent-tool-expand">
                     <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
                     <div v-if="msg.toolOutput" class="team-agent-tool-result">
                       <div class="team-agent-tool-result-label">{{ t('team.agentResult') }}</div>
@@ -2423,7 +2423,7 @@ const App = {
                     </span>
                     <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                   </div>
-                  <div v-show="msg.expanded" class="tool-expand">
+                  <div v-if="msg.expanded" class="tool-expand">
                     <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
                     <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
                     <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
