@@ -174,7 +174,7 @@ All typing dots, spinners, blink-cursor animations use only `opacity`/`transform
 - [x] P3-1: Consolidate duplicate `@keyframes` (spin×4, pulse×2)
 - [x] P2-6: `transition: all` → explicit properties (loop.css ×1, team.css ×9)
 - [x] P3-2: Add `prefers-reduced-motion` global override (base.css)
-- [ ] P1-2: `messages.some(m => m.isStreaming)` → computed (app.js)
+- [x] P1-2: `messages.some(m => m.isStreaming)` → computed (app.js)
 - [ ] P1-4: `canSend` array scan → computed (app.js)
 - [ ] P1-1: Cache `JSON.parse(toolInput)` on `msg._parsedInput` (messageHelpers.js)
 - [ ] P3-3: Resize handler rAF guard (app.js)

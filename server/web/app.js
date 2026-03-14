@@ -430,6 +430,7 @@ const App = {
       status.value === 'Connected' && hasInput.value && !isCompacting.value
       && !messages.value.some(m => m.role === 'ask-question' && !m.answered)
     );
+    const hasStreamingMessage = computed(() => messages.value.some(m => m.isStreaming));
 
     // ── Slash command menu ──
     const slashMenuVisible = computed(() => {
@@ -695,7 +696,7 @@ const App = {
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
-      inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages, usageStats,
+      inputText, isProcessing, isCompacting, canSend, hasInput, hasStreamingMessage, inputRef, queuedMessages, usageStats,
       slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen, selectSlashCommand, openSlashMenu,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       // Side question (/btw)
@@ -2490,7 +2491,7 @@ const App = {
                 </div>
               </div>
 
-              <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
+              <div v-if="isProcessing && !hasStreamingMessage" class="typing-indicator">
                 <span></span><span></span><span></span>
               </div>
             </div>
