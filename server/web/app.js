@@ -127,6 +127,9 @@ const App = {
     const currentConversationId = ref(crypto.randomUUID());    // currently visible conversation
     const processingConversations = ref({});    // conversationId → boolean
 
+    // Plan mode state
+    const planMode = ref(false);
+
     // File browser state
     const filePanelOpen = ref(false);
     const filePanelWidth = ref(parseInt(localStorage.getItem('agentlink-file-panel-width'), 10) || 280);
@@ -240,6 +243,7 @@ const App = {
           messageIdCounter: streaming.getMessageIdCounter(),
           queuedMessages: queuedMessages.value,
           usageStats: usageStats.value,
+          planMode: planMode.value,
         };
       }
 
@@ -260,6 +264,7 @@ const App = {
         _restoreToolMsgMap(cached.toolMsgMap || new Map());
         queuedMessages.value = cached.queuedMessages || [];
         usageStats.value = cached.usageStats || null;
+        planMode.value = cached.planMode || false;
       } else {
         // New blank conversation
         messages.value = [];
@@ -275,6 +280,7 @@ const App = {
         _clearToolMsgMap();
         queuedMessages.value = [];
         usageStats.value = null;
+        planMode.value = false;
       }
 
       currentConversationId.value = newConvId;
@@ -325,6 +331,7 @@ const App = {
     // ── Create module instances ──
 
     const streaming = createStreaming({ messages, scrollToBottom });
+    streaming.setGetPlanMode(() => planMode.value);
 
     const fileAttach = createFileAttachments(attachments, fileInputRef, dragOver);
 
@@ -364,6 +371,8 @@ const App = {
       memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
       // Side question (/btw)
       btwState, btwPending,
+      // Plan mode
+      setPlanMode,
       // i18n
       t,
     });
@@ -512,6 +521,7 @@ const App = {
         id: streaming.nextId(), role: 'user',
         content: text || (files.length > 0 ? `[${files.length} file${files.length > 1 ? 's' : ''} attached]` : ''),
         attachments: msgAttachments.length > 0 ? msgAttachments : undefined,
+        planMode: planMode.value || undefined,
         timestamp: new Date(),
       };
 
@@ -564,6 +574,16 @@ const App = {
     function removeQueuedMessage(msgId) {
       const idx = queuedMessages.value.findIndex(m => m.id === msgId);
       if (idx !== -1) queuedMessages.value.splice(idx, 1);
+    }
+
+    // ── Plan mode ──
+    function togglePlanMode() {
+      if (isProcessing.value) return;
+      planMode.value = !planMode.value;
+      wsSend({ type: 'set_plan_mode', enabled: planMode.value, conversationId: currentConversationId.value });
+    }
+    function setPlanMode(enabled) {
+      planMode.value = enabled;
     }
 
     function selectSlashCommand(cmd) {
@@ -706,6 +726,8 @@ const App = {
       inputText, isProcessing, isCompacting, canSend, hasInput, hasStreamingMessage, inputRef, queuedMessages, usageStats,
       slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen, selectSlashCommand, openSlashMenu,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
+      // Plan mode
+      planMode, togglePlanMode,
       // Side question (/btw)
       btwState, btwPending, dismissBtw, renderMarkdown,
       getRenderedContent, copyMessage, toggleTool,
@@ -2359,7 +2381,7 @@ const App = {
 
                 <!-- User message -->
                 <template v-if="msg.role === 'user'">
-                  <div class="message-role-label user-label">{{ t('chat.you') }}</div>
+                  <div class="message-role-label user-label">{{ t('chat.you') }}<span v-if="msg.planMode" class="plan-badge">Plan</span></div>
                   <div class="message-bubble user-bubble" :title="formatTimestamp(msg.timestamp)">
                     <div class="message-content">{{ msg.content }}</div>
                     <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
@@ -2376,7 +2398,7 @@ const App = {
 
                 <!-- Assistant message (markdown) -->
                 <template v-else-if="msg.role === 'assistant'">
-                  <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">{{ t('chat.claude') }}</div>
+                  <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">{{ t('chat.claude') }}<span v-if="msg.planMode" class="plan-badge">Plan</span></div>
                   <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]" :title="formatTimestamp(msg.timestamp)">
                     <div class="message-actions">
                       <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? t('chat.copied') : t('chat.copy')">
@@ -2562,8 +2584,15 @@ const App = {
                 <span class="slash-menu-desc">{{ t(cmd.descKey) }}</span>
               </div>
             </div>
+            <div v-if="planMode" class="plan-mode-banner">
+              <span class="plan-mode-banner-label">
+                <svg viewBox="0 0 24 24" width="12" height="12"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
+                Plan Mode — read-only, no file changes
+              </span>
+              <button class="plan-mode-banner-exit" @click="togglePlanMode" :disabled="isProcessing">Exit</button>
+            </div>
             <div
-              :class="['input-card', { 'drag-over': dragOver }]"
+              :class="['input-card', { 'drag-over': dragOver, 'plan-mode': planMode }]"
               @dragover="handleDragOver"
               @dragleave="handleDragLeave"
               @drop="handleDrop"
@@ -2598,6 +2627,10 @@ const App = {
                   </button>
                   <button class="slash-btn" @click="openSlashMenu" :disabled="status !== 'Connected'" :title="t('input.slashCommands')">
                     <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 21 11 3h2L9 21H7Z"/></svg>
+                  </button>
+                  <button :class="['plan-mode-btn', { active: planMode }]" @click="togglePlanMode" :disabled="isProcessing" :title="planMode ? 'Switch to Normal Mode' : 'Switch to Plan Mode'">
+                    <svg viewBox="0 0 24 24" width="12" height="12"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
+                    Plan
                   </button>
                 </div>
                 <button v-if="isProcessing && !hasInput" @click="cancelExecution" class="send-btn stop-btn" :title="t('input.stopGeneration')">

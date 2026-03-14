@@ -36,6 +36,8 @@ export function createConnection(deps) {
     memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
     // Side question (/btw)
     btwState, btwPending,
+    // Plan mode
+    setPlanMode,
     // i18n
     t,
   } = deps;
@@ -611,6 +613,8 @@ export function createConnection(deps) {
             btwState.value.done = true;
           }
         }
+      } else if (msg.type === 'plan_mode_changed') {
+        if (setPlanMode) setPlanMode(msg.enabled);
       } else if (msg.type === 'workdir_changed') {
         workdirSwitching.value = false;
         workDir.value = msg.workDir;

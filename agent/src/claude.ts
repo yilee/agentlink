@@ -55,6 +55,8 @@ export interface ConversationState {
   lastClaudeSessionId: string | null;
   isCompacting: boolean;
   createdAt: number;
+  // Plan mode: controls --permission-mode CLI arg
+  permissionMode: 'bypassPermissions' | 'plan';
 }
 
 type SendFn = (msg: Record<string, unknown>) => void;
@@ -510,6 +512,47 @@ export async function handleBtwQuestion(
 
 // ── Internal ───────────────────────────────────────────────────────────────
 
+/**
+ * Set the permission mode for a conversation.
+ * Kills the current Claude process (if any) and stores the new mode so the
+ * next `handleChat()` call spawns Claude with the correct `--permission-mode`.
+ */
+export function setPermissionMode(
+  conversationId: string | undefined,
+  mode: 'bypassPermissions' | 'plan',
+): void {
+  const convId = conversationId || DEFAULT_CONVERSATION_ID;
+  const existing = conversations.get(convId);
+
+  if (existing) {
+    // Preserve session ID and workDir before cleanup
+    const lastSession = existing.claudeSessionId || existing.lastClaudeSessionId;
+    const workDir = existing.workDir;
+
+    // Kill current process
+    cleanupConversation(convId);
+
+    // Create a minimal state entry so the next handleChat() picks up the new mode
+    const newState: ConversationState = {
+      child: null,
+      inputStream: null,
+      abortController: null,
+      claudeSessionId: null,
+      workDir,
+      turnActive: false,
+      turnResultReceived: false,
+      conversationId: convId,
+      lastClaudeSessionId: lastSession || null,
+      isCompacting: false,
+      createdAt: Date.now(),
+      permissionMode: mode,
+    };
+    conversations.set(convId, newState);
+  }
+  // If no existing conversation, do nothing — the mode will be sent again
+  // when a conversation starts via handleChat().
+}
+
 function processFilesForClaude(files: ChatFile[], workDir: string, prompt: string): unknown[] {
   const attachDir = join(CONFIG_DIR, 'tmp-attachments');
   if (!existsSync(attachDir)) {
@@ -584,6 +627,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     lastClaudeSessionId: existing?.lastClaudeSessionId || null,
     isCompacting: false,
     createdAt: Date.now(),
+    permissionMode: existing?.permissionMode || 'bypassPermissions',
   };
 
   conversations.set(conversationId, state);
@@ -598,7 +642,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     '--output-format', 'stream-json',
     '--input-format', 'stream-json',
     '--verbose',
-    '--permission-mode', 'bypassPermissions',
+    '--permission-mode', state.permissionMode,
     '--permission-prompt-tool', 'stdio',
   ];
 

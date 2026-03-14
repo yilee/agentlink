@@ -614,6 +614,94 @@
   color: var(--text-secondary);
 }
 
+/* ── Plan Mode toggle button ── */
+.plan-mode-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.plan-mode-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+}
+
+.plan-mode-btn.active {
+  color: var(--plan-mode);
+  background: var(--plan-mode-bg);
+  border-color: var(--plan-mode);
+}
+
+.plan-mode-btn.active:hover:not(:disabled) {
+  background: rgba(212, 162, 76, 0.18);
+}
+
+.plan-mode-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.plan-mode-btn svg {
+  flex-shrink: 0;
+}
+
+/* ── Plan Mode banner ── */
+.plan-mode-banner {
+  max-width: 768px;
+  margin: 0 auto 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 12px;
+  background: var(--plan-mode-bg);
+  border: 1px solid var(--plan-mode);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--plan-mode);
+}
+
+.plan-mode-banner-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.plan-mode-banner-exit {
+  background: none;
+  border: none;
+  color: var(--plan-mode);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.plan-mode-banner-exit:hover {
+  background: rgba(212, 162, 76, 0.15);
+}
+
+/* ── Input card plan mode accent ── */
+.input-card.plan-mode {
+  border-top: 2px solid var(--plan-mode);
+}
+
 /* ── Sidebar backdrop (mobile overlay) ── */
 .sidebar-backdrop {
   display: none;

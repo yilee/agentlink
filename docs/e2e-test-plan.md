@@ -689,3 +689,222 @@ Same as above (ephemeral server + agent running, browser open to session URL), p
 | 35 | Multiple sequential teams | PASSED |
 
 All 17 team tests passed (2026-03-08).
+
+---
+
+## Plan Mode E2E Tests
+
+Tests for the Plan Mode feature: toggle button, status banner, message badges, mode switching behavior, processing guard, conversation isolation, and page refresh reset.
+
+### Prerequisites
+
+Same as above (ephemeral server + agent running, browser open to session URL), plus:
+- Claude CLI must support `--permission-mode plan` flag
+- Start with a fresh session (no prior plan mode state)
+
+### TC-36: Plan Mode toggle button visibility and initial state
+
+**Steps:**
+1. Open the web UI in chat mode (default).
+2. Observe the input area bottom-left (alongside attach and slash buttons).
+3. Locate the Plan Mode toggle button.
+
+**Expected:**
+- Plan Mode toggle button is visible in the input area bottom-left.
+- Button is in its default (non-active) state: subtle/gray, low visual weight.
+- No status banner is visible above the input card.
+- Input card does not have an amber/accent top border.
+
+---
+
+### TC-37: Toggle Plan Mode on
+
+**Steps:**
+1. Click the Plan Mode toggle button.
+2. Observe the button, status banner, and input card.
+
+**Expected:**
+- Button becomes active/highlighted with plan mode accent color (amber).
+- Status banner appears above the input card with text: "Plan Mode -- read-only, no file changes" and an "Exit" button.
+- Input card gets a plan-mode accent border (amber top border).
+- A `set_plan_mode` WebSocket message is sent to the agent with `enabled: true`.
+- Agent responds with `plan_mode_changed` confirmation.
+
+**Key knowledge:**
+- `togglePlanMode()` in `app.js` guards against toggling while `isProcessing === true`.
+- Web sends `{ type: 'set_plan_mode', enabled: true, conversationId }` to agent.
+- Agent calls `setPermissionMode(conversationId, 'plan')` which kills the current claude process and updates the conversation's `permissionMode`.
+
+---
+
+### TC-38: Toggle Plan Mode off
+
+**Steps:**
+1. Ensure Plan Mode is currently on (button highlighted, banner visible).
+2. Click the Plan Mode toggle button again.
+3. Observe the button, banner, and input card.
+
+**Expected:**
+- Button returns to its default (non-active) state: subtle/gray.
+- Status banner disappears.
+- Input card border returns to normal (no amber accent).
+- A `set_plan_mode` message is sent with `enabled: false`.
+- Agent responds with `plan_mode_changed` confirmation.
+
+---
+
+### TC-39: Plan Mode disabled during processing
+
+**Steps:**
+1. Ensure Plan Mode is off (Normal Mode).
+2. Send a message that triggers a long response: `Count from 1 to 30, one number per line. Do not use any tools.`
+3. While Claude is streaming the response (numbers appearing), attempt to click the Plan Mode toggle button.
+4. Wait for the response to complete.
+5. Observe the Plan Mode toggle button again.
+
+**Expected:**
+- While processing, the Plan Mode toggle button is disabled (grayed out, `cursor: not-allowed`).
+- Clicking the disabled button has no effect (mode does not change, no WebSocket message sent).
+- After `turn_completed` is received and processing ends, the toggle button becomes enabled again.
+- The toggle button can now be clicked normally.
+
+**Key knowledge:**
+- `togglePlanMode()` returns early if `isProcessing.value === true`.
+- Button is disabled via the `isProcessing` reactive state.
+
+---
+
+### TC-40: Send message in Plan Mode
+
+**Steps:**
+1. Toggle Plan Mode on (click the Plan Mode button, verify banner appears).
+2. Type `List the files in the current directory. Do not modify anything.` and press Enter.
+3. Wait for Claude's response.
+
+**Expected:**
+- The user message displays a `(Plan)` badge after the role label (e.g., "You (Plan)").
+- Claude's response displays a `(Plan)` badge after the role label (e.g., "Claude (Plan)").
+- Claude responds with a list of files (proving it can still read/analyze in plan mode).
+- The response does not contain errors about permission denial for read operations.
+
+**Key knowledge:**
+- Messages are tagged with `planMode: true` when sent during Plan Mode.
+- The `(Plan)` badge uses the plan mode accent color.
+- Claude runs with `--permission-mode plan` which allows read operations but blocks writes.
+
+---
+
+### TC-41: Plan Mode prevents file modifications
+
+**Steps:**
+1. Ensure Plan Mode is on (banner visible, button highlighted).
+2. Send `Create a file called test-plan-mode.txt with the content 'hello'`.
+3. Wait for Claude's response.
+4. Check whether the file `test-plan-mode.txt` was created in the working directory.
+
+**Expected:**
+- Claude attempts to create the file but is blocked by plan mode permissions.
+- Claude's response indicates it cannot create/write files in Plan Mode (permission denied or similar message).
+- No file named `test-plan-mode.txt` exists in the working directory (`test/e2e-workdir/`).
+- Both user and assistant messages show `(Plan)` badges.
+
+**Key knowledge:**
+- `--permission-mode plan` blocks write operations at the Claude CLI level.
+- Claude may report the restriction explicitly or attempt the tool call and receive a denial.
+
+---
+
+### TC-42: Switch back to Normal Mode and execute
+
+**Steps:**
+1. After TC-41, toggle Plan Mode off (click the toggle button or click "Exit" in the banner).
+2. Verify the banner disappears and button returns to default state.
+3. Send `What is 1+1? Reply with just the number, do not use any tools.`
+4. Wait for Claude's response.
+
+**Expected:**
+- The user message does NOT show a `(Plan)` badge.
+- Claude's response does NOT show a `(Plan)` badge.
+- Claude responds normally with `2`.
+- The conversation context is preserved (prior plan mode messages from TC-40 and TC-41 are still visible above).
+- This proves the session was correctly resumed via `--resume` after switching back to `bypassPermissions` mode.
+
+**Key knowledge:**
+- Mode switch kills the current claude process and respawns with `--permission-mode bypassPermissions`.
+- Session continuity is preserved via `--resume sessionId` using the stored `claudeSessionId`.
+
+---
+
+### TC-43: Plan Mode state preserved across conversation switch
+
+**Steps:**
+1. In the current conversation (conversation A), toggle Plan Mode on.
+2. Verify the banner is visible and button is highlighted.
+3. Click "New conversation" in the sidebar to create conversation B.
+4. Observe the Plan Mode state in conversation B.
+5. Switch back to conversation A by clicking its entry in the sidebar.
+6. Observe the Plan Mode state.
+
+**Expected:**
+- Conversation A: Plan Mode is on (banner visible, button highlighted) before switching away.
+- Conversation B: Plan Mode resets to off (no banner, button in default state) -- new conversations start in Normal Mode.
+- Switching back to conversation A: Plan Mode is restored to on (banner visible, button highlighted).
+- The toggle button and banner correctly reflect the per-conversation plan mode state after each switch.
+
+**Key knowledge:**
+- `permissionMode` is per-conversation in `ConversationState` on the agent side.
+- The web UI saves/restores `planMode` state as part of `switchConversation()` cache operations.
+
+---
+
+### TC-44: Plan Mode resets on page refresh
+
+**Steps:**
+1. Toggle Plan Mode on (verify banner visible, button highlighted).
+2. Refresh the browser page (F5 or navigate to the same URL).
+3. Wait for the page to load and connect.
+4. Observe the Plan Mode state.
+
+**Expected:**
+- After page refresh, Plan Mode is off (Normal Mode).
+- No status banner is visible.
+- Toggle button is in its default (non-active) state.
+- Input card has no amber accent border.
+- This is the intended safe default -- `planMode` UI state is not persisted across page refreshes.
+
+**Key knowledge:**
+- `planMode` is a `ref(false)` in `app.js` -- it reinitializes to `false` on page load.
+- The claude process is killed on WebSocket disconnect (page refresh), so the next spawn will use whatever mode the UI specifies.
+
+---
+
+### TC-45: Exit button in banner
+
+**Steps:**
+1. Toggle Plan Mode on (verify banner appears with "Exit" button).
+2. Click the "Exit" button/link in the status banner.
+3. Observe the Plan Mode state.
+
+**Expected:**
+- Plan Mode turns off (same behavior as clicking the toggle button).
+- Status banner disappears.
+- Toggle button returns to default (non-active) state.
+- Input card border returns to normal.
+- A `set_plan_mode` message is sent with `enabled: false`.
+
+---
+
+## Plan Mode Test Results Log
+
+| # | Test | Status |
+|---|------|--------|
+| 36 | Plan Mode toggle button visibility and initial state | |
+| 37 | Toggle Plan Mode on | |
+| 38 | Toggle Plan Mode off | |
+| 39 | Plan Mode disabled during processing | |
+| 40 | Send message in Plan Mode | |
+| 41 | Plan Mode prevents file modifications | |
+| 42 | Switch back to Normal Mode and execute | |
+| 43 | Plan Mode state preserved across conversation switch | |
+| 44 | Plan Mode resets on page refresh | |
+| 45 | Exit button in banner | |

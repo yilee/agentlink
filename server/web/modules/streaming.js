@@ -14,6 +14,9 @@ export function createStreaming({ messages, scrollToBottom }) {
   let revealTimer = null;
   let streamingMessageId = null;
   let messageIdCounter = 0;
+  let _getPlanMode = () => false;
+
+  function setGetPlanMode(fn) { _getPlanMode = fn; }
 
   function getMessageIdCounter() { return messageIdCounter; }
   function setMessageIdCounter(v) { messageIdCounter = v; }
@@ -39,11 +42,13 @@ export function createStreaming({ messages, scrollToBottom }) {
 
     if (!streamMsg) {
       const id = ++messageIdCounter;
-      messages.value.push({
+      const newMsg = {
         id, role: 'assistant', content: chunk,
         isStreaming: true, timestamp: new Date(),
         _chunks: [chunk],
-      });
+      };
+      if (_getPlanMode()) newMsg.planMode = true;
+      messages.value.push(newMsg);
       streamingMessageId = id;
     } else {
       streamMsg._chunks.push(chunk);
@@ -64,11 +69,13 @@ export function createStreaming({ messages, scrollToBottom }) {
       streamMsg.content = streamMsg._chunks.join('');
     } else {
       const id = ++messageIdCounter;
-      messages.value.push({
+      const newMsg = {
         id, role: 'assistant', content: pendingText,
         isStreaming: true, timestamp: new Date(),
         _chunks: [pendingText],
-      });
+      };
+      if (_getPlanMode()) newMsg.planMode = true;
+      messages.value.push(newMsg);
       streamingMessageId = id;
     }
     pendingText = '';
@@ -109,6 +116,6 @@ export function createStreaming({ messages, scrollToBottom }) {
     startReveal, flushReveal, appendPending, reset, cleanup,
     getMessageIdCounter, setMessageIdCounter,
     getStreamingMessageId, setStreamingMessageId,
-    nextId, saveState, restoreState,
+    nextId, saveState, restoreState, setGetPlanMode,
   };
 }

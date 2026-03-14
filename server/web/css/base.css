@@ -30,6 +30,8 @@
   --border: #353535;
   --code-bg: #1a1a1a;
   --code-header-bg: #222222;
+  --plan-mode: #d4a24c;
+  --plan-mode-bg: rgba(212, 162, 76, 0.1);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
 }
 
@@ -48,6 +50,8 @@
   --border: #d1d5db;
   --code-bg: #f1f3f5;
   --code-header-bg: #e9ecef;
+  --plan-mode: #d97706;
+  --plan-mode-bg: rgba(217, 119, 6, 0.08);
 }
 
 html {

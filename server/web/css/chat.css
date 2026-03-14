@@ -172,3 +172,18 @@
   padding: 0.2rem 0;
 }
 
+/* ── Plan Mode badge ── */
+.plan-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--plan-mode);
+  background: var(--plan-mode-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
