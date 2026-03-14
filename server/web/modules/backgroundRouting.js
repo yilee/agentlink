@@ -140,11 +140,14 @@ export function routeToBackgroundConversation(deps, convId, msg) {
       const msgs = cache.messages;
       const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
       if (last && last.role === 'assistant' && last.isStreaming) {
-        last.content += data.delta;
+        if (!last._chunks) last._chunks = [last.content];
+        last._chunks.push(data.delta);
+        last.content = last._chunks.join('');
       } else {
         msgs.push({
           id: ++cache.messageIdCounter, role: 'assistant',
           content: data.delta, isStreaming: true, timestamp: new Date(),
+          _chunks: [data.delta],
         });
       }
     } else if (data.type === 'tool_use' && data.tools) {
