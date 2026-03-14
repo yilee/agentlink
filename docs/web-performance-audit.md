@@ -180,7 +180,7 @@ All typing dots, spinners, blink-cursor animations use only `opacity`/`transform
 - [x] P3-3: Resize handler rAF guard (app.js)
 - [x] P3-5: `[...arr].reverse().find()` → reverse for loop (connection.js, backgroundRouting.js)
 - [x] P2-2: `v-show` → `v-if` for tool expand (app.js)
-- [ ] P0-2: Skip Markdown render during streaming (messageHelpers.js, markdown.js)
+- [x] P0-2: Skip Markdown render during streaming (messageHelpers.js, markdown.js)
 - [ ] P2-1: Markdown cache — skip streaming entries (markdown.js)
 - [ ] P2-3: Streaming string concat → array join (streaming.js, backgroundRouting.js)
 - [ ] P2-5: `toolExpand` remove `max-height` animation (tools.css)

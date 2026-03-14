@@ -35,6 +35,10 @@ export function formatTimestamp(ts) {
 
 export function getRenderedContent(msg) {
   if (msg.role !== 'assistant' && !msg.isCommandOutput) return msg.content;
+  if (msg.isStreaming) {
+    const t = msg.content || '';
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  }
   return renderMarkdown(msg.content);
 }
 
