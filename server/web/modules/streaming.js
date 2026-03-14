@@ -14,9 +14,6 @@ export function createStreaming({ messages, scrollToBottom }) {
   let revealTimer = null;
   let streamingMessageId = null;
   let messageIdCounter = 0;
-  let _getPlanMode = () => false;
-
-  function setGetPlanMode(fn) { _getPlanMode = fn; }
 
   function getMessageIdCounter() { return messageIdCounter; }
   function setMessageIdCounter(v) { messageIdCounter = v; }
@@ -47,7 +44,6 @@ export function createStreaming({ messages, scrollToBottom }) {
         isStreaming: true, timestamp: new Date(),
         _chunks: [chunk],
       };
-      if (_getPlanMode()) newMsg.planMode = true;
       messages.value.push(newMsg);
       streamingMessageId = id;
     } else {
@@ -74,7 +70,6 @@ export function createStreaming({ messages, scrollToBottom }) {
         isStreaming: true, timestamp: new Date(),
         _chunks: [pendingText],
       };
-      if (_getPlanMode()) newMsg.planMode = true;
       messages.value.push(newMsg);
       streamingMessageId = id;
     }
@@ -116,6 +111,6 @@ export function createStreaming({ messages, scrollToBottom }) {
     startReveal, flushReveal, appendPending, reset, cleanup,
     getMessageIdCounter, setMessageIdCounter,
     getStreamingMessageId, setStreamingMessageId,
-    nextId, saveState, restoreState, setGetPlanMode,
+    nextId, saveState, restoreState,
   };
 }

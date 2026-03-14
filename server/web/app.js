@@ -332,7 +332,6 @@ const App = {
     // ── Create module instances ──
 
     const streaming = createStreaming({ messages, scrollToBottom });
-    streaming.setGetPlanMode(() => planMode.value);
 
     const fileAttach = createFileAttachments(attachments, fileInputRef, dragOver);
 
@@ -522,7 +521,6 @@ const App = {
         id: streaming.nextId(), role: 'user',
         content: text || (files.length > 0 ? `[${files.length} file${files.length > 1 ? 's' : ''} attached]` : ''),
         attachments: msgAttachments.length > 0 ? msgAttachments : undefined,
-        planMode: planMode.value || undefined,
         timestamp: new Date(),
       };
 
@@ -2400,7 +2398,7 @@ const App = {
 
                 <!-- User message -->
                 <template v-if="msg.role === 'user'">
-                  <div class="message-role-label user-label">{{ t('chat.you') }}<span v-if="msg.planMode" class="plan-badge">Plan</span></div>
+                  <div class="message-role-label user-label">{{ t('chat.you') }}</div>
                   <div class="message-bubble user-bubble" :title="formatTimestamp(msg.timestamp)">
                     <div class="message-content">{{ msg.content }}</div>
                     <div v-if="msg.attachments && msg.attachments.length" class="message-attachments">
@@ -2417,7 +2415,7 @@ const App = {
 
                 <!-- Assistant message (markdown) -->
                 <template v-else-if="msg.role === 'assistant'">
-                  <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">{{ t('chat.claude') }}<span v-if="msg.planMode" class="plan-badge">Plan</span></div>
+                  <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">{{ t('chat.claude') }}</div>
                   <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]" :title="formatTimestamp(msg.timestamp)">
                     <div class="message-actions">
                       <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? t('chat.copied') : t('chat.copy')">
