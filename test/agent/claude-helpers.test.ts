@@ -9,6 +9,7 @@ import {
   handleResultMessage,
   handleAssistantMessage,
   handleUserMessage,
+  isTaskNotification,
 } from '../../agent/src/claude.js';
 import type { ClaudeMessage, ConversationState } from '../../agent/src/claude.js';
 
@@ -285,6 +286,85 @@ describe('claude.ts helpers', () => {
       const result = handleUserMessage(msg, send);
       expect(result).toBe(false);
       expect(send).toHaveBeenCalledWith({ type: 'claude_output', data: msg });
+    });
+  });
+
+  // ── isTaskNotification ──────────────────────────────────────────────
+
+  describe('isTaskNotification', () => {
+    it('returns true for string content with task-notification tag', () => {
+      const msg: ClaudeMessage = {
+        type: 'user',
+        message: {
+          content: '<task-notification>Background task completed: exit code 0</task-notification>',
+        },
+      };
+      expect(isTaskNotification(msg)).toBe(true);
+    });
+
+    it('returns true for array content with task-notification tag', () => {
+      const msg: ClaudeMessage = {
+        type: 'user',
+        message: {
+          content: [
+            { type: 'text', text: '<task-notification>Task failed</task-notification>' },
+          ],
+        },
+      };
+      expect(isTaskNotification(msg)).toBe(true);
+    });
+
+    it('returns true when task-notification is mixed with other content', () => {
+      const msg: ClaudeMessage = {
+        type: 'user',
+        message: {
+          content: [
+            { type: 'text', text: 'Some prefix' },
+            { type: 'text', text: '<task-notification>done</task-notification>' },
+          ],
+        },
+      };
+      expect(isTaskNotification(msg)).toBe(true);
+    });
+
+    it('returns false for regular user messages', () => {
+      const msg: ClaudeMessage = {
+        type: 'user',
+        message: { content: 'Hello, please help me' },
+      };
+      expect(isTaskNotification(msg)).toBe(false);
+    });
+
+    it('returns false for command output messages', () => {
+      const msg: ClaudeMessage = {
+        type: 'user',
+        message: {
+          content: '<local-command-stdout>$0.42</local-command-stdout>',
+        },
+      };
+      expect(isTaskNotification(msg)).toBe(false);
+    });
+
+    it('returns false when message has no content', () => {
+      const msg: ClaudeMessage = { type: 'user', message: {} };
+      expect(isTaskNotification(msg)).toBe(false);
+    });
+
+    it('returns false when message has no message field', () => {
+      const msg: ClaudeMessage = { type: 'user' } as ClaudeMessage;
+      expect(isTaskNotification(msg)).toBe(false);
+    });
+
+    it('returns false for non-text content blocks', () => {
+      const msg: ClaudeMessage = {
+        type: 'user',
+        message: {
+          content: [
+            { type: 'tool_result', content: '<task-notification>sneaky</task-notification>' },
+          ],
+        },
+      };
+      expect(isTaskNotification(msg)).toBe(false);
     });
   });
 });

@@ -868,6 +868,24 @@ export function handleAssistantMessage(
 }
 
 /**
+ * Check if a user message is a task-notification (background task completed/failed).
+ * These are system-injected and should not trigger visible output in the web UI.
+ */
+export function isTaskNotification(msg: ClaudeMessage): boolean {
+  const message = msg.message as { content?: unknown } | undefined;
+  if (!message?.content) return false;
+  const raw = typeof message.content === 'string'
+    ? message.content
+    : Array.isArray(message.content)
+      ? (message.content as Array<{ type: string; text?: string }>)
+          .filter(b => b.type === 'text')
+          .map(b => b.text || '')
+          .join('')
+      : '';
+  return raw.includes('<task-notification>');
+}
+
+/**
  * Handle a 'user' (tool_result) message: detect command output or forward as-is.
  * Returns true if a command output was extracted (caller should `continue`).
  */
@@ -978,6 +996,8 @@ async function processOutput(
   let resultHandled = false;
   // Track accumulated text for streaming delta computation
   let lastSentText = '';
+  // Suppress output for turns triggered by task-notification (background task events)
+  let silentTurn = false;
 
   try {
     for await (const msg of messageStream) {
@@ -990,12 +1010,23 @@ async function processOutput(
         state.turnResultReceived = true;
         resultHandled = true;
         lastSentText = '';
+
+        if (silentTurn) {
+          // Silent turn (task-notification) — clean up without notifying UI
+          silentTurn = false;
+          state.turnActive = false;
+          console.log(`[Claude:${state.conversationId.slice(0, 8)}] Silent turn completed — no output forwarded to UI`);
+          continue;
+        }
+
         handleResultMessage(msg, state, sendWithConvId);
         continue;
       }
 
       // ── assistant message → extract delta and forward incrementally ──
       if (msg.type === 'assistant' && msg.message) {
+        if (silentTurn) continue;
+
         lastSentText = handleAssistantMessage(msg, lastSentText, sendWithConvId);
 
         // Detect EnterPlanMode/ExitPlanMode tool calls — Claude is toggling
@@ -1025,6 +1056,12 @@ async function processOutput(
       // ── user (tool_result) → forward, reset text tracker ──
       if (msg.type === 'user') {
         lastSentText = '';
+        if (isTaskNotification(msg)) {
+          silentTurn = true;
+          console.log(`[Claude:${state.conversationId.slice(0, 8)}] task-notification detected — entering silent turn`);
+          continue;
+        }
+        if (silentTurn) continue;
         if (handleUserMessage(msg, sendWithConvId)) continue;
         continue;
       }
@@ -1033,6 +1070,14 @@ async function processOutput(
       if (msg.type === 'system') {
         const sub = (msg.subtype || '') as string;
         console.log(`[Claude:${state.conversationId.slice(0, 8)}] system/${sub}`);
+
+        if (silentTurn) {
+          // During silent turns, update internal state but don't notify UI
+          if (sub === 'status' && msg.status === 'compacting') state.isCompacting = true;
+          else if (sub === 'compact_boundary' || sub === 'compact_complete' || sub === 'compact_end') state.isCompacting = false;
+          else if (sub === 'compact_start') state.isCompacting = true;
+          continue;
+        }
 
         // Forward context compaction events to web client
         // New format: subtype='status', status='compacting'
@@ -1072,7 +1117,7 @@ async function processOutput(
     }
   } finally {
     // If the process exited mid-turn without a result, notify web client with error
-    if (!resultHandled && state.turnActive) {
+    if (!resultHandled && state.turnActive && !silentTurn) {
       if (stderr.buf.trim()) {
         sendWithConvId({ type: 'error', message: stderr.buf.trim() });
       }
