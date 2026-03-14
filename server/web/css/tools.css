@@ -97,8 +97,8 @@
 }
 
 @keyframes toolExpand {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 500px; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .tool-block {
