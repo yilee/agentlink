@@ -232,10 +232,7 @@
   border: 3px solid rgba(255, 255, 255, 0.2);
   border-top-color: rgba(255, 255, 255, 0.8);
   border-radius: 50%;
-  animation: workdir-spin 0.7s linear infinite;
-}
-@keyframes workdir-spin {
-  to { transform: rotate(360deg); }
+  animation: spin 0.7s linear infinite;
 }
 .workdir-switching-text {
   color: rgba(255, 255, 255, 0.9);

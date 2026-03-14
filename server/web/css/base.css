@@ -236,6 +236,16 @@ body {
   margin-top: 0.75rem;
 }
 
+/* ── Shared keyframes ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 /* ── Main body (sidebar + chat) ── */
 .main-body {
   flex: 1;
