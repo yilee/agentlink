@@ -7,7 +7,7 @@ import { handleListDirectory, handleReadFile, handleChangeWorkDir } from './dire
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, handleBtwQuestion, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, handleBtwQuestion, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, setPermissionMode, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { listMemoryFiles, updateMemoryFile, deleteMemoryFile } from './memory.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
@@ -256,6 +256,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'chat': {
       const chatConvId = (msg as unknown as { conversationId?: string }).conversationId;
       const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
+      console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}`);
       claudeHandleChat(
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
@@ -308,7 +309,24 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       // Include live status so the web client can restore compacting/processing state
       // In multi-session mode, look up by conversationId; in single-session mode, use default
       const currentConv = convId ? getConversation(convId) : getConversation();
-      const isSameSession = currentConv?.claudeSessionId === m.claudeSessionId;
+      const isSameSession = currentConv?.claudeSessionId === m.claudeSessionId
+        || currentConv?.lastClaudeSessionId === m.claudeSessionId;
+
+      // Determine plan mode: prefer in-memory state, fallback to history scan
+      let planMode: boolean | undefined;
+      if (isSameSession) {
+        planMode = currentConv?.planMode === true;
+      } else if (history.length > 0) {
+        // No in-memory state — scan history for the last EnterPlanMode/ExitPlanMode tool
+        for (let i = history.length - 1; i >= 0; i--) {
+          const h = history[i];
+          if (h.role === 'tool' && (h.toolName === 'EnterPlanMode' || h.toolName === 'ExitPlanMode')) {
+            planMode = h.toolName === 'EnterPlanMode';
+            break;
+          }
+        }
+      }
+
       send({
         type: 'conversation_resumed',
         conversationId: convId,
@@ -316,6 +334,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         history,
         isCompacting: isSameSession && (convId ? getIsCompacting(convId) : getIsCompacting()),
         isProcessing: isSameSession && currentConv?.turnActive === true,
+        planMode,
       });
       break;
     }
@@ -586,6 +605,36 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'btw_question': {
       const { question, conversationId, claudeSessionId } = msg as unknown as { question: string; conversationId?: string; claudeSessionId?: string };
       handleBtwQuestion(question, conversationId, state.workDir, send, claudeSessionId);
+      break;
+    }
+    case 'set_plan_mode': {
+      const { enabled, conversationId, claudeSessionId } = msg as unknown as {
+        enabled: boolean;
+        conversationId?: string;
+        claudeSessionId?: string;
+      };
+      const mode = enabled ? 'plan' : 'bypassPermissions';
+      console.log(`[AgentLink] set_plan_mode: enabled=${enabled}, conversationId=${conversationId}`);
+      const result = setPermissionMode(conversationId, mode, claudeSessionId);
+
+      if (result === 'injected') {
+        // Process was idle — setPermissionMode already injected Enter/ExitPlanMode
+        // into the running process. Output flows through normal pipeline.
+        // Just tell UI right away.
+        send({ type: 'plan_mode_changed', enabled, conversationId });
+      } else {
+        // Immediate path — process was killed/recreated or placeholder created.
+        send({ type: 'plan_mode_changed', enabled, conversationId, immediate: true });
+
+        // When exiting plan mode, spawn Claude to record ExitPlanMode in the
+        // JSONL so it doesn't think it's still in plan mode on next resume.
+        const convId = conversationId || 'default';
+        const conv = getConversation(convId);
+        const sessionToFix = conv?.lastClaudeSessionId || claudeSessionId;
+        if (!enabled && sessionToFix) {
+          claudeHandleChat(conversationId, 'Exit plan mode now.', conv?.workDir || state.workDir, { resumeSessionId: sessionToFix });
+        }
+      }
       break;
     }
     default:

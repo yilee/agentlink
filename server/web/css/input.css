@@ -614,6 +614,56 @@
   color: var(--text-secondary);
 }
 
+/* ── Plan Mode toggle button ── */
+.plan-mode-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.plan-mode-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+}
+
+.plan-mode-btn.active {
+  color: var(--plan-mode);
+  background: var(--plan-mode-bg);
+  border-color: var(--plan-mode);
+}
+
+.plan-mode-btn.active:hover:not(:disabled) {
+  background: rgba(212, 162, 76, 0.18);
+}
+
+.plan-mode-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.plan-mode-btn svg {
+  flex-shrink: 0;
+}
+
+
+/* ── Input card plan mode accent ── */
+.input-card.plan-mode {
+  border-top: 2px solid var(--plan-mode);
+}
+
 /* ── Sidebar backdrop (mobile overlay) ── */
 .sidebar-backdrop {
   display: none;

@@ -55,6 +55,8 @@ export interface ConversationState {
   lastClaudeSessionId: string | null;
   isCompacting: boolean;
   createdAt: number;
+  // Plan mode: when true, agent uses --permission-mode plan (Claude natively enforces read-only)
+  planMode: boolean;
 }
 
 type SendFn = (msg: Record<string, unknown>) => void;
@@ -510,6 +512,90 @@ export async function handleBtwQuestion(
 
 // ── Internal ───────────────────────────────────────────────────────────────
 
+/**
+ * Set the permission mode for a conversation.
+ * Kills the current Claude process (if any) and stores the new mode so the
+ * next `handleChat()` call spawns Claude with the correct `--permission-mode`.
+ */
+export function setPermissionMode(
+  conversationId: string | undefined,
+  mode: 'bypassPermissions' | 'plan',
+  claudeSessionId?: string,
+): 'injected' | 'immediate' {
+  const convId = conversationId || DEFAULT_CONVERSATION_ID;
+  const existing = conversations.get(convId);
+  const enteringPlan = mode === 'plan';
+
+  if (existing) {
+    // If the process is alive and idle, inject a user message to make Claude
+    // call EnterPlanMode / ExitPlanMode natively — this records the mode switch
+    // in the JSONL history so Claude stays aware of the current mode across resumes.
+    if (existing.child && !existing.child.killed && existing.inputStream && !existing.turnActive) {
+      existing.planMode = enteringPlan;
+      const instruction = enteringPlan
+        ? 'Enter plan mode now.'
+        : 'Exit plan mode now.';
+      existing.turnActive = true;
+      existing.turnResultReceived = false;
+      existing.inputStream.enqueue({
+        type: 'user',
+        message: { role: 'user', content: instruction },
+      });
+      console.log(`[Claude:${convId.slice(0, 8)}] Injected ${enteringPlan ? 'EnterPlanMode' : 'ExitPlanMode'} instruction into running process`);
+      return 'injected';
+    }
+
+    // Process is not running or turn is active — kill and recreate state.
+    // The next handleChat() will start a fresh process with the correct --permission-mode.
+    const wasTurnActive = existing.turnActive;
+    const lastSession = existing.claudeSessionId || existing.lastClaudeSessionId;
+    const workDir = existing.workDir;
+
+    cleanupConversation(convId);
+
+    // Notify UI if we interrupted an active turn
+    if (wasTurnActive) {
+      sendFn({ type: 'execution_cancelled', conversationId: convId });
+    }
+
+    const newState: ConversationState = {
+      child: null,
+      inputStream: null,
+      abortController: null,
+      claudeSessionId: null,
+      workDir,
+      turnActive: false,
+      turnResultReceived: false,
+      conversationId: convId,
+      lastClaudeSessionId: lastSession || null,
+      isCompacting: false,
+      createdAt: Date.now(),
+      planMode: enteringPlan,
+    };
+    conversations.set(convId, newState);
+    return 'immediate';
+  } else {
+    // No existing conversation yet (e.g. user toggled plan mode before first message).
+    // Create a placeholder so handleChat()/startQuery() picks up the plan mode.
+    const placeholder: ConversationState = {
+      child: null,
+      inputStream: null,
+      abortController: null,
+      claudeSessionId: null,
+      workDir: '',  // will be overridden by handleChat's workDir param
+      turnActive: false,
+      turnResultReceived: false,
+      conversationId: convId,
+      lastClaudeSessionId: claudeSessionId || null,
+      isCompacting: false,
+      createdAt: Date.now(),
+      planMode: enteringPlan,
+    };
+    conversations.set(convId, placeholder);
+    return 'immediate';
+  }
+}
+
 function processFilesForClaude(files: ChatFile[], workDir: string, prompt: string): unknown[] {
   const attachDir = join(CONFIG_DIR, 'tmp-attachments');
   if (!existsSync(attachDir)) {
@@ -558,9 +644,11 @@ function processFilesForClaude(files: ChatFile[], workDir: string, prompt: strin
 function startQuery(conversationId: string, workDir: string, resumeSessionId?: string, extraArgs?: string[]): void {
   // Tear down previous process for THIS conversation only (not others)
   const existing = conversations.get(conversationId);
+  console.log(`[Claude:${conversationId.slice(0, 8)}] startQuery: existing=${!!existing}, existing.planMode=${existing?.planMode}`);
   if (existing) {
     abort(conversationId);
   }
+  console.log(`[Claude:${conversationId.slice(0, 8)}] startQuery after abort: existing.planMode=${existing?.planMode}`);
 
   // Evict oldest idle conversation if at capacity (quota-aware)
   const convType = isLoopConversation(conversationId) ? 'loop' : 'chat';
@@ -584,23 +672,28 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     lastClaudeSessionId: existing?.lastClaudeSessionId || null,
     isCompacting: false,
     createdAt: Date.now(),
+    planMode: existing?.planMode || false,
   };
 
   conversations.set(conversationId, state);
 
   // Build args
-  // bypassPermissions auto-approves all regular tool calls.
+  // In normal mode: bypassPermissions auto-approves all regular tool calls.
+  // In plan mode: use native 'plan' permission mode — Claude's system prompt
+  // knows it's in plan mode and self-enforces read-only behavior.
   // --permission-prompt-tool stdio tells Claude CLI to send control_request
   // via stdout for interactive tools (like AskUserQuestion) instead of
-  // auto-denying them. Our handleControlRequest() intercepts these and
-  // either auto-approves or forwards to the web UI.
+  // auto-denying them.
+  const permissionMode = state.planMode ? 'plan' : 'bypassPermissions';
   const args = [
     '--output-format', 'stream-json',
     '--input-format', 'stream-json',
     '--verbose',
-    '--permission-mode', 'bypassPermissions',
+    '--permission-mode', permissionMode,
     '--permission-prompt-tool', 'stdio',
   ];
+
+  console.log(`[Claude:${conversationId.slice(0, 8)}] planMode=${state.planMode}, permissionMode=${permissionMode}`);
 
   if (resumeSessionId) {
     args.push('--resume', resumeSessionId);
@@ -904,6 +997,28 @@ async function processOutput(
       // ── assistant message → extract delta and forward incrementally ──
       if (msg.type === 'assistant' && msg.message) {
         lastSentText = handleAssistantMessage(msg, lastSentText, sendWithConvId);
+
+        // Detect EnterPlanMode/ExitPlanMode tool calls — Claude is toggling
+        // plan mode natively. Sync state and notify the web UI.
+        const msgContent = (msg.message as { content?: Array<Record<string, unknown>> }).content;
+        if (Array.isArray(msgContent)) {
+          const hasExitPlan = msgContent.some(
+            (b) => b.type === 'tool_use' && b.name === 'ExitPlanMode'
+          );
+          const hasEnterPlan = msgContent.some(
+            (b) => b.type === 'tool_use' && b.name === 'EnterPlanMode'
+          );
+          if (hasExitPlan && state.planMode) {
+            console.log(`[Claude:${state.conversationId.slice(0, 8)}] ExitPlanMode detected — switching to normal mode`);
+            state.planMode = false;
+            sendWithConvId({ type: 'plan_mode_changed', enabled: false });
+          } else if (hasEnterPlan && !state.planMode) {
+            console.log(`[Claude:${state.conversationId.slice(0, 8)}] EnterPlanMode detected — switching to plan mode`);
+            state.planMode = true;
+            sendWithConvId({ type: 'plan_mode_changed', enabled: true });
+          }
+        }
+
         continue;
       }
 
@@ -982,12 +1097,19 @@ async function processOutput(
  * Handle an incoming control_request from Claude's stdout.
  * For AskUserQuestion: forward to web UI and wait for user answer.
  * For other tools: auto-approve immediately.
+ * Note: plan mode tool restrictions are handled natively by Claude's
+ * --permission-mode plan flag — no custom deny logic needed here.
  */
-function handleControlRequest(request: ControlRequest, child: ChildProcess, conversationId: string): void {
+function handleControlRequest(
+  request: ControlRequest,
+  child: ChildProcess,
+  conversationId: string,
+): void {
   const requestId = request.request_id;
   const subtype = request.request?.subtype;
+  const toolName = request.request.tool_name;
 
-  if (subtype === 'can_use_tool' && request.request.tool_name === 'AskUserQuestion') {
+  if (subtype === 'can_use_tool' && toolName === 'AskUserQuestion') {
     console.log(`[Claude:${conversationId.slice(0, 8)}] AskUserQuestion control_request: ${requestId}`);
     pendingControlRequests.set(requestId, { request, child, conversationId });
 

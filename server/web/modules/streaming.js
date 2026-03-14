@@ -39,11 +39,12 @@ export function createStreaming({ messages, scrollToBottom }) {
 
     if (!streamMsg) {
       const id = ++messageIdCounter;
-      messages.value.push({
+      const newMsg = {
         id, role: 'assistant', content: chunk,
         isStreaming: true, timestamp: new Date(),
         _chunks: [chunk],
-      });
+      };
+      messages.value.push(newMsg);
       streamingMessageId = id;
     } else {
       streamMsg._chunks.push(chunk);
@@ -64,11 +65,12 @@ export function createStreaming({ messages, scrollToBottom }) {
       streamMsg.content = streamMsg._chunks.join('');
     } else {
       const id = ++messageIdCounter;
-      messages.value.push({
+      const newMsg = {
         id, role: 'assistant', content: pendingText,
         isStreaming: true, timestamp: new Date(),
         _chunks: [pendingText],
-      });
+      };
+      messages.value.push(newMsg);
       streamingMessageId = id;
     }
     pendingText = '';

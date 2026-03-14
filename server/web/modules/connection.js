@@ -36,6 +36,8 @@ export function createConnection(deps) {
     memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
     // Side question (/btw)
     btwState, btwPending,
+    // Plan mode
+    setPlanMode,
     // i18n
     t,
   } = deps;
@@ -547,6 +549,10 @@ export function createConnection(deps) {
           messages.value = buildHistoryBatch(msg.history, () => streaming.nextId());
           toolMsgMap.clear();
         }
+        // Detect plan mode from agent-provided flag
+        if (msg.planMode != null) {
+          if (setPlanMode) setPlanMode(!!msg.planMode);
+        }
         loadingHistory.value = false;
         // Restore live status from agent (compacting / processing)
         if (msg.isCompacting) {
@@ -611,6 +617,17 @@ export function createConnection(deps) {
             btwState.value.done = true;
           }
         }
+      } else if (msg.type === 'plan_mode_changed') {
+        if (setPlanMode) setPlanMode(msg.enabled);
+        // For the immediate path (no injected turn), clear isProcessing here
+        // because turn_completed will never arrive.
+        if (msg.immediate) {
+          isProcessing.value = false;
+          if (currentConversationId.value) {
+            processingConversations.value[currentConversationId.value] = false;
+          }
+        }
+        // For the injected path, turn_completed handles isProcessing naturally.
       } else if (msg.type === 'workdir_changed') {
         workdirSwitching.value = false;
         workDir.value = msg.workDir;

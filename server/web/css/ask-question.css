@@ -271,7 +271,7 @@
   padding: 0.5rem 0.9rem;
 }
 
-.typing-indicator span {
+.typing-indicator span:not(.typing-label) {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -279,17 +279,29 @@
   animation: typing 1.2s infinite ease-in-out;
 }
 
-.typing-indicator span:nth-child(2) {
+.typing-indicator span:not(.typing-label):nth-child(2) {
   animation-delay: 0.2s;
 }
 
-.typing-indicator span:nth-child(3) {
+.typing-indicator span:not(.typing-label):nth-child(3) {
   animation-delay: 0.4s;
 }
 
 @keyframes typing {
   0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
   30% { opacity: 1; transform: scale(1); }
+}
+
+.typing-label {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-left: 4px;
+  white-space: nowrap;
+  animation: none;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
 }
 
 /* ── Context compaction inline message ── */
