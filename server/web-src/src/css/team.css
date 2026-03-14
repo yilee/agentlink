@@ -1,0 +1,1277 @@
+/* ══════════════════════════════════════════
+   Team Mode
+   ══════════════════════════════════════════ */
+
+/* ── Team mode toggle ── */
+.team-mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 2px;
+  margin-left: 8px;
+}
+
+.team-mode-btn {
+  padding: 4px 14px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.team-mode-btn.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+.team-mode-btn:hover:not(.active) {
+  color: var(--text-primary);
+}
+
+.team-mode-select {
+  display: none;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ── Team create panel ── */
+.team-create-panel {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.team-create-inner {
+  max-width: 560px;
+  width: 100%;
+}
+
+.team-create-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.team-create-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.team-create-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+/* ── Template selector ── */
+.team-tpl-section {
+  margin-bottom: 14px;
+}
+.team-tpl-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.team-tpl-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: auto;
+}
+.team-tpl-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.team-tpl-desc {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* ── Collapsible lead prompt ── */
+.team-lead-prompt-section {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.team-lead-prompt-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg-secondary);
+}
+.team-lead-prompt-header:hover {
+  background: var(--bg-hover);
+}
+.team-lead-prompt-arrow {
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+.team-lead-prompt-arrow.expanded {
+  transform: rotate(90deg);
+}
+.team-lead-prompt-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+.team-lead-prompt-preview {
+  font-size: 0.78rem;
+  color: var(--text-tertiary, #666);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+.team-lead-prompt-body {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+.team-lead-prompt-textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  resize: vertical;
+  min-height: 160px;
+  line-height: 1.5;
+}
+.team-lead-prompt-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.team-lead-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.team-lead-prompt-reset {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.team-lead-prompt-reset:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.team-create-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 100px;
+  line-height: 1.4;
+}
+
+.team-create-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.team-create-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.team-create-launch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.team-create-launch:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.team-create-launch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.team-create-cancel {
+  padding: 8px 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.team-create-cancel:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* ── Example instructions ── */
+.team-examples-section {
+  margin-top: 20px;
+}
+
+.team-examples-header {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.team-examples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-example-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.15s, background 0.15s;
+  background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+}
+
+.team-example-card:hover {
+  border-color: rgba(59,130,246,0.3);
+  background: linear-gradient(135deg, rgba(59,130,246,0.06) 0%, rgba(59,130,246,0.02) 100%);
+}
+
+.team-example-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(59,130,246,0.1);
+  color: var(--accent);
+  margin-top: 1px;
+}
+
+.team-example-card:nth-child(2) .team-example-icon {
+  background: rgba(16,185,129,0.1);
+  color: #10B981;
+}
+
+.team-example-card:nth-child(3) .team-example-icon {
+  background: rgba(139,92,246,0.1);
+  color: #8B5CF6;
+}
+
+.team-example-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.team-example-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.team-example-text {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.team-example-try {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 6px 16px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.team-example-try:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Historical teams in create panel ── */
+.team-history-section {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.team-history-section-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.team-history-section .team-history-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+/* ── Team dashboard ── */
+.team-dashboard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.team-dash-header {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.team-dash-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.team-dash-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-dash-instruction {
+  position: relative;
+}
+
+.team-dash-instruction-text {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.team-dash-instruction.expanded .team-dash-instruction-text {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+
+.team-dash-instruction-toggle {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.78rem;
+  padding: 2px 0;
+  margin-top: 2px;
+}
+
+.team-dash-instruction-toggle:hover {
+  text-decoration: underline;
+}
+
+.team-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.team-status-planning {
+  background: rgba(234,179,8,0.15);
+  color: #eab308;
+}
+
+.team-status-running {
+  background: rgba(59,130,246,0.15);
+  color: #3b82f6;
+}
+
+.team-status-summarizing {
+  background: rgba(139,92,246,0.15);
+  color: #8b5cf6;
+}
+
+.team-status-completed {
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
+}
+
+.team-status-failed {
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+}
+
+.team-dash-header-right {
+  display: flex;
+  gap: 8px;
+}
+
+.team-dissolve-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--error);
+  border-radius: 5px;
+  background: none;
+  color: var(--error);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.team-dissolve-btn:hover {
+  background: rgba(212,84,84,0.1);
+}
+
+.team-back-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.team-back-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.team-new-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.team-new-btn:hover {
+  background: rgba(59,130,246,0.1);
+}
+
+/* ── Lead status bar ── */
+.team-lead-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.team-lead-bar-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.team-lead-bar-clickable:hover {
+  background: var(--bg-hover);
+}
+
+.team-lead-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: agent-pulse 1.5s ease-in-out infinite;
+}
+
+.team-lead-label {
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+}
+
+.team-lead-text {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Dashboard body ── */
+.team-dash-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.team-dash-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Kanban board ── */
+.team-kanban-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.team-kanban-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  transition: background 0.15s;
+}
+.team-kanban-section-header:hover {
+  background: var(--bg-tertiary);
+}
+.team-kanban-section-toggle {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+.team-kanban-section-summary {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.team-kanban {
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+  flex-shrink: 0;
+  padding: 0 8px 8px;
+}
+
+.team-kanban-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.team-kanban-col-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-kanban-col-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.team-kanban-col-dot.pending { background: var(--text-secondary); }
+.team-kanban-col-dot.active { background: var(--accent); }
+.team-kanban-col-dot.done { background: var(--success); }
+.team-kanban-col-dot.failed { background: var(--error); }
+
+.team-kanban-col-count {
+  margin-left: auto;
+  background: var(--bg-tertiary);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+
+.team-kanban-col-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: 160px;
+}
+
+.team-kanban-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* ── Task cards ── */
+.team-task-card {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s;
+}
+
+.team-task-card.active {
+  border-left: 3px solid var(--accent);
+}
+
+.team-task-card.done {
+  opacity: 0.8;
+}
+
+.team-task-card.failed {
+  border-left: 3px solid var(--error);
+}
+
+.team-task-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.team-task-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.team-task-desc-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+}
+.team-task-desc-clamp:hover {
+  color: var(--text-primary);
+}
+.team-task-desc-expanded {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.team-task-assignee {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ── Agent dot ── */
+.team-agent-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.team-agent-dot.working {
+  animation: agent-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes agent-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+/* ── Activity feed ── */
+.team-feed {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.team-feed-header {
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-feed-list {
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.team-feed-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  padding: 2px 0;
+}
+
+.team-feed-time {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+}
+
+.team-feed-text {
+  color: var(--text-primary);
+}
+
+.team-feed-agent-name {
+  font-weight: 600;
+}
+
+.sidebar-section-collapsible {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Teams sidebar section (history list in sidebar) ── */
+.sidebar-teams {
+  padding: 0.5rem 0.75rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Loops sidebar section ── */
+.sidebar-loops {
+  padding: 0.5rem 0.75rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.loop-history-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.team-history-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.team-history-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.team-history-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.team-history-item.active {
+  background: var(--bg-tertiary);
+  border-left-color: var(--accent);
+}
+
+.team-history-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.team-history-title {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.team-history-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.team-history-tasks {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.team-status-badge-sm {
+  font-size: 0.6rem;
+  padding: 1px 5px;
+  border-radius: 8px;
+}
+
+/* ── Completion stats bar ── */
+.team-stats-bar {
+  display: flex;
+  gap: 16px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.team-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.team-stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.team-stat-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ── Team summary (completion) ── */
+.team-summary {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.team-summary-header {
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-summary-body {
+  padding: 12px;
+}
+
+/* ── Agent bar (horizontal) ── */
+.team-agents-bar {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.team-agents-bar-header {
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-agents-bar-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.team-agent-card {
+  flex: 1;
+  min-width: 180px;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.team-agent-card:hover {
+  border-color: var(--accent);
+}
+
+.team-agent-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.team-agent-card-name {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-agent-card-status {
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.team-agent-card-status-starting,
+.team-agent-card-status-working {
+  background: rgba(59,130,246,0.15);
+  color: #3b82f6;
+}
+
+.team-agent-card-status-done {
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
+}
+
+.team-agent-card-status-error {
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+}
+
+.team-agent-card-activity {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.team-agents-empty {
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* ── Agent detail view ── */
+.team-agent-detail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.team-agent-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.team-agent-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-right: 4px;
+}
+
+.team-agent-back-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.team-agent-detail-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.team-agent-detail-status {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.team-agent-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.5rem;
+  min-height: 0;
+}
+
+.team-agent-messages-inner {
+  max-width: 768px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.team-agent-empty-msg {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* ── Agent prompt card ── */
+.team-agent-prompt {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.team-agent-prompt-label {
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.team-agent-prompt-body {
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+/* ── Agent detail name tag (above assistant bubbles) ── */
+.team-agent-detail-name-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-bottom: 2px;
+  padding-left: 2px;
+}
+
+/* ── New team launcher (after completion) ── */
+.team-new-launcher {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  padding: 12px;
+  flex-shrink: 0;
+}
+.team-new-launcher-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+.team-new-launcher-input:focus {
+  border-color: var(--accent);
+}
+.team-new-launcher-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: flex-end;
+}
+
+/* ── Team Agent tool call styling in main chat ── */
+.team-agent-tool-wrapper {
+  border-left: 3px solid #8B5CF6;
+  border-radius: 6px;
+  margin-left: 4px;
+  padding-left: 0;
+}
+.team-agent-tool-line {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.08), transparent);
+}
+.team-agent-tool-line:hover {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.14), transparent);
+}
+.team-agent-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #8B5CF6;
+}
+.team-agent-tool-name {
+  font-weight: 700;
+  color: #8B5CF6;
+  font-size: 0.82rem;
+}
+.team-agent-tool-desc {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.team-agent-tool-expand {
+  border-top: 1px solid rgba(139, 92, 246, 0.15);
+}
+.team-agent-tool-result {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(139, 92, 246, 0.06);
+  border-radius: 4px;
+  border: 1px solid rgba(139, 92, 246, 0.12);
+}
+.team-agent-tool-result-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #8B5CF6;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.team-agent-tool-result-content {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
