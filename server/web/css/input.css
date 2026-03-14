@@ -225,7 +225,6 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
-  backdrop-filter: blur(2px);
 }
 .workdir-switching-spinner {
   width: 36px;
