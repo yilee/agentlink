@@ -854,7 +854,7 @@ const App = {
       },
       workdirMenuCopyPath() {
         workdirMenuOpen.value = false;
-        navigator.clipboard.writeText(workDir.value);
+        fileBrowser.copyToClipboard(workDir.value);
       },
       // Memory management
       memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,

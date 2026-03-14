@@ -256,13 +256,31 @@ export function createFileBrowser(deps) {
     });
   }
 
+  function copyToClipboard(text) {
+    // Use ClipboardItem with explicit text/plain to prevent Chrome (especially
+    // mobile) from URL-encoding paths that look like URL schemes (e.g. Q:\...)
+    if (navigator.clipboard && window.ClipboardItem) {
+      const blob = new Blob([text], { type: 'text/plain' });
+      const item = new ClipboardItem({ 'text/plain': blob });
+      return navigator.clipboard.write([item]);
+    }
+    // Fallback for older browsers
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return Promise.resolve();
+  }
+
   function copyPath() {
     const menu = fileContextMenu.value;
     if (!menu) return;
     const path = menu.path;
-    navigator.clipboard.writeText(path).catch(() => {
-      // Fallback: some browsers block clipboard in non-secure contexts
-    });
+    copyToClipboard(path).catch(() => {});
     // Brief "Copied!" feedback — store temporarily in menu state
     fileContextMenu.value = { ...menu, copied: true };
     setTimeout(() => {
@@ -369,6 +387,7 @@ export function createFileBrowser(deps) {
     closeContextMenu,
     askClaudeRead,
     copyPath,
+    copyToClipboard,
     insertPath,
     refreshTree,
     handleDirectoryListing,
