@@ -547,10 +547,16 @@ export function setPermissionMode(
 
     // Process is not running or turn is active — kill and recreate state.
     // The next handleChat() will start a fresh process with the correct --permission-mode.
+    const wasTurnActive = existing.turnActive;
     const lastSession = existing.claudeSessionId || existing.lastClaudeSessionId;
     const workDir = existing.workDir;
 
     cleanupConversation(convId);
+
+    // Notify UI if we interrupted an active turn
+    if (wasTurnActive) {
+      sendFn({ type: 'execution_cancelled', conversationId: convId });
+    }
 
     const newState: ConversationState = {
       child: null,

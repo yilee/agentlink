@@ -549,16 +549,9 @@ export function createConnection(deps) {
           messages.value = buildHistoryBatch(msg.history, () => streaming.nextId());
           toolMsgMap.clear();
         }
-        // Detect plan mode: prefer agent-provided flag, fallback to history scan
+        // Detect plan mode from agent-provided flag
         if (msg.planMode != null) {
           if (setPlanMode) setPlanMode(!!msg.planMode);
-        } else if (msg.history && Array.isArray(msg.history)) {
-          const lastPlanTool = findLast(msg.history, h =>
-            h.role === 'tool' && (h.toolName === 'EnterPlanMode' || h.toolName === 'ExitPlanMode')
-          );
-          if (lastPlanTool) {
-            if (setPlanMode) setPlanMode(lastPlanTool.toolName === 'EnterPlanMode');
-          }
         }
         loadingHistory.value = false;
         // Restore live status from agent (compacting / processing)

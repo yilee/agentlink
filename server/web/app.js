@@ -584,6 +584,11 @@ const App = {
       if (currentConversationId.value) {
         processingConversations.value[currentConversationId.value] = true;
       }
+      const instruction = newMode ? 'Enter plan mode now.' : 'Exit plan mode now.';
+      messages.value.push({
+        id: streaming.nextId(), role: 'user', content: instruction,
+        status: 'sent', timestamp: new Date(),
+      });
       wsSend({ type: 'set_plan_mode', enabled: newMode, conversationId: currentConversationId.value, claudeSessionId: currentClaudeSessionId.value });
       nextTick(() => scrollToBottom());
     }
@@ -2453,7 +2458,7 @@ const App = {
                 <!-- Plan mode switch indicator -->
                 <div v-else-if="msg.role === 'tool' && (msg.toolName === 'EnterPlanMode' || msg.toolName === 'ExitPlanMode')" class="plan-mode-divider">
                   <span class="plan-mode-divider-line"></span>
-                  <span class="plan-mode-divider-text">{{ msg.toolName === 'EnterPlanMode' ? (t ? t('tool.enteredPlanMode') : 'Entered Plan Mode') : (t ? t('tool.exitedPlanMode') : 'Exited Plan Mode') }}</span>
+                  <span class="plan-mode-divider-text">{{ msg.toolName === 'EnterPlanMode' ? t('tool.enteredPlanMode') : t('tool.exitedPlanMode') }}</span>
                   <span class="plan-mode-divider-line"></span>
                 </div>
 

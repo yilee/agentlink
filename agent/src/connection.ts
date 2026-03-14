@@ -624,12 +624,16 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         send({ type: 'plan_mode_changed', enabled, conversationId });
       } else {
         // Immediate path — process was killed/recreated or placeholder created.
-        // If exiting plan mode on a session with history (has claudeSessionId),
-        // send "Exit plan mode now." so Claude's JSONL records the exit.
-        if (!enabled && claudeSessionId) {
-          claudeHandleChat(conversationId, 'Exit plan mode now.', state.workDir);
-        }
         send({ type: 'plan_mode_changed', enabled, conversationId, immediate: true });
+
+        // When exiting plan mode, spawn Claude to record ExitPlanMode in the
+        // JSONL so it doesn't think it's still in plan mode on next resume.
+        const convId = conversationId || 'default';
+        const conv = getConversation(convId);
+        const sessionToFix = conv?.lastClaudeSessionId || claudeSessionId;
+        if (!enabled && sessionToFix) {
+          claudeHandleChat(conversationId, 'Exit plan mode now.', conv?.workDir || state.workDir, { resumeSessionId: sessionToFix });
+        }
       }
       break;
     }
