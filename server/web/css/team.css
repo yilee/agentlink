@@ -21,7 +21,7 @@
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 .team-mode-btn.active {
@@ -194,7 +194,7 @@
   color: var(--text-secondary);
   font-size: 0.78rem;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 .team-lead-prompt-reset:hover {
   color: var(--text-primary);
@@ -258,7 +258,7 @@
   color: var(--text-secondary);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .team-create-cancel:hover {
@@ -293,7 +293,7 @@
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  transition: all 0.15s;
+  transition: border-color 0.15s, background 0.15s;
   background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 100%);
 }
 
@@ -354,7 +354,7 @@
   border: 1px solid var(--accent);
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, background 0.15s;
   white-space: nowrap;
 }
 
@@ -500,7 +500,7 @@
   color: var(--error);
   font-size: 0.8rem;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s;
 }
 
 .team-dissolve-btn:hover {
@@ -515,7 +515,7 @@
   color: var(--text-secondary);
   font-size: 0.8rem;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .team-back-btn:hover {
@@ -531,7 +531,7 @@
   color: var(--accent);
   font-size: 0.8rem;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s;
 }
 
 .team-new-btn:hover {
@@ -1111,7 +1111,7 @@
   color: var(--text-secondary);
   font-size: 0.78rem;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s;
   margin-right: 4px;
 }
 

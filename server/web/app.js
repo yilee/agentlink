@@ -406,8 +406,15 @@ const App = {
     });
     setFilePreview(filePreview);
 
-    // Track mobile state on resize
-    let _resizeHandler = () => { isMobile.value = window.innerWidth <= 768; };
+    // Track mobile state on resize (rAF-throttled)
+    let _resizeRafId = 0;
+    let _resizeHandler = () => {
+      if (_resizeRafId) return;
+      _resizeRafId = requestAnimationFrame(() => {
+        _resizeRafId = 0;
+        isMobile.value = window.innerWidth <= 768;
+      });
+    };
     window.addEventListener('resize', _resizeHandler);
 
     // Close workdir menu on outside click or Escape
@@ -426,10 +433,11 @@ const App = {
 
     // ── Computed ──
     const hasInput = computed(() => !!(inputText.value.trim() || attachments.value.length > 0));
+    const hasPendingQuestion = computed(() => messages.value.some(m => m.role === 'ask-question' && !m.answered));
     const canSend = computed(() =>
-      status.value === 'Connected' && hasInput.value && !isCompacting.value
-      && !messages.value.some(m => m.role === 'ask-question' && !m.answered)
+      status.value === 'Connected' && hasInput.value && !isCompacting.value && !hasPendingQuestion.value
     );
+    const hasStreamingMessage = computed(() => messages.value.some(m => m.isStreaming));
 
     // ── Slash command menu ──
     const slashMenuVisible = computed(() => {
@@ -695,7 +703,7 @@ const App = {
       status, agentName, hostname, workDir, sessionId, error,
       serverVersion, agentVersion, latency,
       messages, visibleMessages, hasMoreMessages, loadMoreMessages,
-      inputText, isProcessing, isCompacting, canSend, hasInput, inputRef, queuedMessages, usageStats,
+      inputText, isProcessing, isCompacting, canSend, hasInput, hasStreamingMessage, inputRef, queuedMessages, usageStats,
       slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen, selectSlashCommand, openSlashMenu,
       sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
       // Side question (/btw)
@@ -2033,7 +2041,7 @@ const App = {
                             </span>
                             <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                           </div>
-                          <div v-show="msg.expanded" class="tool-expand">
+                          <div v-if="msg.expanded" class="tool-expand">
                             <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
                             <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
                             <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
@@ -2090,7 +2098,7 @@ const App = {
                         </span>
                         <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                       </div>
-                      <div v-show="msg.expanded" class="tool-expand">
+                      <div v-if="msg.expanded" class="tool-expand">
                         <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
                         <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
                         <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
@@ -2394,7 +2402,7 @@ const App = {
                     </span>
                     <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                   </div>
-                  <div v-show="msg.expanded" class="tool-expand team-agent-tool-expand">
+                  <div v-if="msg.expanded" class="tool-expand team-agent-tool-expand">
                     <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
                     <div v-if="msg.toolOutput" class="team-agent-tool-result">
                       <div class="team-agent-tool-result-label">{{ t('team.agentResult') }}</div>
@@ -2415,7 +2423,7 @@ const App = {
                     </span>
                     <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
                   </div>
-                  <div v-show="msg.expanded" class="tool-expand">
+                  <div v-if="msg.expanded" class="tool-expand">
                     <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
                     <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
                     <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
@@ -2490,7 +2498,7 @@ const App = {
                 </div>
               </div>
 
-              <div v-if="isProcessing && !messages.some(m => m.isStreaming)" class="typing-indicator">
+              <div v-if="isProcessing && !hasStreamingMessage" class="typing-indicator">
                 <span></span><span></span><span></span>
               </div>
             </div>

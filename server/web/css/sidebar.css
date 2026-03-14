@@ -210,11 +210,6 @@
   transform: rotate(-90deg);
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 .spinning {
   animation: spin 0.8s linear infinite;
 }
@@ -329,12 +324,7 @@
   background: var(--accent);
   margin-right: 6px;
   vertical-align: middle;
-  animation: pulse-dot 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .session-meta {

@@ -34,19 +34,20 @@ export function createStreaming({ messages, scrollToBottom }) {
       ? messages.value.find(m => m.id === streamingMessageId)
       : null;
 
+    const chunk = pendingText.slice(0, CHARS_PER_TICK);
+    pendingText = pendingText.slice(CHARS_PER_TICK);
+
     if (!streamMsg) {
       const id = ++messageIdCounter;
-      const chunk = pendingText.slice(0, CHARS_PER_TICK);
-      pendingText = pendingText.slice(CHARS_PER_TICK);
       messages.value.push({
         id, role: 'assistant', content: chunk,
         isStreaming: true, timestamp: new Date(),
+        _chunks: [chunk],
       });
       streamingMessageId = id;
     } else {
-      const chunk = pendingText.slice(0, CHARS_PER_TICK);
-      pendingText = pendingText.slice(CHARS_PER_TICK);
-      streamMsg.content += chunk;
+      streamMsg._chunks.push(chunk);
+      streamMsg.content = streamMsg._chunks.join('');
     }
     scrollToBottom();
     if (pendingText) revealTimer = setTimeout(revealTick, TICK_MS);
@@ -58,12 +59,15 @@ export function createStreaming({ messages, scrollToBottom }) {
     const streamMsg = streamingMessageId !== null
       ? messages.value.find(m => m.id === streamingMessageId) : null;
     if (streamMsg) {
-      streamMsg.content += pendingText;
+      if (!streamMsg._chunks) streamMsg._chunks = [streamMsg.content];
+      streamMsg._chunks.push(pendingText);
+      streamMsg.content = streamMsg._chunks.join('');
     } else {
       const id = ++messageIdCounter;
       messages.value.push({
         id, role: 'assistant', content: pendingText,
         isStreaming: true, timestamp: new Date(),
+        _chunks: [pendingText],
       });
       streamingMessageId = id;
     }

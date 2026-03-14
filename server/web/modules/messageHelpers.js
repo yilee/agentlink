@@ -4,6 +4,13 @@ import { renderMarkdown } from './markdown.js';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CONTEXT_SUMMARY_PREFIX = 'This session is being continued from a previous conversation';
 
+function parseToolInput(msg) {
+  if (msg._parsedInput !== undefined) return msg._parsedInput;
+  try { msg._parsedInput = JSON.parse(msg.toolInput); }
+  catch { msg._parsedInput = null; }
+  return msg._parsedInput;
+}
+
 export function isContextSummary(text) {
   return typeof text === 'string' && text.trimStart().startsWith(CONTEXT_SUMMARY_PREFIX);
 }
@@ -28,6 +35,10 @@ export function formatTimestamp(ts) {
 
 export function getRenderedContent(msg) {
   if (msg.role !== 'assistant' && !msg.isCommandOutput) return msg.content;
+  if (msg.isStreaming) {
+    const t = msg.content || '';
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  }
   return renderMarkdown(msg.content);
 }
 
@@ -55,9 +66,9 @@ export function toggleTool(msg) {
 
 export function getToolSummary(msg, t) {
   const name = msg.toolName;
-  const input = msg.toolInput;
+  const obj = parseToolInput(msg);
+  if (!obj) return '';
   try {
-    const obj = JSON.parse(input);
     if (name === 'Read' && obj.file_path) return obj.file_path;
     if (name === 'Edit' && obj.file_path) return obj.file_path;
     if (name === 'Write' && obj.file_path) return obj.file_path;
@@ -83,8 +94,9 @@ export function isEditTool(msg) {
 
 export function getFormattedToolInput(msg, t) {
   if (!msg.toolInput) return null;
+  const obj = parseToolInput(msg);
+  if (!obj) return null;
   try {
-    const obj = JSON.parse(msg.toolInput);
     const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const name = msg.toolName;
 
@@ -169,8 +181,9 @@ export function getFormattedToolInput(msg, t) {
 }
 
 export function getEditDiffHtml(msg, t) {
+  const obj = parseToolInput(msg);
+  if (!obj) return null;
   try {
-    const obj = JSON.parse(msg.toolInput);
     if (!obj.old_string && !obj.new_string) return null;
     const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const filePath = obj.file_path || '';

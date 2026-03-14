@@ -44,7 +44,8 @@ export function createHighlightScheduler() {
     _hlTimer = setTimeout(() => {
       _hlTimer = null;
       if (typeof hljs !== 'undefined') {
-        document.querySelectorAll('pre code:not([data-highlighted])').forEach(block => {
+        const root = document.querySelector('.message-list') || document;
+        root.querySelectorAll('pre code:not([data-highlighted])').forEach(block => {
           hljs.highlightElement(block);
           block.dataset.highlighted = 'true';
         });

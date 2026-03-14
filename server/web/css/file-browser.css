@@ -151,10 +151,6 @@
   margin-left: auto;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 .file-tree-empty {
   padding: 4px 8px;
   font-size: 0.75rem;

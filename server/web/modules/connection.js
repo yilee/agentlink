@@ -7,6 +7,13 @@ const MAX_RECONNECT_ATTEMPTS = 50;
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 15000;
 
+function findLast(arr, predicate) {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (predicate(arr[i])) return arr[i];
+  }
+  return undefined;
+}
+
 /**
  * Creates the WebSocket connection controller.
  * @param {object} deps - All reactive state and callbacks needed
@@ -469,7 +476,7 @@ export function createConnection(deps) {
         } else if (msg.status === 'completed') {
           isCompacting.value = false;
           // Update the start message to show completed
-          const startMsg = [...messages.value].reverse().find(m => m.isCompactStart && !m.compactDone);
+          const startMsg = findLast(messages.value, m => m.isCompactStart && !m.compactDone);
           if (startMsg) {
             startMsg.content = t('system.contextCompacted');
             startMsg.compactDone = true;
