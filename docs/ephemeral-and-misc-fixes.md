@@ -48,6 +48,23 @@ Tracked issues discovered during config/auto-update audit (2026-03-14).
 - `resolveConfig` with `ignoreConfigFile=true` (same as fix #1)
 - Skip `startAutoUpdate()` in ephemeral daemon mode
 
+**Shutdown mechanism for automated testing:**
+
+Since ephemeral mode skips writing `agent.json`/`server.json`, the normal `stop` commands won't find the process. Three options:
+
+1. **`--pid-file <path>` flag (recommended):** Add an option to both client and server CLI that writes the daemon PID to a specified file, independent of `agent.json`/`server.json`. The test harness reads the file and kills by PID. Clean, deterministic, cross-platform.
+   ```bash
+   node server/dist/cli.js start --daemon --ephemeral --pid-file /tmp/test-server.pid
+   node agent/dist/cli.js start --daemon --ephemeral --pid-file /tmp/test-agent.pid
+   # Shutdown:
+   kill $(cat /tmp/test-server.pid)  # or taskkill on Windows
+   kill $(cat /tmp/test-agent.pid)
+   ```
+
+2. **Parse PID from spawn output:** The daemon start command already prints `PID <N>`. Test harness can capture and parse stdout. No code changes needed but fragile (output format coupling).
+
+3. **Environment-based identification:** Set a unique env var (e.g. `AGENTLINK_TEST_ID=run42`) and use `pgrep -f` to find/kill. Cross-platform issues on Windows.
+
 ## Server (`server/src/`)
 
 ### 4. `upgrade` command: Windows path wrong
