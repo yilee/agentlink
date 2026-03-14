@@ -1,6 +1,11 @@
 <script setup>
 import { inject } from 'vue';
 
+import BtwOverlay from './components/BtwOverlay.vue';
+import FolderPickerDialog from './components/FolderPickerDialog.vue';
+import ConfirmDialog from './components/ConfirmDialog.vue';
+import AuthDialog from './components/AuthDialog.vue';
+
 const store = inject('store');
 const {
   status,
@@ -1535,31 +1540,7 @@ const {
           </div>
           </template>
 
-          <!-- ══ Side question overlay ══ -->
-          <Transition name="fade">
-            <div v-if="btwState" class="btw-overlay" @click.self="dismissBtw">
-              <div class="btw-panel">
-                <div class="btw-header">
-                  <span class="btw-title">{{ t('btw.title') }}</span>
-                  <button class="btw-close" @click="dismissBtw" :aria-label="t('btw.dismiss')">&#10005;</button>
-                </div>
-                <div class="btw-body">
-                  <div class="btw-question">{{ btwState.question }}</div>
-                  <div v-if="btwState.error" class="btw-error">{{ btwState.error }}</div>
-                  <template v-else>
-                    <div v-if="btwState.answer" class="btw-answer markdown-body" v-html="renderMarkdown(btwState.answer)"></div>
-                    <div v-if="!btwState.done" class="btw-loading">
-                      <span class="btw-loading-dots"><span></span><span></span><span></span></span>
-                      <span v-if="!btwState.answer" class="btw-loading-text">{{ t('btw.thinking') }}</span>
-                    </div>
-                  </template>
-                </div>
-                <div v-if="btwState.done && !btwState.error" class="btw-hint">
-                  {{ isMobile ? t('btw.tapDismiss') : t('btw.escDismiss') }}
-                </div>
-              </div>
-            </div>
-          </Transition>
+          <BtwOverlay />
 
           <!-- Input area (shown in both chat and team create mode) -->
           <div class="input-area" v-if="viewMode === 'chat'">
@@ -1715,114 +1696,11 @@ const {
 
       </div>
 
-      <!-- Folder Picker Modal -->
-      <div class="folder-picker-overlay" v-if="folderPickerOpen" @click.self="folderPickerOpen = false">
-        <div class="folder-picker-dialog">
-          <div class="folder-picker-header">
-            <span>{{ t('folderPicker.title') }}</span>
-            <button class="folder-picker-close" @click="folderPickerOpen = false">&times;</button>
-          </div>
-          <div class="folder-picker-nav">
-            <button class="folder-picker-up" @click="folderPickerNavigateUp" :disabled="!folderPickerPath" :title="t('folderPicker.parentDir')">
-              <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-            </button>
-            <input class="folder-picker-path-input" type="text" v-model="folderPickerPath" @keydown.enter="folderPickerGoToPath" :placeholder="t('folderPicker.pathPlaceholder')" spellcheck="false" />
-          </div>
-          <div class="folder-picker-list">
-            <div v-if="folderPickerLoading" class="folder-picker-loading">
-              <div class="history-loading-spinner"></div>
-              <span>{{ t('preview.loading') }}</span>            </div>
-            <template v-else>
-              <div
-                v-for="entry in folderPickerEntries" :key="entry.name"
-                :class="['folder-picker-item', { 'folder-picker-selected': folderPickerSelected === entry.name }]"
-                @click="folderPickerSelectItem(entry)"
-                @dblclick="folderPickerEnter(entry)"
-              >
-                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                <span>{{ entry.name }}</span>
-              </div>
-              <div v-if="folderPickerEntries.length === 0" class="folder-picker-empty">{{ t('folderPicker.noSubdirs') }}</div>
-            </template>
-          </div>
-          <div class="folder-picker-footer">
-            <button class="folder-picker-cancel" @click="folderPickerOpen = false">{{ t('folderPicker.cancel') }}</button>
-            <button class="folder-picker-confirm" @click="confirmFolderPicker" :disabled="!folderPickerPath">{{ t('folderPicker.open') }}</button>
-          </div>
-        </div>
-      </div>
+      <FolderPickerDialog />
 
-      <!-- Delete Session Confirmation Dialog -->
-      <div class="folder-picker-overlay" v-if="deleteConfirmOpen" @click.self="cancelDeleteSession">
-        <div class="delete-confirm-dialog">
-          <div class="delete-confirm-header">{{ t('dialog.deleteSession') }}</div>
-          <div class="delete-confirm-body">
-            <p>{{ t('dialog.deleteSessionConfirm') }}</p>
-            <p class="delete-confirm-title">{{ deleteConfirmTitle }}</p>
-            <p class="delete-confirm-warning">{{ t('dialog.cannotUndo') }}</p>
-          </div>
-          <div class="delete-confirm-footer">
-            <button class="folder-picker-cancel" @click="cancelDeleteSession">{{ t('dialog.cancel') }}</button>
-            <button class="delete-confirm-btn" @click="confirmDeleteSession">{{ t('dialog.delete') }}</button>
-          </div>
-        </div>
-      </div>
+      <ConfirmDialog />
 
-      <!-- Delete Team Confirmation Dialog -->
-      <div class="folder-picker-overlay" v-if="deleteTeamConfirmOpen" @click.self="cancelDeleteTeam">
-        <div class="delete-confirm-dialog">
-          <div class="delete-confirm-header">{{ t('dialog.deleteTeam') }}</div>
-          <div class="delete-confirm-body">
-            <p>{{ t('dialog.deleteTeamConfirm') }}</p>
-            <p class="delete-confirm-title">{{ deleteTeamConfirmTitle }}</p>
-            <p class="delete-confirm-warning">{{ t('dialog.cannotUndo') }}</p>
-          </div>
-          <div class="delete-confirm-footer">
-            <button class="folder-picker-cancel" @click="cancelDeleteTeam">{{ t('dialog.cancel') }}</button>
-            <button class="delete-confirm-btn" @click="confirmDeleteTeam">{{ t('dialog.delete') }}</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Password Authentication Dialog -->
-      <div class="folder-picker-overlay" v-if="authRequired && !authLocked">
-        <div class="auth-dialog">
-          <div class="auth-dialog-header">
-            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-            <span>{{ t('auth.sessionProtected') }}</span>
-          </div>
-          <div class="auth-dialog-body">
-            <p>{{ t('auth.passwordRequired') }}</p>
-            <input
-              type="password"
-              class="auth-password-input"
-              v-model="authPassword"
-              @keydown.enter="submitPassword"
-              :placeholder="t('auth.passwordPlaceholder')"
-              autofocus
-            />
-            <p v-if="authError" class="auth-error">{{ authError }}</p>
-            <p v-if="authAttempts" class="auth-attempts">{{ authAttempts }}</p>
-          </div>
-          <div class="auth-dialog-footer">
-            <button class="auth-submit-btn" @click="submitPassword" :disabled="!authPassword.trim()">{{ t('auth.unlock') }}</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Auth Locked Out -->
-      <div class="folder-picker-overlay" v-if="authLocked">
-        <div class="auth-dialog auth-dialog-locked">
-          <div class="auth-dialog-header">
-            <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-            <span>{{ t('auth.accessLocked') }}</span>
-          </div>
-          <div class="auth-dialog-body">
-            <p>{{ authError }}</p>
-            <p class="auth-locked-hint">{{ t('auth.tryAgainLater') }}</p>
-          </div>
-        </div>
-      </div>
+      <AuthDialog />
 
       <!-- Workdir switching overlay -->
       <Transition name="fade">
