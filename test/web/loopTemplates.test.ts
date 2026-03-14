@@ -8,7 +8,7 @@ import {
   LOOP_TEMPLATE_KEYS,
   buildCronExpression,
   formatSchedule,
-} from '../../server/web/modules/loopTemplates.js';
+} from '../../server/web-src/src/modules/loopTemplates.js';
 
 describe('loopTemplates', () => {
   describe('LOOP_TEMPLATES', () => {
