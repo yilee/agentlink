@@ -246,6 +246,15 @@ body {
   50% { opacity: 0.3; }
 }
 
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ── Main body (sidebar + chat) ── */
 .main-body {
   flex: 1;
