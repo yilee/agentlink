@@ -19,9 +19,8 @@ import { createConnection } from './modules/connection.js';
 import { createFileBrowser } from './modules/fileBrowser.js';
 import { createFilePreview } from './modules/filePreview.js';
 import { createTeam } from './modules/team.js';
-import { TEMPLATES, TEMPLATE_KEYS, buildFullLeadPrompt } from './modules/teamTemplates.js';
+import { createMemory } from './modules/memory.js';
 import { createLoop } from './modules/loop.js';
-import { LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS, buildCronExpression, formatSchedule } from './modules/loopTemplates.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
 
@@ -100,11 +99,6 @@ export function createStore() {
   const renameText = ref('');
 
   // Team rename/delete state
-  const renamingTeamId = ref(null);
-  const renameTeamText = ref('');
-  const deleteTeamConfirmOpen = ref(false);
-  const deleteTeamConfirmTitle = ref('');
-  const pendingDeleteTeamId = ref(null);
 
   // Working directory history
   const workdirHistory = ref([]);
@@ -142,10 +136,6 @@ export function createStore() {
   const sidebarView = ref('sessions');
   const isMobile = ref(window.innerWidth <= 768);
   const workdirMenuOpen = ref(false);
-  const teamsCollapsed = ref(false);
-  const chatsCollapsed = ref(false);
-  const loopsCollapsed = ref(false);
-
   // Memory management state
   const memoryPanelOpen = ref(false);
   const memoryFiles = ref([]);
@@ -154,58 +144,17 @@ export function createStore() {
   const memoryEditing = ref(false);
   const memoryEditContent = ref('');
   const memorySaving = ref(false);
+  const teamsCollapsed = ref(false);
+  const chatsCollapsed = ref(false);
+  const loopsCollapsed = ref(false);
+
   const _sidebarCollapseKey = () => hostname.value ? `agentlink-sidebar-collapsed-${hostname.value}` : null;
   const loadingTeams = ref(false);
   const loadingLoops = ref(false);
 
   // Team creation state
-  const teamInstruction = ref('');
-  const selectedTemplate = ref('custom');
-  const editedLeadPrompt = ref(TEMPLATES.custom.leadPrompt);
-  const leadPromptExpanded = ref(false);
-  const teamExamples = [
-    {
-      icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>',
-      title: 'Full-stack App',
-      template: 'full-stack',
-      text: 'Build a single-page calculator app: one agent creates the HTML/CSS UI, one implements the JavaScript logic, and one writes tests.',
-    },
-    {
-      icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>',
-      title: 'Research',
-      template: 'research',
-      text: 'Research this project\'s architecture: one agent analyzes the backend structure, one maps the frontend components, and one reviews the build and deployment pipeline. Produce a unified architecture report.',
-    },
-    {
-      icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
-      title: '\u4EE3\u7801\u5BA1\u67E5',
-      template: 'code-review',
-      text: '\u5BA1\u67E5\u5F53\u524D\u9879\u76EE\u7684\u4EE3\u7801\u8D28\u91CF\u3001\u5B89\u5168\u6F0F\u6D1E\u548C\u6D4B\u8BD5\u8986\u76D6\u7387\uFF0C\u6309\u4E25\u91CD\u7A0B\u5EA6\u751F\u6210\u5206\u7EA7\u62A5\u544A\uFF0C\u5E76\u7ED9\u51FA\u4FEE\u590D\u5EFA\u8BAE\u3002',
-    },
-    {
-      icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>',
-      title: '\u6280\u672F\u6587\u6863',
-      template: 'content',
-      text: '\u4E3A\u5F53\u524D\u9879\u76EE\u7F16\u5199\u4E00\u4EFD\u5B8C\u6574\u7684\u6280\u672F\u6587\u6863\uFF1A\u5148\u8C03\u7814\u9879\u76EE\u7ED3\u6784\u548C\u6838\u5FC3\u6A21\u5757\uFF0C\u7136\u540E\u64B0\u5199\u5305\u542B\u67B6\u6784\u6982\u89C8\u3001API \u53C2\u8003\u548C\u4F7F\u7528\u6307\u5357\u7684\u6587\u6863\uFF0C\u6700\u540E\u6821\u5BA1\u786E\u4FDD\u51C6\u786E\u6027\u548C\u53EF\u8BFB\u6027\u3002',
-    },
-  ];
-  const kanbanExpanded = ref(false);
-  const instructionExpanded = ref(false);
 
   // Loop creation/editing form state
-  const loopName = ref('');
-  const loopPrompt = ref('');
-  const loopScheduleType = ref('daily');
-  const loopScheduleHour = ref(9);
-  const loopScheduleMinute = ref(0);
-  const loopScheduleDayOfWeek = ref(1);
-  const loopCronExpr = ref('0 9 * * *');
-  const loopSelectedTemplate = ref(null);
-  const loopDeleteConfirmOpen = ref(false);
-  const loopDeleteConfirmId = ref(null);
-  const loopDeleteConfirmName = ref('');
-  const renamingLoopId = ref(null);
-  const renameLoopText = ref('');
 
   // File preview state
   const previewPanelOpen = ref(false);
@@ -213,12 +162,6 @@ export function createStore() {
   const previewFile = ref(null);
   const previewLoading = ref(false);
   const previewMarkdownRendered = ref(false);
-  const isMemoryPreview = computed(() => {
-    if (!previewFile.value?.filePath || !memoryDir.value) return false;
-    const fp = previewFile.value.filePath.replace(/\\/g, '/');
-    const md = memoryDir.value.replace(/\\/g, '/');
-    return fp.startsWith(md);
-  });
 
   // ── switchConversation: save current → load target ──
   let _getToolMsgMap = () => new Map();
@@ -347,6 +290,8 @@ export function createStore() {
     deleteConfirmOpen, deleteConfirmTitle,
     renamingSessionId, renameText,
     hostname, workdirHistory, workdirSwitching,
+    workdirMenuOpen, memoryPanelOpen, filePanelOpen,
+    isMobile, sidebarView,
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations,
     switchConversation,
@@ -391,6 +336,8 @@ export function createStore() {
   // Loop module
   const loop = createLoop({
     wsSend, scrollToBottom, loadingLoops,
+    setViewMode: (mode) => { team.viewMode.value = mode; },
+    formatRelativeTime: (ts) => formatRelativeTime(ts, t),
   });
   setLoop(loop);
   sidebar.setOnSwitchToChat(() => {
@@ -405,13 +352,30 @@ export function createStore() {
     sidebarOpen, sidebarView,
   });
   setFileBrowser(fileBrowser);
+  sidebar.setFileBrowser(fileBrowser);
 
   // File preview module
   const filePreview = createFilePreview({
     wsSend, previewPanelOpen, previewPanelWidth, previewFile, previewLoading,
     previewMarkdownRendered, sidebarView, sidebarOpen, isMobile, renderMarkdown,
   });
+
+  // Memory module
+  const memory = createMemory({
+    wsSend, workDir,
+    memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
+    memoryEditing, memoryEditContent, memorySaving,
+    previewFile: filePreview.previewFile, filePreview,
+    isMobile, sidebarView, workdirMenuOpen, filePanelOpen, t,
+  });
   setFilePreview(filePreview);
+
+  const isMemoryPreview = computed(() => {
+    if (!filePreview.previewFile.value?.filePath || !memoryDir.value) return false;
+    const fp = filePreview.previewFile.value.filePath.replace(/\\/g, '/');
+    const md = memoryDir.value.replace(/\\/g, '/');
+    return fp.startsWith(md);
+  });
 
   // Track mobile state on resize (rAF-throttled)
   let _resizeRafId = 0;
@@ -798,40 +762,7 @@ export function createStore() {
     startRename: sidebar.startRename,
     confirmRename: sidebar.confirmRename,
     cancelRename: sidebar.cancelRename,
-    // Team rename/delete
-    renamingTeamId, renameTeamText,
-    deleteTeamConfirmOpen, deleteTeamConfirmTitle, pendingDeleteTeamId,
-    startTeamRename(tm) {
-      renamingTeamId.value = tm.teamId;
-      renameTeamText.value = tm.title || '';
-    },
-    confirmTeamRename() {
-      const tid = renamingTeamId.value;
-      const title = renameTeamText.value.trim();
-      if (!tid || !title) { renamingTeamId.value = null; renameTeamText.value = ''; return; }
-      team.renameTeamById(tid, title);
-      renamingTeamId.value = null;
-      renameTeamText.value = '';
-    },
-    cancelTeamRename() {
-      renamingTeamId.value = null;
-      renameTeamText.value = '';
-    },
-    requestDeleteTeam(tm) {
-      pendingDeleteTeamId.value = tm.teamId;
-      deleteTeamConfirmTitle.value = tm.title || tm.teamId.slice(0, 8);
-      deleteTeamConfirmOpen.value = true;
-    },
-    confirmDeleteTeam() {
-      if (!pendingDeleteTeamId.value) return;
-      team.deleteTeamById(pendingDeleteTeamId.value);
-      deleteTeamConfirmOpen.value = false;
-      pendingDeleteTeamId.value = null;
-    },
-    cancelDeleteTeam() {
-      deleteTeamConfirmOpen.value = false;
-      pendingDeleteTeamId.value = null;
-    },
+    // Team rename/delete (forwarded from team module above)
     // Working directory history
     filteredWorkdirHistory: sidebar.filteredWorkdirHistory,
     switchToWorkdir: sidebar.switchToWorkdir,
@@ -857,74 +788,21 @@ export function createStore() {
     // File preview
     previewPanelOpen, previewPanelWidth, previewFile, previewLoading, previewMarkdownRendered, filePreview,
     workdirMenuOpen,
-    teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
-    toggleWorkdirMenu() { workdirMenuOpen.value = !workdirMenuOpen.value; },
-    workdirMenuBrowse() {
-      workdirMenuOpen.value = false;
-      if (isMobile.value) { sidebarView.value = 'files'; fileBrowser.openPanel(); }
-      else { memoryPanelOpen.value = false; fileBrowser.togglePanel(); }
-    },
-    workdirMenuChangeDir() {
-      workdirMenuOpen.value = false;
-      sidebar.openFolderPicker();
-    },
-    workdirMenuCopyPath() {
-      workdirMenuOpen.value = false;
-      fileBrowser.copyToClipboard(workDir.value);
-    },
     // Memory management
     memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
     memoryEditing, memoryEditContent, memorySaving, isMemoryPreview,
-    workdirMenuMemory() {
-      workdirMenuOpen.value = false;
-      if (isMobile.value) {
-        sidebarView.value = 'memory';
-      } else {
-        memoryPanelOpen.value = !memoryPanelOpen.value;
-        if (memoryPanelOpen.value) filePanelOpen.value = false;
-      }
-      if (!memoryFiles.value.length) {
-        memoryLoading.value = true;
-        wsSend({ type: 'list_memory' });
-      }
-    },
-    refreshMemory() {
-      memoryLoading.value = true;
-      wsSend({ type: 'list_memory' });
-    },
-    openMemoryFile(file) {
-      memoryEditing.value = false;
-      memoryEditContent.value = '';
-      if (memoryDir.value) {
-        const sep = memoryDir.value.includes('\\') ? '\\' : '/';
-        filePreview.openPreview(memoryDir.value + sep + file.name);
-      }
-      if (isMobile.value) sidebarView.value = 'preview';
-    },
-    startMemoryEdit() {
-      memoryEditing.value = true;
-      memoryEditContent.value = previewFile.value?.content || '';
-    },
-    cancelMemoryEdit() {
-      if (memoryEditContent.value !== (previewFile.value?.content || '')) {
-        if (!confirm(t('memory.discardChanges'))) return;
-      }
-      memoryEditing.value = false;
-      memoryEditContent.value = '';
-    },
-    saveMemoryEdit() {
-      if (!previewFile.value) return;
-      memorySaving.value = true;
-      wsSend({
-        type: 'update_memory',
-        filename: previewFile.value.fileName,
-        content: memoryEditContent.value,
-      });
-    },
-    deleteMemoryFile(file) {
-      if (!confirm(t('memory.deleteConfirm', { name: file.name }))) return;
-      wsSend({ type: 'delete_memory', filename: file.name });
-    },
+    workdirMenuMemory: memory.workdirMenuMemory,
+    refreshMemory: memory.refreshMemory,
+    openMemoryFile: memory.openMemoryFile,
+    startMemoryEdit: memory.startMemoryEdit,
+    cancelMemoryEdit: memory.cancelMemoryEdit,
+    saveMemoryEdit: memory.saveMemoryEdit,
+    deleteMemoryFile: memory.deleteMemoryFile,
+    teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
+    toggleWorkdirMenu: sidebar.toggleWorkdirMenu,
+    workdirMenuBrowse: sidebar.workdirMenuBrowse,
+    workdirMenuChangeDir: sidebar.workdirMenuChangeDir,
+    workdirMenuCopyPath: sidebar.workdirMenuCopyPath,
     // Team mode
     team,
     teamState: team.teamState,
@@ -954,76 +832,8 @@ export function createStore() {
     getAgentMessages: team.getAgentMessages,
     backToChat: team.backToChat,
     newTeam: team.newTeam,
-    teamInstruction,
-    teamExamples,
-    kanbanExpanded,
-    instructionExpanded,
-    selectedTemplate,
-    editedLeadPrompt,
-    leadPromptExpanded,
-    TEMPLATES,
-    TEMPLATE_KEYS,
-    onTemplateChange(key) {
-      selectedTemplate.value = key;
-      editedLeadPrompt.value = TEMPLATES[key].leadPrompt;
-    },
-    resetLeadPrompt() {
-      editedLeadPrompt.value = TEMPLATES[selectedTemplate.value].leadPrompt;
-    },
-    leadPromptPreview() {
-      const text = editedLeadPrompt.value || '';
-      return text.length > 80 ? text.slice(0, 80) + '...' : text;
-    },
-    launchTeamFromPanel() {
-      const inst = teamInstruction.value.trim();
-      if (!inst) return;
-      const tplKey = selectedTemplate.value;
-      const tpl = TEMPLATES[tplKey];
-      const agents = tpl.agents;
-      const leadPrompt = buildFullLeadPrompt(editedLeadPrompt.value, agents, inst);
-      team.launchTeam(inst, leadPrompt, agents);
-      teamInstruction.value = '';
-      // Reset template state for next time
-      selectedTemplate.value = 'custom';
-      editedLeadPrompt.value = TEMPLATES.custom.leadPrompt;
-      leadPromptExpanded.value = false;
-    },
-    formatTeamTime(ts) {
-      if (!ts) return '';
-      const d = new Date(ts);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    },
-    getTaskAgent(task) {
-      const assignee = task.assignee || task.assignedTo;
-      if (!assignee) return null;
-      return team.findAgent(assignee);
-    },
-    viewAgentWithHistory(agentId) {
-      team.viewAgent(agentId);
-      // For historical teams, request agent conversation history from server
-      if (team.historicalTeam.value && team.historicalTeam.value.teamId) {
-        team.requestAgentHistory(team.historicalTeam.value.teamId, agentId);
-      }
-    },
     feedAgentName,
     feedContentRest,
-    getLatestAgentActivity(agentId) {
-      // Find the latest feed entry for this agent
-      const t = team.displayTeam.value;
-      if (!t || !t.feed) return '';
-      for (let i = t.feed.length - 1; i >= 0; i--) {
-        const entry = t.feed[i];
-        if (entry.agentId === agentId && entry.type === 'tool_call') {
-          // Strip agent name prefix since it's already shown on the card
-          const agent = team.findAgent(agentId);
-          if (agent && agent.name && entry.content.startsWith(agent.name)) {
-            return entry.content.slice(agent.name.length).trimStart();
-          }
-          return entry.content;
-        }
-      }
-      return '';
-    },
     // Loop mode
     loop,
     loopsList: loop.loopsList,
@@ -1047,185 +857,5 @@ export function createStore() {
     viewExecution: loop.viewExecution,
     backToLoopsList: loop.backToLoopsList,
     backToLoopDetail: loop.backToLoopDetail,
-    LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS,
-    buildCronExpression, formatSchedule,
-    // Loop form state
-    loopName, loopPrompt, loopScheduleType,
-    loopScheduleHour, loopScheduleMinute, loopScheduleDayOfWeek,
-    loopCronExpr, loopSelectedTemplate,
-    loopDeleteConfirmOpen, loopDeleteConfirmId, loopDeleteConfirmName,
-    renamingLoopId, renameLoopText,
-    startLoopRename(l) {
-      renamingLoopId.value = l.id;
-      renameLoopText.value = l.name || '';
-    },
-    confirmLoopRename() {
-      const lid = renamingLoopId.value;
-      const name = renameLoopText.value.trim();
-      if (!lid || !name) { renamingLoopId.value = null; renameLoopText.value = ''; return; }
-      loop.updateExistingLoop(lid, { name });
-      renamingLoopId.value = null;
-      renameLoopText.value = '';
-    },
-    cancelLoopRename() {
-      renamingLoopId.value = null;
-      renameLoopText.value = '';
-    },
-    requestLoopsList() {
-      loop.requestLoopsList();
-    },
-    newLoop() {
-      loop.backToLoopsList();
-      loop.editingLoopId.value = null;
-      loopSelectedTemplate.value = null;
-      loopName.value = '';
-      loopPrompt.value = '';
-      loopScheduleType.value = 'daily';
-      loopScheduleHour.value = 9;
-      loopScheduleMinute.value = 0;
-      loopScheduleDayOfWeek.value = 1;
-      loopCronExpr.value = '0 9 * * *';
-      team.viewMode.value = 'loop';
-    },
-    viewLoop(loopId) {
-      loop.viewLoopDetail(loopId);
-      team.viewMode.value = 'loop';
-    },
-    selectLoopTemplate(key) {
-      loopSelectedTemplate.value = key;
-      const tpl = LOOP_TEMPLATES[key];
-      if (!tpl) return;
-      loopName.value = tpl.name || '';
-      loopPrompt.value = tpl.prompt || '';
-      loopScheduleType.value = tpl.scheduleType || 'daily';
-      const cfg = tpl.scheduleConfig || {};
-      loopScheduleHour.value = cfg.hour ?? 9;
-      loopScheduleMinute.value = cfg.minute ?? 0;
-      loopScheduleDayOfWeek.value = cfg.dayOfWeek ?? 1;
-      loopCronExpr.value = buildCronExpression(tpl.scheduleType || 'daily', cfg);
-    },
-    resetLoopForm() {
-      loopSelectedTemplate.value = null;
-      loopName.value = '';
-      loopPrompt.value = '';
-      loopScheduleType.value = 'daily';
-      loopScheduleHour.value = 9;
-      loopScheduleMinute.value = 0;
-      loopScheduleDayOfWeek.value = 1;
-      loopCronExpr.value = '0 9 * * *';
-      loop.editingLoopId.value = null;
-    },
-    createLoopFromPanel() {
-      const name = loopName.value.trim();
-      const prompt = loopPrompt.value.trim();
-      if (!name || !prompt) return;
-      loop.clearLoopError();
-      const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
-      if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
-      if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
-      const schedule = loopScheduleType.value === 'manual' ? ''
-        : loopScheduleType.value === 'cron' ? loopCronExpr.value
-        : buildCronExpression(loopScheduleType.value, schedCfg);
-      loop.createNewLoop({ name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
-      // Reset form
-      loopSelectedTemplate.value = null;
-      loopName.value = '';
-      loopPrompt.value = '';
-      loopScheduleType.value = 'daily';
-      loopScheduleHour.value = 9;
-      loopScheduleMinute.value = 0;
-      loopScheduleDayOfWeek.value = 1;
-      loopCronExpr.value = '0 9 * * *';
-    },
-    startEditingLoop(l) {
-      loop.editingLoopId.value = l.id;
-      loopName.value = l.name || '';
-      loopPrompt.value = l.prompt || '';
-      loopScheduleType.value = l.scheduleType || 'daily';
-      const cfg = l.scheduleConfig || {};
-      loopScheduleHour.value = cfg.hour ?? 9;
-      loopScheduleMinute.value = cfg.minute ?? 0;
-      loopScheduleDayOfWeek.value = cfg.dayOfWeek ?? 1;
-      loopCronExpr.value = l.schedule || buildCronExpression(l.scheduleType || 'daily', cfg);
-    },
-    saveLoopEdits() {
-      const lid = loop.editingLoopId.value;
-      if (!lid) return;
-      const name = loopName.value.trim();
-      const prompt = loopPrompt.value.trim();
-      if (!name || !prompt) return;
-      loop.clearLoopError();
-      const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
-      if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
-      if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
-      const schedule = loopScheduleType.value === 'manual' ? ''
-        : loopScheduleType.value === 'cron' ? loopCronExpr.value
-        : buildCronExpression(loopScheduleType.value, schedCfg);
-      loop.updateExistingLoop(lid, { name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
-      loop.editingLoopId.value = null;
-      loopName.value = '';
-      loopPrompt.value = '';
-    },
-    cancelEditingLoop() {
-      loop.editingLoopId.value = null;
-      loopName.value = '';
-      loopPrompt.value = '';
-      loopScheduleType.value = 'daily';
-      loopScheduleHour.value = 9;
-      loopScheduleMinute.value = 0;
-    },
-    requestDeleteLoop(l) {
-      loopDeleteConfirmId.value = l.id;
-      loopDeleteConfirmName.value = l.name || l.id.slice(0, 8);
-      loopDeleteConfirmOpen.value = true;
-    },
-    confirmDeleteLoop() {
-      if (!loopDeleteConfirmId.value) return;
-      loop.deleteExistingLoop(loopDeleteConfirmId.value);
-      loopDeleteConfirmOpen.value = false;
-      loopDeleteConfirmId.value = null;
-    },
-    cancelDeleteLoop() {
-      loopDeleteConfirmOpen.value = false;
-      loopDeleteConfirmId.value = null;
-    },
-    loadMoreExecutions() {
-      loop.loadMoreExecutions();
-    },
-    clearLoopError() {
-      loop.clearLoopError();
-    },
-    loopScheduleDisplay(l) {
-      return formatSchedule(l.scheduleType, l.scheduleConfig || {}, l.schedule);
-    },
-    loopLastRunDisplay(l) {
-      if (!l.lastExecution) return '';
-      const exec = l.lastExecution;
-      const ago = formatRelativeTime(exec.startedAt, t);
-      const icon = exec.status === 'success' ? 'OK' : exec.status === 'error' ? 'ERR' : exec.status;
-      return ago + ' ' + icon;
-    },
-    formatExecTime(ts) {
-      if (!ts) return '';
-      const d = new Date(ts);
-      return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    },
-    formatDuration(ms) {
-      if (!ms && ms !== 0) return '';
-      const totalSecs = Math.floor(ms / 1000);
-      if (totalSecs < 60) return totalSecs + 's';
-      const m = Math.floor(totalSecs / 60);
-      const s = totalSecs % 60;
-      if (m < 60) return m + 'm ' + String(s).padStart(2, '0') + 's';
-      const h = Math.floor(m / 60);
-      const rm = m % 60;
-      return h + 'h ' + String(rm).padStart(2, '0') + 'm';
-    },
-    isLoopRunning(loopId) {
-      return !!loop.runningLoops.value[loopId];
-    },
-    padTwo(n) {
-      return String(n).padStart(2, '0');
-    },
   };
 }

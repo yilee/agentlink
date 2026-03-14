@@ -1,5 +1,6 @@
 // ── Team mode: state management and message routing ───────────────────────
 import { ref, computed } from 'vue';
+import { TEMPLATES, TEMPLATE_KEYS, buildFullLeadPrompt } from './teamTemplates.js';
 
 const MAX_FEED_ENTRIES = 200;
 
@@ -37,6 +38,20 @@ export function createTeam(deps) {
 
   /** Per-agent message accumulator: agentId → message[] */
   const agentMessages = ref({});
+
+  // --- Team panel refs (moved from store.js) ---
+  const renamingTeamId = ref(null);
+  const renameTeamText = ref('');
+  const deleteTeamConfirmOpen = ref(false);
+  const deleteTeamConfirmTitle = ref('');
+  const pendingDeleteTeamId = ref(null);
+  const teamInstruction = ref('');
+  const selectedTemplate = ref('custom');
+  const editedLeadPrompt = ref(TEMPLATES.custom.leadPrompt);
+  const leadPromptExpanded = ref(false);
+  const kanbanExpanded = ref(false);
+  const instructionExpanded = ref(false);
+
 
   /** Per-agent message ID counter */
   let agentMsgIdCounter = 0;
@@ -376,6 +391,139 @@ export function createTeam(deps) {
         }
       }
     }
+  }
+
+
+  // --- Team panel methods (moved from store.js) ---
+    const teamExamples = [
+    {
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>',
+      title: 'Full-stack App',
+      template: 'full-stack',
+      text: 'Build a single-page calculator app: one agent creates the HTML/CSS UI, one implements the JavaScript logic, and one writes tests.',
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>',
+      title: 'Research',
+      template: 'research',
+      text: 'Research this project\'s architecture: one agent analyzes the backend structure, one maps the frontend components, and one reviews the build and deployment pipeline. Produce a unified architecture report.',
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+      title: '\u4EE3\u7801\u5BA1\u67E5',
+      template: 'code-review',
+      text: '\u5BA1\u67E5\u5F53\u524D\u9879\u76EE\u7684\u4EE3\u7801\u8D28\u91CF\u3001\u5B89\u5168\u6F0F\u6D1E\u548C\u6D4B\u8BD5\u8986\u76D6\u7387\uFF0C\u6309\u4E25\u91CD\u7A0B\u5EA6\u751F\u6210\u5206\u7EA7\u62A5\u544A\uFF0C\u5E76\u7ED9\u51FA\u4FEE\u590D\u5EFA\u8BAE\u3002',
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>',
+      title: '\u6280\u672F\u6587\u6863',
+      template: 'content',
+      text: '\u4E3A\u5F53\u524D\u9879\u76EE\u7F16\u5199\u4E00\u4EFD\u5B8C\u6574\u7684\u6280\u672F\u6587\u6863\uFF1A\u5148\u8C03\u7814\u9879\u76EE\u7ED3\u6784\u548C\u6838\u5FC3\u6A21\u5757\uFF0C\u7136\u540E\u64B0\u5199\u5305\u542B\u67B6\u6784\u6982\u89C8\u3001API \u53C2\u8003\u548C\u4F7F\u7528\u6307\u5357\u7684\u6587\u6863\uFF0C\u6700\u540E\u6821\u5BA1\u786E\u4FDD\u51C6\u786E\u6027\u548C\u53EF\u8BFB\u6027\u3002',
+    },
+  ];
+
+  function startTeamRename(tm) {
+    renamingTeamId.value = tm.teamId;
+    renameTeamText.value = tm.title || '';
+  }
+
+  function confirmTeamRename() {
+    const tid = renamingTeamId.value;
+    const title = renameTeamText.value.trim();
+    if (!tid || !title) { renamingTeamId.value = null; renameTeamText.value = ''; return; }
+    renameTeamById(tid, title);
+    renamingTeamId.value = null;
+    renameTeamText.value = '';
+  }
+
+  function cancelTeamRename() {
+    renamingTeamId.value = null;
+    renameTeamText.value = '';
+  }
+
+  function requestDeleteTeam(tm) {
+    pendingDeleteTeamId.value = tm.teamId;
+    deleteTeamConfirmTitle.value = tm.title || tm.teamId.slice(0, 8);
+    deleteTeamConfirmOpen.value = true;
+  }
+
+  function confirmDeleteTeam() {
+    if (!pendingDeleteTeamId.value) return;
+    deleteTeamById(pendingDeleteTeamId.value);
+    deleteTeamConfirmOpen.value = false;
+    pendingDeleteTeamId.value = null;
+  }
+
+  function cancelDeleteTeam() {
+    deleteTeamConfirmOpen.value = false;
+    pendingDeleteTeamId.value = null;
+  }
+
+  function onTemplateChange(key) {
+    selectedTemplate.value = key;
+    editedLeadPrompt.value = TEMPLATES[key].leadPrompt;
+  }
+
+  function resetLeadPrompt() {
+    editedLeadPrompt.value = TEMPLATES[selectedTemplate.value].leadPrompt;
+  }
+
+  function leadPromptPreview() {
+    const text = editedLeadPrompt.value || '';
+    return text.length > 80 ? text.slice(0, 80) + '...' : text;
+  }
+
+  function launchTeamFromPanel() {
+    const inst = teamInstruction.value.trim();
+    if (!inst) return;
+    const tplKey = selectedTemplate.value;
+    const tpl = TEMPLATES[tplKey];
+    const agents = tpl.agents;
+    const leadPrompt = buildFullLeadPrompt(editedLeadPrompt.value, agents, inst);
+    launchTeam(inst, leadPrompt, agents);
+    teamInstruction.value = '';
+    // Reset template state for next time
+    selectedTemplate.value = 'custom';
+    editedLeadPrompt.value = TEMPLATES.custom.leadPrompt;
+    leadPromptExpanded.value = false;
+  }
+
+  function formatTeamTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function getTaskAgent(task) {
+    const assignee = task.assignee || task.assignedTo;
+    if (!assignee) return null;
+    return findAgent(assignee);
+  }
+
+  function viewAgentWithHistory(agentId) {
+    viewAgent(agentId);
+    // For historical teams, request agent conversation history from server
+    if (historicalTeam.value && historicalTeam.value.teamId) {
+      requestAgentHistory(historicalTeam.value.teamId, agentId);
+    }
+  }
+
+  function getLatestAgentActivity(agentId) {
+    // Find the latest feed entry for this agent
+    const t = displayTeam.value;
+    if (!t || !t.feed) return '';
+    for (let i = t.feed.length - 1; i >= 0; i--) {
+      const entry = t.feed[i];
+      if (entry.agentId === agentId && entry.type === 'tool_call') {
+        // Strip agent name prefix since it's already shown on the card
+        const agent = findAgent(agentId);
+        if (agent && agent.name && entry.content.startsWith(agent.name)) {
+          return entry.content.slice(agent.name.length).trimStart();
+        }
+        return entry.content;
+      }
+    }
+    return '';
   }
 
   return {

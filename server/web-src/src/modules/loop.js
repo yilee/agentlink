@@ -1,5 +1,6 @@
 // ── Loop mode: state management and message routing ───────────────────────────
 import { ref, computed } from 'vue';
+import { LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS, buildCronExpression, formatSchedule } from './loopTemplates.js';
 
 import { buildHistoryBatch } from './backgroundRouting.js';
 
@@ -10,7 +11,7 @@ import { buildHistoryBatch } from './backgroundRouting.js';
  * @param {Function} deps.scrollToBottom
  */
 export function createLoop(deps) {
-  const { wsSend, scrollToBottom, loadingLoops } = deps;
+  const { wsSend, scrollToBottom, loadingLoops, setViewMode, formatRelativeTime } = deps;
 
   // ── Reactive state ──────────────────────────────────
 
@@ -52,6 +53,22 @@ export function createLoop(deps) {
 
   /** @type {import('vue').Ref<boolean>} Loading more executions via pagination */
   const loadingMoreExecutions = ref(false);
+
+  // --- Loop form state refs (moved from store.js) ---
+  const loopName = ref('');
+  const loopPrompt = ref('');
+  const loopScheduleType = ref('daily');
+  const loopScheduleHour = ref(9);
+  const loopScheduleMinute = ref(0);
+  const loopScheduleDayOfWeek = ref(1);
+  const loopCronExpr = ref('0 9 * * *');
+  const loopSelectedTemplate = ref(null);
+  const loopDeleteConfirmOpen = ref(false);
+  const loopDeleteConfirmId = ref(null);
+  const loopDeleteConfirmName = ref('');
+  const renamingLoopId = ref(null);
+  const renameLoopText = ref('');
+
 
   // ── Computed ──────────────────────────────────────
 
@@ -313,6 +330,191 @@ export function createLoop(deps) {
       default:
         return false;
     }
+  }
+
+
+  // --- Loop panel methods (moved from store.js) ---
+  function startLoopRename(l) {
+    renamingLoopId.value = l.id;
+    renameLoopText.value = l.name || '';
+  }
+
+  function confirmLoopRename() {
+    const lid = renamingLoopId.value;
+    const name = renameLoopText.value.trim();
+    if (!lid || !name) { renamingLoopId.value = null; renameLoopText.value = ''; return; }
+    updateExistingLoop(lid, { name });
+    renamingLoopId.value = null;
+    renameLoopText.value = '';
+  }
+
+  function cancelLoopRename() {
+    renamingLoopId.value = null;
+    renameLoopText.value = '';
+  }
+
+  function newLoop() {
+    backToLoopsList();
+    editingLoopId.value = null;
+    loopSelectedTemplate.value = null;
+    loopName.value = '';
+    loopPrompt.value = '';
+    loopScheduleType.value = 'daily';
+    loopScheduleHour.value = 9;
+    loopScheduleMinute.value = 0;
+    loopScheduleDayOfWeek.value = 1;
+    loopCronExpr.value = '0 9 * * *';
+    setViewMode('loop');
+  }
+
+  function viewLoop(loopId) {
+    viewLoopDetail(loopId);
+    setViewMode('loop');
+  }
+
+  function selectLoopTemplate(key) {
+    loopSelectedTemplate.value = key;
+    const tpl = LOOP_TEMPLATES[key];
+    if (!tpl) return;
+    loopName.value = tpl.name || '';
+    loopPrompt.value = tpl.prompt || '';
+    loopScheduleType.value = tpl.scheduleType || 'daily';
+    const cfg = tpl.scheduleConfig || {};
+    loopScheduleHour.value = cfg.hour ?? 9;
+    loopScheduleMinute.value = cfg.minute ?? 0;
+    loopScheduleDayOfWeek.value = cfg.dayOfWeek ?? 1;
+    loopCronExpr.value = buildCronExpression(tpl.scheduleType || 'daily', cfg);
+  }
+
+  function resetLoopForm() {
+    loopSelectedTemplate.value = null;
+    loopName.value = '';
+    loopPrompt.value = '';
+    loopScheduleType.value = 'daily';
+    loopScheduleHour.value = 9;
+    loopScheduleMinute.value = 0;
+    loopScheduleDayOfWeek.value = 1;
+    loopCronExpr.value = '0 9 * * *';
+    editingLoopId.value = null;
+  }
+
+  function createLoopFromPanel() {
+    const name = loopName.value.trim();
+    const prompt = loopPrompt.value.trim();
+    if (!name || !prompt) return;
+    clearLoopError();
+    const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
+    if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
+    if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
+    const schedule = loopScheduleType.value === 'manual' ? ''
+      : loopScheduleType.value === 'cron' ? loopCronExpr.value
+      : buildCronExpression(loopScheduleType.value, schedCfg);
+    createNewLoop({ name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
+    // Reset form
+    loopSelectedTemplate.value = null;
+    loopName.value = '';
+    loopPrompt.value = '';
+    loopScheduleType.value = 'daily';
+    loopScheduleHour.value = 9;
+    loopScheduleMinute.value = 0;
+    loopScheduleDayOfWeek.value = 1;
+    loopCronExpr.value = '0 9 * * *';
+  }
+
+  function startEditingLoop(l) {
+    editingLoopId.value = l.id;
+    loopName.value = l.name || '';
+    loopPrompt.value = l.prompt || '';
+    loopScheduleType.value = l.scheduleType || 'daily';
+    const cfg = l.scheduleConfig || {};
+    loopScheduleHour.value = cfg.hour ?? 9;
+    loopScheduleMinute.value = cfg.minute ?? 0;
+    loopScheduleDayOfWeek.value = cfg.dayOfWeek ?? 1;
+    loopCronExpr.value = l.schedule || buildCronExpression(l.scheduleType || 'daily', cfg);
+  }
+
+  function saveLoopEdits() {
+    const lid = editingLoopId.value;
+    if (!lid) return;
+    const name = loopName.value.trim();
+    const prompt = loopPrompt.value.trim();
+    if (!name || !prompt) return;
+    clearLoopError();
+    const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
+    if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
+    if (loopScheduleType.value === 'cron') schedCfg.cronExpression = loopCronExpr.value;
+    const schedule = loopScheduleType.value === 'manual' ? ''
+      : loopScheduleType.value === 'cron' ? loopCronExpr.value
+      : buildCronExpression(loopScheduleType.value, schedCfg);
+    updateExistingLoop(lid, { name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
+    editingLoopId.value = null;
+    loopName.value = '';
+    loopPrompt.value = '';
+  }
+
+  function cancelEditingLoop() {
+    editingLoopId.value = null;
+    loopName.value = '';
+    loopPrompt.value = '';
+    loopScheduleType.value = 'daily';
+    loopScheduleHour.value = 9;
+    loopScheduleMinute.value = 0;
+  }
+
+  function requestDeleteLoop(l) {
+    loopDeleteConfirmId.value = l.id;
+    loopDeleteConfirmName.value = l.name || l.id.slice(0, 8);
+    loopDeleteConfirmOpen.value = true;
+  }
+
+  function confirmDeleteLoop() {
+    if (!loopDeleteConfirmId.value) return;
+    deleteExistingLoop(loopDeleteConfirmId.value);
+    loopDeleteConfirmOpen.value = false;
+    loopDeleteConfirmId.value = null;
+  }
+
+  function cancelDeleteLoop() {
+    loopDeleteConfirmOpen.value = false;
+    loopDeleteConfirmId.value = null;
+  }
+
+  function loopScheduleDisplay(l) {
+    return formatSchedule(l.scheduleType, l.scheduleConfig || {}, l.schedule);
+  }
+
+  function loopLastRunDisplay(l) {
+    if (!l.lastExecution) return '';
+    const exec = l.lastExecution;
+    const ago = formatRelativeTime(exec.startedAt);
+    const icon = exec.status === 'success' ? 'OK' : exec.status === 'error' ? 'ERR' : exec.status;
+    return ago + ' ' + icon;
+  }
+
+  function formatExecTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatDuration(ms) {
+    if (!ms && ms !== 0) return '';
+    const totalSecs = Math.floor(ms / 1000);
+    if (totalSecs < 60) return totalSecs + 's';
+    const m = Math.floor(totalSecs / 60);
+    const s = totalSecs % 60;
+    if (m < 60) return m + 'm ' + String(s).padStart(2, '0') + 's';
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return h + 'h ' + String(rm).padStart(2, '0') + 'm';
+  }
+
+  function isLoopRunning(loopId) {
+    return !!runningLoops.value[loopId];
+  }
+
+  function padTwo(n) {
+    return String(n).padStart(2, '0');
   }
 
   return {

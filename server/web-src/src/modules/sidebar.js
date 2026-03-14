@@ -32,12 +32,18 @@ export function createSidebar(deps) {
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
     hostname, workdirHistory, workdirSwitching,
+    workdirMenuOpen, memoryPanelOpen, filePanelOpen,
+    isMobile, sidebarView,
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations,
     switchConversation,
     // i18n
     t,
   } = deps;
+
+  // Late-binding: set after fileBrowser is created
+  let _fileBrowser = null;
+  function setFileBrowser(fb) { _fileBrowser = fb; }
 
   // Late-binding callback: called when user switches to a normal chat session
   let _onSwitchToChat = null;
@@ -388,9 +394,31 @@ export function createSidebar(deps) {
     return order.filter(k => groups[k]).map(k => ({ label: t(GROUP_KEYS[k]), sessions: groups[k] }));
   });
 
+  // ── Workdir menu actions ──
+
+  function toggleWorkdirMenu() {
+    workdirMenuOpen.value = !workdirMenuOpen.value;
+  }
+
+  function workdirMenuBrowse() {
+    workdirMenuOpen.value = false;
+    if (isMobile.value) { sidebarView.value = 'files'; _fileBrowser.openPanel(); }
+    else { memoryPanelOpen.value = false; _fileBrowser.togglePanel(); }
+  }
+
+  function workdirMenuChangeDir() {
+    workdirMenuOpen.value = false;
+    openFolderPicker();
+  }
+
+  function workdirMenuCopyPath() {
+    workdirMenuOpen.value = false;
+    _fileBrowser.copyToClipboard(deps.workDir.value);
+  }
+
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
-    setOnSwitchToChat,
+    setOnSwitchToChat, setFileBrowser,
     deleteSession, confirmDeleteSession, cancelDeleteSession,
     startRename, confirmRename, cancelRename,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
@@ -398,5 +426,6 @@ export function createSidebar(deps) {
     groupedSessions, isSessionProcessing,
     loadWorkdirHistory, addToWorkdirHistory, removeFromWorkdirHistory,
     switchToWorkdir, filteredWorkdirHistory,
+    toggleWorkdirMenu, workdirMenuBrowse, workdirMenuChangeDir, workdirMenuCopyPath,
   };
 }
