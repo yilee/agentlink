@@ -28,6 +28,26 @@ Tracked issues discovered during config/auto-update audit (2026-03-14).
 
 **Fix:** Resolved by fix #1 — ephemeral won't read `autoUpdate` from config.json.
 
+### 7. `--ephemeral --daemon` support
+
+**Current:** `--ephemeral` only works in foreground mode (sets `AGENTLINK_NO_STATE=1` then imports `index.js`). The daemon code path ignores `--ephemeral` entirely.
+
+**Goal:** `--ephemeral --daemon` should spawn a fully isolated daemon that:
+- Does NOT read `~/.agentlink/config.json` (no password, server, name, autoUpdate inheritance)
+- Does NOT write to `~/.agentlink/config.json`
+- Does NOT write `~/.agentlink/agent.json` (runtime state) — so it doesn't interfere with the production daemon's state
+- Does NOT trigger auto-update
+- Uses only CLI flags + defaults for config
+- Logs to a separate location or with a distinguishable prefix to avoid mixing with production daemon logs
+
+**Why:** Enables automated E2E testing with `--daemon` mode without any side effects on the production environment. Currently, testing requires foreground mode which blocks the terminal.
+
+**Implementation notes:**
+- Pass `ephemeral` flag through the config JSON to `daemon.js`
+- `daemon.js` sets `AGENTLINK_NO_STATE=1` before calling `start()`
+- `resolveConfig` with `ignoreConfigFile=true` (same as fix #1)
+- Skip `startAutoUpdate()` in ephemeral daemon mode
+
 ## Server (`server/src/`)
 
 ### 4. `upgrade` command: Windows path wrong
