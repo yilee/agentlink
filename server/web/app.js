@@ -426,9 +426,9 @@ const App = {
 
     // ── Computed ──
     const hasInput = computed(() => !!(inputText.value.trim() || attachments.value.length > 0));
+    const hasPendingQuestion = computed(() => messages.value.some(m => m.role === 'ask-question' && !m.answered));
     const canSend = computed(() =>
-      status.value === 'Connected' && hasInput.value && !isCompacting.value
-      && !messages.value.some(m => m.role === 'ask-question' && !m.answered)
+      status.value === 'Connected' && hasInput.value && !isCompacting.value && !hasPendingQuestion.value
     );
     const hasStreamingMessage = computed(() => messages.value.some(m => m.isStreaming));
 
