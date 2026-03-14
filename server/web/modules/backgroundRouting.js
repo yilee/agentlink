@@ -1,6 +1,13 @@
 // ── History batch building & background conversation routing ──────────────────
 import { isContextSummary } from './messageHelpers.js';
 
+function findLast(arr, predicate) {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (predicate(arr[i])) return arr[i];
+  }
+  return undefined;
+}
+
 /**
  * Convert a history array (from conversation_resumed) into a batch of UI messages.
  * @param {Array} history - Array of {role, content, ...} from the agent
@@ -206,7 +213,7 @@ export function routeToBackgroundConversation(deps, convId, msg) {
       });
     } else if (msg.status === 'completed') {
       cache.isCompacting = false;
-      const startMsg = [...cache.messages].reverse().find(m => m.isCompactStart && !m.compactDone);
+      const startMsg = findLast(cache.messages, m => m.isCompactStart && !m.compactDone);
       if (startMsg) {
         startMsg.content = 'Context compacted';
         startMsg.compactDone = true;

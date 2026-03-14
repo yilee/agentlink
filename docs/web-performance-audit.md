@@ -178,7 +178,7 @@ All typing dots, spinners, blink-cursor animations use only `opacity`/`transform
 - [x] P1-4: `canSend` array scan → computed (app.js)
 - [x] P1-1: Cache `JSON.parse(toolInput)` on `msg._parsedInput` (messageHelpers.js)
 - [x] P3-3: Resize handler rAF guard (app.js)
-- [ ] P3-5: `[...arr].reverse().find()` → reverse for loop (connection.js, backgroundRouting.js)
+- [x] P3-5: `[...arr].reverse().find()` → reverse for loop (connection.js, backgroundRouting.js)
 - [ ] P2-2: `v-show` → `v-if` for tool expand (app.js)
 - [ ] P0-2: Skip Markdown render during streaming (messageHelpers.js, markdown.js)
 - [ ] P2-1: Markdown cache — skip streaming entries (markdown.js)
