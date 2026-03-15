@@ -79,14 +79,22 @@ export function finalizeLastStreaming(msgs) {
 
 /**
  * Route a message to a background (non-foreground) conversation's cache.
- * @param {object} deps - Dependencies: conversationCache, processingConversations, sidebar, wsSend
+ * @param {object} deps - Dependencies: conversationCache, processingConversations, activeClaudeSessions, sidebar, wsSend
  * @param {string} convId - The conversation ID
  * @param {object} msg - The incoming message
  */
 export function routeToBackgroundConversation(deps, convId, msg) {
-  const { conversationCache, processingConversations, sidebar, wsSend } = deps;
+  const { conversationCache, processingConversations, activeClaudeSessions, sidebar, wsSend } = deps;
   const cache = conversationCache.value[convId];
-  if (!cache) return;
+  if (!cache) {
+    // No cache for this conversation (e.g. after page refresh).
+    // If it's a terminal event, re-query active conversations so the server
+    // sends the updated set and activeClaudeSessions gets rebuilt without the finished one.
+    if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled' || msg.type === 'error') {
+      wsSend({ type: 'query_active_conversations' });
+    }
+    return;
+  }
 
   if (msg.type === 'session_started') {
     cache.claudeSessionId = msg.claudeSessionId;
@@ -187,6 +195,15 @@ export function routeToBackgroundConversation(deps, convId, msg) {
     if (msg.usage) cache.usageStats = msg.usage;
     if (cache.toolMsgMap) cache.toolMsgMap.clear();
     processingConversations.value[convId] = false;
+    // Clear from activeClaudeSessions so sidebar dot disappears
+    if (activeClaudeSessions && cache.claudeSessionId) {
+      const s = activeClaudeSessions.value;
+      if (s instanceof Set && s.has(cache.claudeSessionId)) {
+        const next = new Set(s);
+        next.delete(cache.claudeSessionId);
+        activeClaudeSessions.value = next;
+      }
+    }
     if (msg.type === 'execution_cancelled') {
       cache.needsResume = true;
       cache.messages.push({

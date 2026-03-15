@@ -35,7 +35,7 @@ export function createSidebar(deps) {
     workdirMenuOpen, memoryPanelOpen, filePanelOpen,
     isMobile, sidebarView,
     // Multi-session parallel
-    currentConversationId, conversationCache, processingConversations,
+    currentConversationId, conversationCache, processingConversations, activeClaudeSessions,
     switchConversation,
     // i18n
     t,
@@ -348,17 +348,33 @@ export function createSidebar(deps) {
   });
 
   // ── isSessionProcessing ──
-  // Used by sidebar template to show processing indicator on session items
+  // Used by sidebar template to show processing indicator on session items.
+  // IMPORTANT: All reactive deps are read up-front (no short-circuit) so that
+  // Vue's dependency tracker always registers them during render, ensuring
+  // the component re-renders when any of these values change.
   function isSessionProcessing(claudeSessionId) {
-    if (!conversationCache || !processingConversations) return false;
-    // Check cached background conversations
-    for (const [convId, cached] of Object.entries(conversationCache.value)) {
-      if (cached.claudeSessionId === claudeSessionId && cached.isProcessing) {
-        return true;
+    // Read all reactive dependencies eagerly so Vue always tracks them
+    const activeSet = activeClaudeSessions && activeClaudeSessions.value;
+    const curSessionId = currentClaudeSessionId.value;
+    const processing = isProcessing.value;
+    const cache = conversationCache ? conversationCache.value : null;
+
+    if (!claudeSessionId) return false;
+
+    // Check 1: activeClaudeSessions (set by active_conversations response on connect/reconnect)
+    if (activeSet instanceof Set && activeSet.has(claudeSessionId)) {
+      return true;
+    }
+    // Check 2: cached background conversations
+    if (cache) {
+      for (const [convId, cached] of Object.entries(cache)) {
+        if (cached.claudeSessionId === claudeSessionId && cached.isProcessing) {
+          return true;
+        }
       }
     }
-    // Check current foreground conversation
-    if (currentClaudeSessionId.value === claudeSessionId && isProcessing.value) {
+    // Check 3: current foreground conversation
+    if (curSessionId === claudeSessionId && processing) {
       return true;
     }
     return false;

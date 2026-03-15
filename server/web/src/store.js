@@ -114,6 +114,7 @@ export function createStore() {
   const conversationCache = ref({});
   const currentConversationId = ref(crypto.randomUUID());
   const processingConversations = ref({});
+  const activeClaudeSessions = ref(new Set());
 
   // Plan mode state
   const planMode = ref(false);
@@ -280,7 +281,7 @@ export function createStore() {
     workdirMenuOpen, memoryPanelOpen, filePanelOpen,
     isMobile, sidebarView,
     // Multi-session parallel
-    currentConversationId, conversationCache, processingConversations,
+    currentConversationId, conversationCache, processingConversations, activeClaudeSessions,
     switchConversation,
     // i18n
     t,
@@ -295,7 +296,7 @@ export function createStore() {
     streaming, sidebar, scrollToBottom,
     workdirSwitching,
     // Multi-session parallel
-    currentConversationId, processingConversations, conversationCache,
+    currentConversationId, processingConversations, conversationCache, activeClaudeSessions,
     switchConversation,
     // Memory management
     memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,

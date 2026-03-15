@@ -268,4 +268,87 @@ describe('Agent Disconnect Edge Cases', () => {
       await page.close();
     }
   });
+
+  it('TC-5: sidebar processing dot appears from active_conversations and clears on turn_completed', async () => {
+    const { agent, page } = await setupTest('Disconnect5');
+
+    try {
+      // Send a chat message to establish a conversation
+      await page.fill('textarea', 'test processing dot');
+      await page.click('.send-btn');
+      const chatMsg = await agent.waitForMessage((m) => m.type === 'chat', 3000);
+      const conversationId = (chatMsg.conversationId as string) || 'conv-dot';
+      const claudeSessionId = 'claude-dot-test';
+
+      // Provide a sessions_list with our session so the sidebar has an item to show
+      agent.sendEncrypted({
+        type: 'sessions_list',
+        sessions: [{ sessionId: claudeSessionId, title: 'Dot Test Session', lastModified: new Date().toISOString(), preview: 'test' }],
+        workDir: '/disconnect-test',
+      });
+      await delay(300);
+
+      // Disconnect
+      const sessionId = agent.sessionId;
+      agent.ws.close();
+      await delay(500);
+
+      // Reconnect
+      const agent2 = await reconnectAgent(sessionId, 'Disconnect5-R');
+      await page.waitForSelector('.badge.connected', { timeout: 5000 });
+
+      // Consume query_active_conversations
+      await agent2.waitForMessage(
+        (m) => m.type === 'query_active_conversations',
+        3000,
+      );
+
+      // Respond with active conversation — this session is processing
+      agent2.sendEncrypted({
+        type: 'active_conversations',
+        conversations: [{
+          conversationId,
+          claudeSessionId,
+          isProcessing: true,
+          isCompacting: false,
+        }],
+      });
+
+      // Respond to sessions_list request with the same session
+      await agent2.waitForMessage((m) => m.type === 'list_sessions', 3000).catch(() => null);
+      agent2.sendEncrypted({
+        type: 'sessions_list',
+        sessions: [{ sessionId: claudeSessionId, title: 'Dot Test Session', lastModified: new Date().toISOString(), preview: 'test' }],
+        workDir: '/disconnect-test',
+      });
+      await delay(500);
+
+      // Sidebar should show .processing class on the session item
+      const processingItems = await page.locator('.session-item.processing').count();
+      expect(processingItems).toBeGreaterThanOrEqual(1);
+
+      // Now complete the turn
+      agent2.sendEncrypted({ type: 'turn_completed', conversationId });
+      await delay(500);
+
+      // Re-query will be sent since cache may not exist for this convId
+      // Respond with empty active_conversations
+      const reQuery = await agent2.waitForMessage(
+        (m) => m.type === 'query_active_conversations',
+        3000,
+      ).catch(() => null);
+      if (reQuery) {
+        agent2.sendEncrypted({ type: 'active_conversations', conversations: [] });
+        await delay(500);
+      }
+
+      // Processing class should be gone from sidebar
+      const processingAfter = await page.locator('.session-item.processing').count();
+      expect(processingAfter).toBe(0);
+
+      agent2.ws.close();
+    } finally {
+      await page.close();
+    }
+  });
 });
