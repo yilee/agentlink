@@ -9,7 +9,7 @@ export function createFeatureHandlers(deps) {
     queuedMessages, visibleLimit, currentClaudeSessionId,
     historySessions, memoryFiles, memoryDir, memoryPanelOpen, memoryEditing,
     sidebar, wsSend, switchConversation, toolMsgMap,
-    fileBrowser, filePreview, team, loop, t,
+    t,
   } = deps;
 
   return {
@@ -37,8 +37,8 @@ export function createFeatureHandlers(deps) {
       workDir.value = msg.workDir;
       localStorage.setItem(`agentlink-workdir-${sessionId.value}`, msg.workDir);
       sidebar.addToWorkdirHistory(msg.workDir);
-      if (fileBrowser) fileBrowser.onWorkdirChanged();
-      if (filePreview) filePreview.onWorkdirChanged();
+      if (deps.fileBrowser) deps.fileBrowser.onWorkdirChanged();
+      if (deps.filePreview) deps.filePreview.onWorkdirChanged();
 
       // Multi-session: switch to a new blank conversation for the new workdir
       if (switchConversation) {
@@ -62,22 +62,22 @@ export function createFeatureHandlers(deps) {
       });
       // Clear old history so UI doesn't show stale data
       historySessions.value = [];
-      if (team) {
-        team.teamsList.value = [];
-        team.teamState.value = null;
-        team.historicalTeam.value = null;
-        if (team.viewMode.value === 'team') {
-          team.viewMode.value = 'chat';
+      if (deps.team) {
+        deps.team.teamsList.value = [];
+        deps.team.teamState.value = null;
+        deps.team.historicalTeam.value = null;
+        if (deps.team.viewMode.value === 'team') {
+          deps.team.viewMode.value = 'chat';
         }
       }
-      if (loop) loop.loopsList.value = [];
+      if (deps.loop) deps.loop.loopsList.value = [];
       memoryFiles.value = [];
       memoryDir.value = null;
       memoryPanelOpen.value = false;
       memoryEditing.value = false;
       sidebar.requestSessionList();
-      if (team) team.requestTeamsList();
-      if (loop) loop.requestLoopsList();
+      if (deps.team) deps.team.requestTeamsList();
+      if (deps.loop) deps.loop.requestLoopsList();
     },
   };
 }
