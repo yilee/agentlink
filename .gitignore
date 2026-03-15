@@ -31,8 +31,8 @@ Thumbs.db
 server/package-lock.json
 agent/package-lock.json
 
-# Vite build output (generated in CI)
-server/web/assets/
+# Vite build output (entire server/web/ is generated from server/web-src/)
+server/web/
 server/web-src/node_modules/
 
 # Test artifacts
