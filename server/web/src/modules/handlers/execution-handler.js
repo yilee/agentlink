@@ -12,7 +12,7 @@ export function createExecutionHandlers(deps) {
     messages, isProcessing, isCompacting, streaming, scrollToBottom,
     needsResume, usageStats, toolMsgMap, sidebar,
     currentConversationId, processingConversations,
-    clearIdleCheck, dequeueNext, t,
+    clearIdleCheck, t,
     finalizeStreamingMsg,
   } = deps;
 
@@ -29,7 +29,7 @@ export function createExecutionHandlers(deps) {
         processingConversations.value[currentConversationId.value] = false;
       }
       sidebar.requestSessionList();
-      dequeueNext();
+      deps.dequeueNext();
     },
     execution_cancelled(msg, scheduleHighlight) {
       streaming.flushReveal();
@@ -49,7 +49,7 @@ export function createExecutionHandlers(deps) {
       });
       scrollToBottom();
       sidebar.requestSessionList();
-      dequeueNext();
+      deps.dequeueNext();
     },
     context_compaction(msg) {
       if (msg.status === 'started') {

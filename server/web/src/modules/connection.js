@@ -118,11 +118,9 @@ export function createConnection(deps) {
   };
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
+  handlerDeps.finalizeStreamingMsg = claudeHandlers.finalizeStreamingMsg;
   const sessionHandlers = createSessionHandlers(handlerDeps);
-  const executionHandlers = createExecutionHandlers({
-    ...handlerDeps,
-    finalizeStreamingMsg: claudeHandlers.finalizeStreamingMsg,
-  });
+  const executionHandlers = createExecutionHandlers(handlerDeps);
   const fileHandlers = createFileHandlers(handlerDeps);
   const featureHandlers = createFeatureHandlers(handlerDeps);
 
