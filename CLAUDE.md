@@ -12,7 +12,7 @@ AgentLink is a local CLI agent that proxies a local working directory to a cloud
 
 ```
 agentlink/
-├── server/src/          # Express + ws server: cli.ts, index.ts, context.ts, ws-agent.ts, ws-client.ts, encryption.ts, config.ts
+├── server/src/          # Express + ws server: cli.ts, index.ts, session-manager.ts, auth-manager.ts, http.ts, message-relay.ts, ws-agent.ts, ws-client.ts, encryption.ts, config.ts
 ├── server/web/           # Vue 3 SPA source (Vite + Vue SFC), builds to server/web/dist/
 │   ├── src/
 │   │   ├── main.js, App.vue, store.js    # Entry point, root component, central store (~735 lines)
@@ -26,9 +26,9 @@ agentlink/
 ├── agent/src/           # Agent: cli.ts, connection.ts, claude.ts, sdk.ts, stream.ts, history.ts, daemon.ts, encryption.ts, auto-update.ts, service.ts, config.ts, index.ts
 └── test/                # Vitest unit tests + E2E
     ├── agent/           # 17 tests (claude, encryption, history, stream, config, team, scheduler, btw, sdk, etc.)
-    ├── server/          # 5 tests (auth, config, context, encryption, heartbeat)
+    ├── server/          # 6 tests (auth, config, session-manager, encryption, heartbeat, message-relay)
     ├── web/             # 3 tests (appHelpers, loopTemplates, planMode)
-    ├── functional/      # Automated functional tests (mock agent + Playwright, `npm run test:functional`)
+    ├── functional/      # 9 automated functional tests (mock agent + Playwright, `npm run test:functional`)
     └── e2e-workdir/     # Working directory for manual E2E tests (gitignored except .gitkeep)
 ```
 
@@ -100,6 +100,15 @@ interface ConversationState {
 
 **Server acts as a transparent relay** — all messages from web clients are forwarded to the bound agent, and vice versa. Server intercepts `workdir_changed` to keep its agent state in sync.
 
+**Server architecture** (`server/src/`): Modular design with separated concerns:
+- `index.ts` — Entry point, wires modules together, starts HTTP + WebSocket servers
+- `session-manager.ts` — `SessionManager` class: creates/retrieves sessions, manages agent↔session bindings, tracks active conversations per session
+- `auth-manager.ts` — `AuthManager` class: per-session password hashing (scrypt), login attempt rate limiting, token-based auth for web clients
+- `http.ts` — `createHttpApp()`: Express routes for health check, session landing page, static files, auth endpoints
+- `message-relay.ts` — `relayAgentMessage()`: forwards agent messages to all bound web clients, intercepts `workdir_changed`
+- `ws-agent.ts` — Agent WebSocket connection handler: registration, encryption setup, message routing
+- `ws-client.ts` — Web client WebSocket handler: session binding, auth verification, message forwarding to agent
+
 **Registration:** Agent connects with `?type=agent&id=NAME&name=NAME&workDir=PATH`, gets `{ type: 'registered', sessionId, sessionKey }`. Web client connects with `?type=web&sessionId=SID`, gets `{ type: 'connected', sessionKey, agent }`. All subsequent messages encrypted (XSalsa20-Poly1305, envelope: `{ n, c, z? }`).
 
 **Message types (Web → Agent):**
@@ -150,7 +159,9 @@ interface ConversationState {
 - `provide('sidebar', store._sidebar)` — sidebar module
 - `provide('files', store._files)` — file browser module
 
-**Module pattern:** Modules in `modules/` use factory pattern `createFoo(deps)` → returns methods/refs. Deps are reactive refs + callbacks (e.g., `wsSend`). Circular dependencies resolved via late-binding forwarding functions. Stateless modules (e.g., `markdown.js`, `messageHelpers.js`) export pure functions.
+**Module pattern:** Modules in `modules/` use factory pattern `createFoo(deps)` → returns methods/refs. Deps are reactive refs + callbacks (e.g., `wsSend`). Stateless modules (e.g., `markdown.js`, `messageHelpers.js`) export pure functions.
+
+**Late-binding pattern:** `connection.js` uses JavaScript getters in `handlerDeps` to resolve circular dependencies. Five properties (`dequeueNext`, `fileBrowser`, `filePreview`, `team`, `loop`) are set via `setXxx()` functions *after* handler factories run. **Do NOT destructure or spread** these getter properties — always access as `deps.xxx` at call time to get the live value.
 
 **WebSocket message handlers** (`modules/handlers/`): 5 domain handler files — `claude-output-handler.js`, `session-handler.js`, `execution-handler.js`, `file-handler.js`, `feature-handler.js`. Each exports `createXyzHandlers(deps)`, instantiated and dispatched by `connection.js`.
 
@@ -227,7 +238,7 @@ git push && git push origin server-v0.1.86
 
 **Two types of tests with different names:**
 
-- **Functional tests** (`npm run test:functional`): Automated Vitest + Playwright tests in `test/functional/`. Use a mock agent (simulated WebSocket messages) to verify UI rendering and protocol handling. No real Claude subprocess.
+- **Functional tests** (`npm run test:functional`): Automated Vitest + Playwright tests in `test/functional/`. Use a mock agent (simulated WebSocket messages) to verify UI rendering and protocol handling. No real Claude subprocess. Shared test infrastructure in `test/functional/e2e-helpers.ts`. 9 test suites: `e2e`, `btw-side-question`, `btw-bugfix-verification`, `context-compaction`, `ask-user-question`, `plan-mode`, `file-attachment`, `loop-crud`, `agent-disconnect`.
 - **E2E tests** (`docs/e2e-test-plan.md`): Manual tests against a live ephemeral server + real agent + real Claude. When asked to "run E2E tests", follow every test case in that document using Playwright.
 
 **E2E test plan:** [`docs/e2e-test-plan.md`](docs/e2e-test-plan.md) — 19 manual E2E tests covering multi-session parallel features.
