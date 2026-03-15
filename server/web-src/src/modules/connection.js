@@ -1,18 +1,15 @@
 // ── WebSocket connection, message routing, reconnection ──────────────────────
 import { encrypt, decrypt, isEncrypted, decodeKey } from './encryption.js';
-import { isContextSummary } from './messageHelpers.js';
-import { buildHistoryBatch, finalizeLastStreaming, routeToBackgroundConversation } from './backgroundRouting.js';
+import { routeToBackgroundConversation } from './backgroundRouting.js';
+import { createClaudeOutputHandlers } from './handlers/claude-output-handler.js';
+import { createSessionHandlers } from './handlers/session-handler.js';
+import { createExecutionHandlers } from './handlers/execution-handler.js';
+import { createFileHandlers } from './handlers/file-handler.js';
+import { createFeatureHandlers } from './handlers/feature-handler.js';
 
 const MAX_RECONNECT_ATTEMPTS = 50;
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 15000;
-
-function findLast(arr, predicate) {
-  for (let i = arr.length - 1; i >= 0; i--) {
-    if (predicate(arr[i])) return arr[i];
-  }
-  return undefined;
-}
 
 /**
  * Creates the WebSocket connection controller.
@@ -22,22 +19,14 @@ export function createConnection(deps) {
   const {
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
-    messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
-    historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
-    folderPickerLoading, folderPickerEntries, folderPickerPath,
+    messages, isProcessing, isCompacting, queuedMessages,
+    historySessions, loadingSessions, loadingHistory,
     authRequired, authPassword, authError, authAttempts, authLocked,
     streaming, sidebar,
     scrollToBottom,
     workdirSwitching,
     // Multi-session parallel
     currentConversationId, processingConversations, conversationCache,
-    switchConversation,
-    // Memory management
-    memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
-    // Side question (/btw)
-    btwState, btwPending,
-    // Plan mode
-    setPlanMode,
     // i18n
     t,
   } = deps;
@@ -46,19 +35,13 @@ export function createConnection(deps) {
   let _dequeueNext = () => {};
   function setDequeueNext(fn) { _dequeueNext = fn; }
 
-  // File browser — set after creation to resolve circular dependency
+  // Late-binding setters for circular dependencies
   let fileBrowser = null;
   function setFileBrowser(fb) { fileBrowser = fb; }
-
-  // File preview — set after creation to resolve circular dependency
   let filePreview = null;
   function setFilePreview(fp) { filePreview = fp; }
-
-  // Team module — set after creation to resolve circular dependency
   let team = null;
   function setTeam(t) { team = t; }
-
-  // Loop module — set after creation to resolve circular dependency
   let loop = null;
   function setLoop(l) { loop = l; }
 
@@ -68,15 +51,12 @@ export function createConnection(deps) {
   let reconnectTimer = null;
   let pingTimer = null;
   let idleCheckTimer = null;
-  const toolMsgMap = new Map(); // toolId -> message (for fast tool_result lookup)
+  const toolMsgMap = new Map();
 
   // ── toolMsgMap save/restore for conversation switching ──
   function getToolMsgMap() { return new Map(toolMsgMap); }
   function restoreToolMsgMap(map) { toolMsgMap.clear(); for (const [k, v] of map) toolMsgMap.set(k, v); }
   function clearToolMsgMap() { toolMsgMap.clear(); }
-
-  // ── Background conversation routing ──
-  // Delegated to backgroundRouting.js module.
 
   function wsSend(msg) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -90,7 +70,6 @@ export function createConnection(deps) {
 
   function startPing() {
     stopPing();
-    // Send first ping immediately, then every 10s
     wsSend({ type: 'ping', ts: Date.now() });
     pingTimer = setInterval(() => {
       wsSend({ type: 'ping', ts: Date.now() });
@@ -103,7 +82,7 @@ export function createConnection(deps) {
   }
 
   // Idle-check: if isProcessing stays true with no claude_output for 15s,
-  // poll the agent to reconcile stale state (guards against lost turn_completed).
+  // poll the agent to reconcile stale state.
   const IDLE_CHECK_MS = 15000;
   function resetIdleCheck() {
     if (idleCheckTimer) { clearTimeout(idleCheckTimer); idleCheckTimer = null; }
@@ -123,74 +102,38 @@ export function createConnection(deps) {
     return match ? match[1] : null;
   }
 
-  function finalizeStreamingMsg(scheduleHighlight) {
-    const sid = streaming.getStreamingMessageId();
-    if (sid === null) return;
-    const streamMsg = messages.value.find(m => m.id === sid);
-    if (streamMsg) {
-      streamMsg.isStreaming = false;
-      if (isContextSummary(streamMsg.content)) {
-        streamMsg.role = 'context-summary';
-        streamMsg.contextExpanded = false;
-      }
-    }
-    streaming.setStreamingMessageId(null);
-    if (scheduleHighlight) scheduleHighlight();
-  }
+  // ── Create handler modules ──
+  // Shared deps object for handlers (uses getters for late-bound refs)
+  const handlerDeps = {
+    ...deps,
+    toolMsgMap,
+    resetIdleCheck,
+    clearIdleCheck,
+    wsSend,
+    get dequeueNext() { return _dequeueNext; },
+    get fileBrowser() { return fileBrowser; },
+    get filePreview() { return filePreview; },
+    get team() { return team; },
+    get loop() { return loop; },
+  };
 
-  function handleClaudeOutput(msg, scheduleHighlight) {
-    const data = msg.data;
-    if (!data) return;
+  const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
+  const sessionHandlers = createSessionHandlers(handlerDeps);
+  const executionHandlers = createExecutionHandlers({
+    ...handlerDeps,
+    finalizeStreamingMsg: claudeHandlers.finalizeStreamingMsg,
+  });
+  const fileHandlers = createFileHandlers(handlerDeps);
+  const featureHandlers = createFeatureHandlers(handlerDeps);
 
-    // Safety net: if streaming output arrives but isProcessing is false
-    // (e.g. after reconnect before active_conversations response), self-correct
-    if (!isProcessing.value) {
-      isProcessing.value = true;
-      resetIdleCheck();
-      if (currentConversationId && currentConversationId.value) {
-        processingConversations.value[currentConversationId.value] = true;
-      }
-    }
-
-    if (data.type === 'content_block_delta' && data.delta) {
-      streaming.appendPending(data.delta);
-      streaming.startReveal();
-      return;
-    }
-
-    if (data.type === 'tool_use' && data.tools) {
-      streaming.flushReveal();
-      finalizeStreamingMsg(scheduleHighlight);
-
-      for (const tool of data.tools) {
-        const toolMsg = {
-          id: streaming.nextId(), role: 'tool',
-          toolId: tool.id, toolName: tool.name || 'unknown',
-          toolInput: tool.input ? JSON.stringify(tool.input, null, 2) : '',
-          hasResult: false, expanded: (tool.name === 'Edit' || tool.name === 'TodoWrite' || tool.name === 'Agent'), timestamp: new Date(),
-        };
-        messages.value.push(toolMsg);
-        if (tool.id) toolMsgMap.set(tool.id, toolMsg);
-      }
-      scrollToBottom();
-      return;
-    }
-
-    if (data.type === 'user' && data.tool_use_result) {
-      const result = data.tool_use_result;
-      const results = Array.isArray(result) ? result : [result];
-      for (const r of results) {
-        const toolMsg = toolMsgMap.get(r.tool_use_id);
-        if (toolMsg) {
-          toolMsg.toolOutput = typeof r.content === 'string'
-            ? r.content : JSON.stringify(r.content, null, 2);
-          toolMsg.hasResult = true;
-        }
-      }
-      scrollToBottom();
-      return;
-    }
-  }
+  // Dispatch map: message type → handler(msg, scheduleHighlight)
+  const handlers = {
+    ...claudeHandlers,
+    ...sessionHandlers,
+    ...executionHandlers,
+    ...fileHandlers,
+    ...featureHandlers,
+  };
 
   function connect(scheduleHighlight) {
     const sid = getSessionId();
@@ -205,7 +148,6 @@ export function createConnection(deps) {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     let wsUrl = `${protocol}//${window.location.host}/?type=web&sessionId=${sid}`;
-    // Include saved auth token for automatic re-authentication
     const savedToken = localStorage.getItem(`agentlink-auth-${sid}`);
     if (savedToken) {
       wsUrl += `&authToken=${encodeURIComponent(savedToken)}`;
@@ -242,6 +184,7 @@ export function createConnection(deps) {
         return;
       }
 
+      // Decrypt
       if (parsed.type === 'connected') {
         msg = parsed;
         if (typeof parsed.sessionKey === 'string') {
@@ -274,8 +217,6 @@ export function createConnection(deps) {
       }
 
       // ── Multi-session: route messages to background conversations ──
-      // Messages with a conversationId that doesn't match the current foreground
-      // conversation are routed to their cached background state.
       if (msg.conversationId && currentConversationId
           && currentConversationId.value
           && msg.conversationId !== currentConversationId.value) {
@@ -283,399 +224,23 @@ export function createConnection(deps) {
         return;
       }
 
+      // ── Connection lifecycle (stays inline — tightly coupled to ws state) ──
       if (msg.type === 'connected') {
-        // Reset auth state
-        authRequired.value = false;
-        authPassword.value = '';
-        authError.value = '';
-        authAttempts.value = null;
-        authLocked.value = false;
-        // Save auth token for automatic re-authentication
-        if (msg.authToken) {
-          localStorage.setItem(`agentlink-auth-${sessionId.value}`, msg.authToken);
-        }
-        if (msg.serverVersion) serverVersion.value = msg.serverVersion;
-        if (msg.agent) {
-          status.value = 'Connected';
-          agentName.value = msg.agent.name;
-          hostname.value = msg.agent.hostname || '';
-          workDir.value = msg.agent.workDir;
-          agentVersion.value = msg.agent.version || '';
-          sidebar.loadWorkdirHistory();
-          sidebar.addToWorkdirHistory(msg.agent.workDir);
-          const savedDir = localStorage.getItem(`agentlink-workdir-${sessionId.value}`);
-          if (savedDir && savedDir !== msg.agent.workDir) {
-            workdirSwitching.value = true;
-            setTimeout(() => { workdirSwitching.value = false; }, 10000);
-            wsSend({ type: 'change_workdir', workDir: savedDir });
-          }
-          sidebar.requestSessionList();
-          if (team) team.requestTeamsList();
-          if (loop) loop.requestLoopsList();
-          startPing();
-          wsSend({ type: 'query_active_conversations' });
-        } else {
-          status.value = 'Waiting';
-          error.value = t('error.agentNotConnected');
-        }
+        handleConnected(msg, scheduleHighlight);
       } else if (msg.type === 'pong') {
-        if (typeof msg.ts === 'number') {
-          latency.value = Date.now() - msg.ts;
-        }
+        if (typeof msg.ts === 'number') latency.value = Date.now() - msg.ts;
       } else if (msg.type === 'agent_disconnected') {
-        stopPing();
-        status.value = 'Waiting';
-        agentName.value = '';
-        hostname.value = '';
-        error.value = t('error.agentDisconnected');
-        isProcessing.value = false;
-        isCompacting.value = false;
-        queuedMessages.value = [];
-        loadingSessions.value = false;
-        // Clear processing state for all background conversations
-        if (conversationCache) {
-          for (const [convId, cached] of Object.entries(conversationCache.value)) {
-            cached.isProcessing = false;
-            cached.isCompacting = false;
-            processingConversations.value[convId] = false;
-          }
-        }
-        if (currentConversationId && currentConversationId.value) {
-          processingConversations.value[currentConversationId.value] = false;
-        }
+        handleAgentDisconnected();
       } else if (msg.type === 'agent_reconnected') {
-        status.value = 'Connected';
-        error.value = '';
-        if (msg.agent) {
-          agentName.value = msg.agent.name;
-          hostname.value = msg.agent.hostname || '';
-          workDir.value = msg.agent.workDir;
-          agentVersion.value = msg.agent.version || '';
-          workDir.value = msg.agent.workDir;
-          sidebar.addToWorkdirHistory(msg.agent.workDir);
-        }
-        sidebar.requestSessionList();
-        if (team) team.requestTeamsList();
-        if (loop) loop.requestLoopsList();
-        startPing();
-        wsSend({ type: 'query_active_conversations' });
+        handleAgentReconnected(msg, scheduleHighlight);
       } else if (msg.type === 'active_conversations') {
-        // Agent's response is authoritative — first clear all processing state,
-        // then re-apply only for conversations the agent reports as active.
-        // This corrects any stale isProcessing=true left by the safety net or
-        // from turns that finished while the socket was down.
-        const activeSet = new Set();
-        const convs = msg.conversations || [];
-        for (const entry of convs) {
-          if (entry.conversationId) activeSet.add(entry.conversationId);
-        }
-
-        // Clear foreground
-        const wasForegroundProcessing = isProcessing.value;
-        if (!activeSet.has(currentConversationId && currentConversationId.value)) {
-          isProcessing.value = false;
-          isCompacting.value = false;
-        }
-        // Clear all cached background conversations
-        if (conversationCache) {
-          for (const [convId, cached] of Object.entries(conversationCache.value)) {
-            if (!activeSet.has(convId)) {
-              cached.isProcessing = false;
-              cached.isCompacting = false;
-            }
-          }
-        }
-        // Clear processingConversations map
-        if (processingConversations) {
-          for (const convId of Object.keys(processingConversations.value)) {
-            if (!activeSet.has(convId)) {
-              processingConversations.value[convId] = false;
-            }
-          }
-        }
-
-        // Now set state for actually active conversations
-        for (const entry of convs) {
-          const convId = entry.conversationId;
-          if (!convId) continue;
-          if (currentConversationId && currentConversationId.value === convId) {
-            // Foreground conversation
-            isProcessing.value = true;
-            isCompacting.value = !!entry.isCompacting;
-          } else if (conversationCache && conversationCache.value[convId]) {
-            // Background conversation
-            const cached = conversationCache.value[convId];
-            cached.isProcessing = true;
-            cached.isCompacting = !!entry.isCompacting;
-          }
-          if (processingConversations) {
-            processingConversations.value[convId] = true;
-          }
-        }
-
-        // Restore active team state on reconnect
-        if (team && msg.activeTeam) {
-          team.handleActiveTeamRestore(msg.activeTeam, workDir.value);
-        }
-        resetIdleCheck();
-        // If foreground was processing but no longer is, dequeue pending messages
-        if (wasForegroundProcessing && !isProcessing.value) _dequeueNext();
+        handleActiveConversations(msg);
       } else if (msg.type === 'error') {
-        // Route btw-related errors to the overlay instead of the message list
-        if (btwPending && btwPending.value && msg.message && msg.message.includes('btw_question')) {
-          btwPending.value = false;
-          if (btwState && btwState.value) {
-            btwState.value.error = msg.message;
-            btwState.value.done = true;
-          }
-          return;
-        }
-        streaming.flushReveal();
-        finalizeStreamingMsg(scheduleHighlight);
-        messages.value.push({
-          id: streaming.nextId(), role: 'system',
-          content: msg.message, isError: true,
-          timestamp: new Date(),
-        });
-        scrollToBottom();
-        isProcessing.value = false;
-        isCompacting.value = false;
-        loadingSessions.value = false;
-        clearIdleCheck();
-        if (currentConversationId && currentConversationId.value) {
-          processingConversations.value[currentConversationId.value] = false;
-        }
-        // Forward error to Loop module for inline display
-        if (loop && loop.loopError) {
-          loop.loopError.value = msg.message || '';
-        }
-        _dequeueNext();
-      } else if (msg.type === 'claude_output') {
-        handleClaudeOutput(msg, scheduleHighlight);
-        resetIdleCheck();
-      } else if (msg.type === 'session_started') {
-        // Claude session ID captured — update and refresh sidebar
-        currentClaudeSessionId.value = msg.claudeSessionId;
-        sidebar.requestSessionList();
-      } else if (msg.type === 'command_output') {
-        streaming.flushReveal();
-        finalizeStreamingMsg(scheduleHighlight);
-        messages.value.push({
-          id: streaming.nextId(), role: 'system',
-          content: msg.content, isCommandOutput: true,
-          timestamp: new Date(),
-        });
-        scrollToBottom();
-      } else if (msg.type === 'context_compaction') {
-        if (msg.status === 'started') {
-          isCompacting.value = true;
-          messages.value.push({
-            id: streaming.nextId(), role: 'system',
-            content: t('system.contextCompacting'), isCompactStart: true,
-            timestamp: new Date(),
-          });
-          scrollToBottom();
-        } else if (msg.status === 'completed') {
-          isCompacting.value = false;
-          // Update the start message to show completed
-          const startMsg = findLast(messages.value, m => m.isCompactStart && !m.compactDone);
-          if (startMsg) {
-            startMsg.content = t('system.contextCompacted');
-            startMsg.compactDone = true;
-          }
-          scrollToBottom();
-        }
-      } else if (msg.type === 'turn_completed' || msg.type === 'execution_cancelled') {
-        streaming.flushReveal();
-        finalizeStreamingMsg(scheduleHighlight);
-        isProcessing.value = false;
-        isCompacting.value = false;
-        clearIdleCheck();
-        toolMsgMap.clear();
-        if (msg.usage) usageStats.value = msg.usage;
-        if (currentConversationId && currentConversationId.value) {
-          processingConversations.value[currentConversationId.value] = false;
-        }
-        if (msg.type === 'execution_cancelled') {
-          needsResume.value = true;
-          messages.value.push({
-            id: streaming.nextId(), role: 'system',
-            content: t('system.generationStopped'), timestamp: new Date(),
-          });
-          scrollToBottom();
-        }
-        sidebar.requestSessionList();
-        _dequeueNext();
-      } else if (msg.type === 'ask_user_question') {
-        streaming.flushReveal();
-        finalizeStreamingMsg(scheduleHighlight);
-        for (let i = messages.value.length - 1; i >= 0; i--) {
-          const m = messages.value[i];
-          if (m.role === 'tool' && m.toolName === 'AskUserQuestion') {
-            messages.value.splice(i, 1);
-            break;
-          }
-          if (m.role === 'user') break;
-        }
-        const questions = msg.questions || [];
-        const selectedAnswers = {};
-        const customTexts = {};
-        for (let i = 0; i < questions.length; i++) {
-          selectedAnswers[i] = questions[i].multiSelect ? [] : null;
-          customTexts[i] = '';
-        }
-        messages.value.push({
-          id: streaming.nextId(),
-          role: 'ask-question',
-          requestId: msg.requestId,
-          questions,
-          answered: false,
-          selectedAnswers,
-          customTexts,
-          timestamp: new Date(),
-        });
-        scrollToBottom();
-      } else if (msg.type === 'sessions_list') {
-        historySessions.value = msg.sessions || [];
-        loadingSessions.value = false;
-      } else if (msg.type === 'session_deleted') {
-        historySessions.value = historySessions.value.filter(s => s.sessionId !== msg.sessionId);
-      } else if (msg.type === 'session_renamed') {
-        const session = historySessions.value.find(s => s.sessionId === msg.sessionId);
-        if (session) session.title = msg.newTitle;
-      } else if (msg.type === 'conversation_resumed') {
-        currentClaudeSessionId.value = msg.claudeSessionId;
-        if (msg.history && Array.isArray(msg.history)) {
-          messages.value = buildHistoryBatch(msg.history, () => streaming.nextId());
-          toolMsgMap.clear();
-        }
-        // Detect plan mode from agent-provided flag
-        if (msg.planMode != null) {
-          if (setPlanMode) setPlanMode(!!msg.planMode);
-        }
-        loadingHistory.value = false;
-        // Restore live status from agent (compacting / processing)
-        if (msg.isCompacting) {
-          isCompacting.value = true;
-          isProcessing.value = true;
-          messages.value.push({
-            id: streaming.nextId(), role: 'system',
-            content: t('system.contextCompacting'), isCompactStart: true,
-            timestamp: new Date(),
-          });
-        } else if (msg.isProcessing) {
-          isProcessing.value = true;
-          messages.value.push({
-            id: streaming.nextId(), role: 'system',
-            content: t('system.agentProcessing'),
-            timestamp: new Date(),
-          });
-        } else {
-          messages.value.push({
-            id: streaming.nextId(), role: 'system',
-            content: t('system.sessionRestored'),
-            timestamp: new Date(),
-          });
-        }
-        scrollToBottom();
-      } else if (msg.type === 'directory_listing') {
-        if (msg.source === 'file_browser' && fileBrowser) {
-          fileBrowser.handleDirectoryListing(msg);
-        } else {
-          folderPickerLoading.value = false;
-          folderPickerEntries.value = (msg.entries || [])
-            .filter(e => e.type === 'directory')
-            .sort((a, b) => a.name.localeCompare(b.name));
-          if (msg.dirPath != null) folderPickerPath.value = msg.dirPath;
-        }
-      } else if (msg.type === 'file_content') {
-        if (filePreview) filePreview.handleFileContent(msg);
-      } else if (msg.type === 'memory_list') {
-        memoryLoading.value = false;
-        memoryFiles.value = msg.files || [];
-        memoryDir.value = msg.memoryDir || null;
-      } else if (msg.type === 'memory_updated') {
-        memorySaving.value = false;
-        if (msg.success) {
-          memoryEditing.value = false;
-          memoryEditContent.value = '';
-          // Refresh list and preview
-          wsSend({ type: 'list_memory' });
-          if (filePreview) filePreview.refreshPreview();
-        }
-      } else if (msg.type === 'memory_deleted') {
-        if (msg.success) {
-          memoryFiles.value = memoryFiles.value.filter(f => f.name !== msg.filename);
-          // Close preview if open (might be showing the deleted file)
-          if (filePreview) filePreview.closePreview();
-        }
-      } else if (msg.type === 'btw_answer') {
-        if (btwPending) btwPending.value = false;
-        if (btwState && btwState.value) {
-          btwState.value.answer += msg.delta;
-          if (msg.done) {
-            btwState.value.done = true;
-          }
-        }
-      } else if (msg.type === 'plan_mode_changed') {
-        if (setPlanMode) setPlanMode(msg.enabled);
-        // For the immediate path (no injected turn), clear isProcessing here
-        // because turn_completed will never arrive.
-        if (msg.immediate) {
-          isProcessing.value = false;
-          if (currentConversationId.value) {
-            processingConversations.value[currentConversationId.value] = false;
-          }
-        }
-        // For the injected path, turn_completed handles isProcessing naturally.
-      } else if (msg.type === 'workdir_changed') {
-        workdirSwitching.value = false;
-        workDir.value = msg.workDir;
-        localStorage.setItem(`agentlink-workdir-${sessionId.value}`, msg.workDir);
-        sidebar.addToWorkdirHistory(msg.workDir);
-        if (fileBrowser) fileBrowser.onWorkdirChanged();
-        if (filePreview) filePreview.onWorkdirChanged();
-
-        // Multi-session: switch to a new blank conversation for the new workdir.
-        // Background conversations keep running and receiving output in their cache.
-        if (switchConversation) {
-          const newConvId = crypto.randomUUID();
-          switchConversation(newConvId);
-        } else {
-          // Fallback for old code path (no switchConversation)
-          messages.value = [];
-          queuedMessages.value = [];
-          toolMsgMap.clear();
-          visibleLimit.value = 50;
-          streaming.setMessageIdCounter(0);
-          streaming.setStreamingMessageId(null);
-          streaming.reset();
-          currentClaudeSessionId.value = null;
-          isProcessing.value = false;
-        }
-        messages.value.push({
-          id: streaming.nextId(), role: 'system',
-          content: t('system.workdirChanged', { dir: msg.workDir }),
-          timestamp: new Date(),
-        });
-        // Clear old history immediately so UI doesn't show stale data
-        historySessions.value = [];
-        if (team) {
-          team.teamsList.value = [];
-          team.teamState.value = null;
-          team.historicalTeam.value = null;
-          if (team.viewMode.value === 'team') {
-            team.viewMode.value = 'chat';
-          }
-        }
-        if (loop) loop.loopsList.value = [];
-        memoryFiles.value = [];
-        memoryDir.value = null;
-        memoryPanelOpen.value = false;
-        memoryEditing.value = false;
-        sidebar.requestSessionList();
-        if (team) team.requestTeamsList();
-        if (loop) loop.requestLoopsList();
+        handleError(msg, scheduleHighlight);
+      } else {
+        // Dispatch to extracted handler modules
+        const handler = handlers[msg.type];
+        if (handler) handler(msg, scheduleHighlight);
       }
     };
 
@@ -690,15 +255,171 @@ export function createConnection(deps) {
       loadingSessions.value = false;
       loadingHistory.value = false;
 
-      // Don't auto-reconnect if auth-locked or still in auth prompt
       if (authLocked.value || authRequired.value) return;
-
       if (wasConnected || reconnectAttempts > 0) {
         scheduleReconnect(scheduleHighlight);
       }
     };
 
     ws.onerror = () => {};
+  }
+
+  // ── Connection lifecycle handlers (inline — depend on ws/ping/session state) ──
+
+  function handleConnected(msg, scheduleHighlight) {
+    authRequired.value = false;
+    authPassword.value = '';
+    authError.value = '';
+    authAttempts.value = null;
+    authLocked.value = false;
+    if (msg.authToken) {
+      localStorage.setItem(`agentlink-auth-${sessionId.value}`, msg.authToken);
+    }
+    if (msg.serverVersion) serverVersion.value = msg.serverVersion;
+    if (msg.agent) {
+      status.value = 'Connected';
+      agentName.value = msg.agent.name;
+      hostname.value = msg.agent.hostname || '';
+      workDir.value = msg.agent.workDir;
+      agentVersion.value = msg.agent.version || '';
+      sidebar.loadWorkdirHistory();
+      sidebar.addToWorkdirHistory(msg.agent.workDir);
+      const savedDir = localStorage.getItem(`agentlink-workdir-${sessionId.value}`);
+      if (savedDir && savedDir !== msg.agent.workDir) {
+        workdirSwitching.value = true;
+        setTimeout(() => { workdirSwitching.value = false; }, 10000);
+        wsSend({ type: 'change_workdir', workDir: savedDir });
+      }
+      sidebar.requestSessionList();
+      if (team) team.requestTeamsList();
+      if (loop) loop.requestLoopsList();
+      startPing();
+      wsSend({ type: 'query_active_conversations' });
+    } else {
+      status.value = 'Waiting';
+      error.value = t('error.agentNotConnected');
+    }
+  }
+
+  function handleAgentDisconnected() {
+    stopPing();
+    status.value = 'Waiting';
+    agentName.value = '';
+    hostname.value = '';
+    error.value = t('error.agentDisconnected');
+    isProcessing.value = false;
+    isCompacting.value = false;
+    queuedMessages.value = [];
+    loadingSessions.value = false;
+    if (conversationCache) {
+      for (const [convId, cached] of Object.entries(conversationCache.value)) {
+        cached.isProcessing = false;
+        cached.isCompacting = false;
+        processingConversations.value[convId] = false;
+      }
+    }
+    if (currentConversationId && currentConversationId.value) {
+      processingConversations.value[currentConversationId.value] = false;
+    }
+  }
+
+  function handleAgentReconnected(msg, scheduleHighlight) {
+    status.value = 'Connected';
+    error.value = '';
+    if (msg.agent) {
+      agentName.value = msg.agent.name;
+      hostname.value = msg.agent.hostname || '';
+      workDir.value = msg.agent.workDir;
+      agentVersion.value = msg.agent.version || '';
+      sidebar.addToWorkdirHistory(msg.agent.workDir);
+    }
+    sidebar.requestSessionList();
+    if (team) team.requestTeamsList();
+    if (loop) loop.requestLoopsList();
+    startPing();
+    wsSend({ type: 'query_active_conversations' });
+  }
+
+  function handleActiveConversations(msg) {
+    const activeSet = new Set();
+    const convs = msg.conversations || [];
+    for (const entry of convs) {
+      if (entry.conversationId) activeSet.add(entry.conversationId);
+    }
+
+    const wasForegroundProcessing = isProcessing.value;
+    if (!activeSet.has(currentConversationId && currentConversationId.value)) {
+      isProcessing.value = false;
+      isCompacting.value = false;
+    }
+    if (conversationCache) {
+      for (const [convId, cached] of Object.entries(conversationCache.value)) {
+        if (!activeSet.has(convId)) {
+          cached.isProcessing = false;
+          cached.isCompacting = false;
+        }
+      }
+    }
+    if (processingConversations) {
+      for (const convId of Object.keys(processingConversations.value)) {
+        if (!activeSet.has(convId)) {
+          processingConversations.value[convId] = false;
+        }
+      }
+    }
+
+    for (const entry of convs) {
+      const convId = entry.conversationId;
+      if (!convId) continue;
+      if (currentConversationId && currentConversationId.value === convId) {
+        isProcessing.value = true;
+        isCompacting.value = !!entry.isCompacting;
+      } else if (conversationCache && conversationCache.value[convId]) {
+        const cached = conversationCache.value[convId];
+        cached.isProcessing = true;
+        cached.isCompacting = !!entry.isCompacting;
+      }
+      if (processingConversations) {
+        processingConversations.value[convId] = true;
+      }
+    }
+
+    if (team && msg.activeTeam) {
+      team.handleActiveTeamRestore(msg.activeTeam, workDir.value);
+    }
+    resetIdleCheck();
+    if (wasForegroundProcessing && !isProcessing.value) _dequeueNext();
+  }
+
+  function handleError(msg, scheduleHighlight) {
+    // Route btw-related errors to the overlay
+    if (deps.btwPending && deps.btwPending.value && msg.message && msg.message.includes('btw_question')) {
+      deps.btwPending.value = false;
+      if (deps.btwState && deps.btwState.value) {
+        deps.btwState.value.error = msg.message;
+        deps.btwState.value.done = true;
+      }
+      return;
+    }
+    streaming.flushReveal();
+    claudeHandlers.finalizeStreamingMsg(scheduleHighlight);
+    messages.value.push({
+      id: streaming.nextId(), role: 'system',
+      content: msg.message, isError: true,
+      timestamp: new Date(),
+    });
+    deps.scrollToBottom();
+    isProcessing.value = false;
+    isCompacting.value = false;
+    loadingSessions.value = false;
+    clearIdleCheck();
+    if (currentConversationId && currentConversationId.value) {
+      processingConversations.value[currentConversationId.value] = false;
+    }
+    if (loop && loop.loopError) {
+      loop.loopError.value = msg.message || '';
+    }
+    _dequeueNext();
   }
 
   function scheduleReconnect(scheduleHighlight) {
