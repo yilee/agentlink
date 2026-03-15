@@ -24,7 +24,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:agent\"",
     "start:server": "npm run start --workspace=server",
     "start:agent": "npm run start --workspace=agent",
-    "build:web": "cd server/web-src && npm install && npm run build",
+    "build:web": "cd server/web && npm install && npm run build",
     "clean": "rimraf server/dist agent/dist",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",

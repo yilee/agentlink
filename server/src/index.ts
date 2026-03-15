@@ -21,7 +21,7 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-const webDir = join(__dirname, '../web');
+const webDir = join(__dirname, '../web/dist');
 
 // Landing page at root
 app.get('/', (_req, res) => {
