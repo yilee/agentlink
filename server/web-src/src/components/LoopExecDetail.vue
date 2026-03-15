@@ -1,5 +1,6 @@
 <script setup>
 import { inject } from 'vue';
+import ToolBlock from './ToolBlock.vue';
 
 const store = inject('store');
 const loopStore = inject('loop');
@@ -7,12 +8,6 @@ const loopStore = inject('loop');
 const {
   t,
   getRenderedContent,
-  getToolIcon,
-  getToolSummary,
-  getEditDiffHtml,
-  toggleTool,
-  isEditTool,
-  getFormattedToolInput,
 } = store;
 
 const {
@@ -50,29 +45,8 @@ const {
               <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
             </div>
           </div>
-          <div v-else-if="msg.role === 'tool' && (msg.toolName === 'EnterPlanMode' || msg.toolName === 'ExitPlanMode')" class="plan-mode-divider">
-            <span class="plan-mode-divider-line"></span>
-            <span class="plan-mode-divider-text">{{ msg.toolName === 'EnterPlanMode' ? t('tool.enteredPlanMode') : t('tool.exitedPlanMode') }}</span>
-            <span class="plan-mode-divider-line"></span>
-          </div>
-          <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
-            <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
-              <span class="tool-icon" v-html="getToolIcon(msg.toolName)"></span>
-              <span class="tool-name">{{ msg.toolName }}</span>
-              <span class="tool-summary">{{ getToolSummary(msg) }}</span>
-              <span class="tool-status-icon" v-if="msg.hasResult">&#x2713;</span>
-              <span class="tool-status-icon running-dots" v-else>
-                <span></span><span></span><span></span>
-              </span>
-              <span class="tool-toggle">{{ msg.expanded ? '&#x25B2;' : '&#x25BC;' }}</span>
-            </div>
-            <div v-if="msg.expanded" class="tool-expand">
-              <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
-              <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
-              <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
-              <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
-            </div>
-          </div>
+          <!-- Tool use block (shared component) -->
+          <ToolBlock v-else-if="msg.role === 'tool'" :msg="msg" />
         </template>
       </div>
     </div>

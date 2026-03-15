@@ -1,5 +1,7 @@
 <script setup>
 import { inject } from 'vue';
+import ToolBlock from './ToolBlock.vue';
+import AskQuestionCard from './AskQuestionCard.vue';
 
 const store = inject('store');
 const teamStore = inject('team');
@@ -10,21 +12,12 @@ const {
   viewMode,
   t,
   getRenderedContent,
-  getToolIcon,
   getToolSummary,
   isPrevAssistant,
   toggleContextSummary,
-  selectQuestionOption,
-  submitQuestionAnswer,
-  hasQuestionAnswer,
-  attachments,
-  planMode,
   onMessageListScroll,
   loadingHistory,
-  btwState,
   agentName,
-  getEditDiffHtml,
-  getQuestionResponseSummary,
   pendingPlanMode,
   workDir,
   visibleMessages,
@@ -35,8 +28,6 @@ const {
   formatTimestamp,
   copyMessage,
   toggleTool,
-  isEditTool,
-  getFormattedToolInput
 } = store;
 
 const { teamState: team } = teamStore;
@@ -105,11 +96,11 @@ const { teamState: team } = teamStore;
                     </span>
                     <span class="team-agent-tool-name">Agent</span>
                     <span class="team-agent-tool-desc">{{ getToolSummary(msg) }}</span>
-                    <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>
+                    <span class="tool-status-icon" v-if="msg.hasResult">&#x2713;</span>
                     <span class="tool-status-icon running-dots" v-else>
                       <span></span><span></span><span></span>
                     </span>
-                    <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
+                    <span class="tool-toggle">{{ msg.expanded ? '&#x25B2;' : '&#x25BC;' }}</span>
                   </div>
                   <div v-if="msg.expanded" class="tool-expand team-agent-tool-expand">
                     <pre v-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
@@ -120,74 +111,11 @@ const { teamState: team } = teamStore;
                   </div>
                 </div>
 
-                <!-- Plan mode switch indicator -->
-                <div v-else-if="msg.role === 'tool' && (msg.toolName === 'EnterPlanMode' || msg.toolName === 'ExitPlanMode')" class="plan-mode-divider">
-                  <span class="plan-mode-divider-line"></span>
-                  <span class="plan-mode-divider-text">{{ msg.toolName === 'EnterPlanMode' ? t('tool.enteredPlanMode') : t('tool.exitedPlanMode') }}</span>
-                  <span class="plan-mode-divider-line"></span>
-                </div>
-
-                <!-- Tool use block (collapsible) -->
-                <div v-else-if="msg.role === 'tool'" class="tool-line-wrapper">
-                  <div :class="['tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
-                    <span class="tool-icon" v-html="getToolIcon(msg.toolName)"></span>
-                    <span class="tool-name">{{ msg.toolName }}</span>
-                    <span class="tool-summary">{{ getToolSummary(msg) }}</span>
-                    <span class="tool-status-icon" v-if="msg.hasResult">\u{2713}</span>
-                    <span class="tool-status-icon running-dots" v-else>
-                      <span></span><span></span><span></span>
-                    </span>
-                    <span class="tool-toggle">{{ msg.expanded ? '\u{25B2}' : '\u{25BC}' }}</span>
-                  </div>
-                  <div v-if="msg.expanded" class="tool-expand">
-                    <div v-if="isEditTool(msg) && getEditDiffHtml(msg)" class="tool-diff" v-html="getEditDiffHtml(msg)"></div>
-                    <div v-else-if="getFormattedToolInput(msg)" class="tool-input-formatted" v-html="getFormattedToolInput(msg)"></div>
-                    <pre v-else-if="msg.toolInput" class="tool-block">{{ msg.toolInput }}</pre>
-                    <pre v-if="msg.toolOutput" class="tool-block tool-output">{{ msg.toolOutput }}</pre>
-                  </div>
-                </div>
+                <!-- Tool use block (shared component) -->
+                <ToolBlock v-else-if="msg.role === 'tool'" :msg="msg" />
 
                 <!-- AskUserQuestion interactive card -->
-                <div v-else-if="msg.role === 'ask-question'" class="ask-question-wrapper">
-                  <div v-if="!msg.answered" class="ask-question-card">
-                    <div v-for="(q, qi) in msg.questions" :key="qi" class="ask-question-block">
-                      <div v-if="q.header" class="ask-question-header">{{ q.header }}</div>
-                      <div class="ask-question-text">{{ q.question }}</div>
-                      <div class="ask-question-options">
-                        <div
-                          v-for="(opt, oi) in q.options" :key="oi"
-                          :class="['ask-question-option', {
-                            selected: q.multiSelect
-                              ? (msg.selectedAnswers[qi] || []).includes(opt.label)
-                              : msg.selectedAnswers[qi] === opt.label
-                          }]"
-                          @click="selectQuestionOption(msg, qi, opt.label)"
-                        >
-                          <div class="ask-option-label">{{ opt.label }}</div>
-                          <div v-if="opt.description" class="ask-option-desc">{{ opt.description }}</div>
-                        </div>
-                      </div>
-                      <div class="ask-question-custom">
-                        <input
-                          type="text"
-                          v-model="msg.customTexts[qi]"
-                          :placeholder="t('chat.customResponse')"
-                          @input="msg.selectedAnswers[qi] = q.multiSelect ? [] : null"
-                          @keydown.enter="hasQuestionAnswer(msg) && submitQuestionAnswer(msg)"
-                        />
-                      </div>
-                    </div>
-                    <div class="ask-question-actions">
-                      <button class="ask-question-submit" :disabled="!hasQuestionAnswer(msg)" @click="submitQuestionAnswer(msg)">
-                        {{ t('chat.submit') }}
-                      </button>
-                    </div>
-                  </div>
-                  <div v-else class="ask-question-answered">
-                    <span class="ask-answered-icon">\u{2713}</span>
-                    <span class="ask-answered-text">{{ getQuestionResponseSummary(msg) }}</span>
-                  </div>
-                </div>
+                <AskQuestionCard v-else-if="msg.role === 'ask-question'" :msg="msg" />
 
                 <!-- Context summary (collapsed by default) -->
                 <div v-else-if="msg.role === 'context-summary'" class="context-summary-wrapper">
