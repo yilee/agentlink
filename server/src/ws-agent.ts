@@ -1,22 +1,12 @@
 import { WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { randomUUID } from 'crypto';
-import {
-  agents,
-  sessionToAgent,
-  webClients,
-  generateSessionId,
-  sessionAuth,
-  type AgentSession,
-} from './context.js';
+import { sessions, type AgentSession } from './session-manager.js';
+import { auth } from './auth-manager.js';
+import { MessageRelay } from './message-relay.js';
 import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
-import { hashPassword } from './auth.js';
 
-// Per-agent message processing queue to guarantee relay order.
-// Without this, concurrent async handleAgentMessage calls can finish out-of-order
-// (e.g. a large message needing gzip encryption completes after a smaller subsequent one),
-// causing turn_completed to arrive before the last claude_output on the web client.
-const agentSendQueues = new Map<string, Promise<void>>();
+const agentRelay = new MessageRelay();
 
 export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
@@ -31,14 +21,14 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   let passwordHash: string | null = null;
   let passwordSalt: string | null = null;
   if (password) {
-    const h = hashPassword(password);
+    const h = auth.hashPassword(password);
     passwordHash = h.hash;
     passwordSalt = h.salt;
   }
 
   // Reuse requested sessionId (agent reconnecting) or generate a new one
   const requestedSessionId = url.searchParams.get('sessionId');
-  const sessionId = requestedSessionId || generateSessionId();
+  const sessionId = requestedSessionId || sessions.generateSessionId();
   if (!requestedSessionId) {
     console.log(`[Agent] No sessionId in query params for ${name} — generated new: ${sessionId}`);
   }
@@ -59,12 +49,11 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     passwordSalt,
   };
 
-  agents.set(agentId, agent);
-  sessionToAgent.set(sessionId, agentId);
+  sessions.registerAgent(agentId, agent);
 
   // Persist password auth per session so it survives agent disconnects
   if (passwordHash && passwordSalt) {
-    sessionAuth.set(sessionId, { passwordHash, passwordSalt });
+    auth.setSessionPassword(sessionId, passwordHash, passwordSalt);
   }
 
   console.log(`[Agent] Registered: ${name} (${agentId}), session: ${sessionId}${requestedSessionId ? ' (reconnect)' : ''}${passwordHash ? ' (password protected)' : ''}`);
@@ -78,8 +67,8 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   }));
 
   // Notify any web clients already connected to this session (reconnect scenario)
-  for (const [, client] of webClients) {
-    if (client.sessionId === sessionId && client.ws.readyState === WebSocket.OPEN) {
+  for (const client of sessions.getClientsForSession(sessionId)) {
+    if (client.ws.readyState === WebSocket.OPEN) {
       encryptAndSend(client.ws, {
         type: 'agent_reconnected',
         agent: { agentId, name, hostname, workDir, version },
@@ -88,26 +77,23 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   }
 
   ws.on('message', (data) => {
-    // Chain through per-agent queue to preserve message order across async encryption
-    const prev = agentSendQueues.get(agentId) || Promise.resolve();
-    agentSendQueues.set(agentId, prev.then(() => handleAgentMessage(agentId, data.toString())).catch(() => {}));
+    agentRelay.enqueue(agentId, () => handleAgentMessage(agentId, data.toString()));
   });
 
   ws.on('close', () => {
     console.log(`[Agent] Disconnected: ${name} (${agentId})`);
-    agentSendQueues.delete(agentId);
+    agentRelay.cleanup(agentId);
 
     // Only clean up if this WebSocket is still the current one for this agent.
     // On reconnect, the new connection overwrites the agents Map entry before
     // the old connection's close event fires — deleting would remove the new entry.
-    const current = agents.get(agentId);
+    const current = sessions.getAgent(agentId);
     if (current && current.ws === ws) {
-      sessionToAgent.delete(sessionId);
-      agents.delete(agentId);
+      sessions.removeAgent(agentId);
 
       // Notify connected web clients that agent is gone
-      for (const [, client] of webClients) {
-        if (client.sessionId === sessionId && client.ws.readyState === WebSocket.OPEN) {
+      for (const client of sessions.getClientsForSession(sessionId)) {
+        if (client.ws.readyState === WebSocket.OPEN) {
           encryptAndSend(client.ws, { type: 'agent_disconnected' }, client.sessionKey);
         }
       }
@@ -120,7 +106,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
 }
 
 async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
-  const agent = agents.get(agentId);
+  const agent = sessions.getAgent(agentId);
   if (!agent) return;
 
   const msg = await parseMessage(raw, agent.sessionKey);
@@ -141,10 +127,9 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
   }
 
   // Forward agent messages to all web clients connected to this session
-  // Re-encrypt with each client's own session key
   let relayCount = 0;
-  for (const [, client] of webClients) {
-    if (client.sessionId === agent.sessionId && client.ws.readyState === WebSocket.OPEN) {
+  for (const client of sessions.getClientsForSession(agent.sessionId)) {
+    if (client.ws.readyState === WebSocket.OPEN) {
       await encryptAndSend(client.ws, msg, client.sessionKey);
       relayCount++;
     }
