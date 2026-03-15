@@ -1,7 +1,6 @@
 import express from 'express';
 import { createServer } from 'http';
 import { createRequire } from 'module';
-import { readFileSync } from 'fs';
 import { WebSocket, WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -16,21 +15,13 @@ const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 const startedAt = new Date();
 
-// Build versioned index.html at startup (cache-busting for browsers like iPhone Safari)
-const versionTag = `v=${pkg.version}`;
-const indexHtml = readFileSync(join(__dirname, '../web/index.html'), 'utf-8')
-  // Version-stamp local asset URLs in src="..." and href="..." attributes
-  .replace(/((?:src|href)\s*=\s*")(\/(?!\/)[^"?]+\.(?:js|css))(")/g, `$1$2?${versionTag}$3`)
-  // Version-stamp JS string literals referencing local .css/.js paths (e.g. theme switching)
-  .replace(/(')(\/(?!\/)[^'?]+\.(?:js|css))(')/g, `$1$2?${versionTag}$3`);
-
 const PORT = parseInt(process.env.PORT || '3456', 10);
 
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-const webDir = join(__dirname, '../web');
+const webDir = join(__dirname, '../web/dist');
 
 // Landing page at root
 app.get('/', (_req, res) => {
@@ -42,20 +33,24 @@ app.get('/zh', (_req, res) => {
   res.sendFile(join(webDir, 'landing.zh.html'));
 });
 
-// Serve versioned index.html with no-store (cache-busting for browsers like iPhone Safari)
+// Serve index.html with no-store (Vite hashed filenames handle cache-busting)
 const sendIndexHtml = (_req: express.Request, res: express.Response) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
-  res.send(indexHtml);
+  res.sendFile(join(webDir, 'index.html'));
 };
 
-// Intercept /index.html before express.static to ensure versioned HTML is served
+// Intercept /index.html before express.static to ensure no-store is applied
 app.get('/index.html', sendIndexHtml);
 
-// Serve static assets from web/ with no-cache for JS/CSS (ensures updates are picked up)
+// Serve static assets from web/ — hashed assets are immutable, others use no-cache
 app.use(express.static(webDir, {
   setHeaders(res, filePath) {
-    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
+    if (filePath.includes('assets')) {
+      // Vite-hashed files (e.g. index-CqWVRN_z.js) — immutable
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store');
+    } else {
       res.setHeader('Cache-Control', 'no-cache');
     }
   },

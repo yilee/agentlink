@@ -97,7 +97,7 @@ agentlink-client start --daemon --server ws://your-server:3456
 |------|--------|
 | Agent 客户端 | TypeScript, Commander.js, `ws` |
 | 中继服务器 | Express, `ws`, 静态文件服务 |
-| Web 界面 | Vue 3（浏览器 ES 模块）, marked.js, highlight.js |
+| Web 界面 | Vue 3 SFC + Vite, marked.js, highlight.js |
 | 加密 | TweetNaCl (XSalsa20-Poly1305 secretbox) |
 
 ## 相关链接

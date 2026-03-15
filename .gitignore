@@ -31,6 +31,10 @@ Thumbs.db
 server/package-lock.json
 agent/package-lock.json
 
+# Vite build output
+server/web/dist/
+server/web/node_modules/
+
 # Test artifacts
 *.png
 .playwright-mcp/

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createScrollManager, createHighlightScheduler, formatTokens, formatUsage } from '../../server/web/modules/appHelpers.js';
+import { createScrollManager, createHighlightScheduler, formatTokens, formatUsage } from '../../server/web/src/modules/appHelpers.js';
 
 describe('appHelpers', () => {
   describe('formatTokens', () => {
