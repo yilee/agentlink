@@ -2,30 +2,15 @@ import { WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { randomUUID } from 'crypto';
 import { createRequire } from 'module';
-import {
-  agents,
-  sessionToAgent,
-  webClients,
-  pendingAuth,
-  sessionAuth,
-  type AgentSession,
-  type WebClient,
-} from './context.js';
+import { sessions, type AgentSession, type WebClient } from './session-manager.js';
+import { auth } from './auth-manager.js';
+import { MessageRelay } from './message-relay.js';
 import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
-import {
-  isSessionLocked,
-  recordFailure,
-  clearFailures,
-  verifyPassword,
-  generateAuthToken,
-  verifyAuthToken,
-} from './auth.js';
 
 const require = createRequire(import.meta.url);
 const serverPkg = require('../package.json');
 
-// Per-client message processing queue to guarantee relay order
-const clientSendQueues = new Map<string, Promise<void>>();
+const clientRelay = new MessageRelay();
 
 export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
@@ -40,24 +25,21 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   }
 
   // Check if agent exists for this session
-  const agentId = sessionToAgent.get(sessionId);
-  const agent = agentId ? agents.get(agentId) : undefined;
+  const agent = sessions.getAgentBySession(sessionId);
 
-  // Password-protected session? Check persistent sessionAuth (survives agent disconnects)
-  const auth = sessionAuth.get(sessionId);
-  const requiresAuth = !!(auth?.passwordHash && auth?.passwordSalt);
+  // Password-protected session?
+  const requiresAuth = auth.requiresAuth(sessionId);
 
   if (requiresAuth) {
     // Check saved auth token first
-    if (authToken && verifyAuthToken(authToken, sessionId)) {
-      // Refresh the token so it doesn't expire during long sessions
-      const refreshedToken = generateAuthToken(sessionId);
+    if (authToken && auth.verifyAuthToken(authToken, sessionId)) {
+      const refreshedToken = auth.generateAuthToken(sessionId);
       completeConnection(ws, clientId, sessionId, agent, refreshedToken);
       return;
     }
 
     // Check lockout
-    if (isSessionLocked(sessionId)) {
+    if (auth.isLocked(sessionId)) {
       ws.send(JSON.stringify({
         type: 'auth_locked',
         message: 'Too many failed attempts. Try again in 15 minutes.',
@@ -67,7 +49,7 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
     }
 
     // Require authentication
-    pendingAuth.set(clientId, sessionId);
+    auth.setPending(clientId, sessionId);
 
     ws.send(JSON.stringify({ type: 'auth_required', sessionId }));
 
@@ -76,7 +58,7 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
     });
 
     ws.on('close', () => {
-      pendingAuth.delete(clientId);
+      auth.removePending(clientId);
     });
 
     return;
@@ -87,7 +69,7 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
 }
 
 function handlePendingAuthMessage(clientId: string, ws: WebSocket, raw: string): void {
-  const sessionId = pendingAuth.get(clientId);
+  const sessionId = auth.getPending(clientId);
   if (!sessionId) return;
 
   let msg: { type: string; password?: string };
@@ -99,39 +81,38 @@ function handlePendingAuthMessage(clientId: string, ws: WebSocket, raw: string):
 
   if (msg.type !== 'authenticate' || typeof msg.password !== 'string') return;
 
-  const agentId = sessionToAgent.get(sessionId);
-  const agent = agentId ? agents.get(agentId) : undefined;
-  const auth = sessionAuth.get(sessionId);
+  const agent = sessions.getAgentBySession(sessionId);
+  const sessionAuth = auth.getSessionAuth(sessionId);
 
-  if (!auth?.passwordHash || !auth?.passwordSalt) {
+  if (!sessionAuth?.passwordHash || !sessionAuth?.passwordSalt) {
     // Password removed while authenticating
     ws.send(JSON.stringify({ type: 'error', message: 'Session no longer available.' }));
-    pendingAuth.delete(clientId);
+    auth.removePending(clientId);
     ws.close();
     return;
   }
 
   // Check lockout (may have been triggered by another client)
-  if (isSessionLocked(sessionId)) {
+  if (auth.isLocked(sessionId)) {
     ws.send(JSON.stringify({
       type: 'auth_locked',
       message: 'Too many failed attempts. Try again in 15 minutes.',
     }));
-    pendingAuth.delete(clientId);
+    auth.removePending(clientId);
     ws.close();
     return;
   }
 
-  const valid = verifyPassword(msg.password, auth.passwordHash, auth.passwordSalt);
+  const valid = auth.verifyPassword(msg.password, sessionAuth.passwordHash, sessionAuth.passwordSalt);
 
   if (!valid) {
-    const { locked, remaining } = recordFailure(sessionId);
+    const { locked, remaining } = auth.recordFailure(sessionId);
     if (locked) {
       ws.send(JSON.stringify({
         type: 'auth_locked',
         message: 'Too many failed attempts. Try again in 15 minutes.',
       }));
-      pendingAuth.delete(clientId);
+      auth.removePending(clientId);
       ws.close();
     } else {
       ws.send(JSON.stringify({
@@ -144,10 +125,10 @@ function handlePendingAuthMessage(clientId: string, ws: WebSocket, raw: string):
   }
 
   // Success
-  clearFailures(sessionId);
-  pendingAuth.delete(clientId);
+  auth.clearFailures(sessionId);
+  auth.removePending(clientId);
 
-  const token = generateAuthToken(sessionId);
+  const token = auth.generateAuthToken(sessionId);
 
   // Replace pending auth message handler with normal encrypted handler
   ws.removeAllListeners('message');
@@ -174,7 +155,7 @@ function completeConnection(
     isAlive: true,
   };
 
-  webClients.set(clientId, client);
+  sessions.registerClient(clientId, client);
 
   // Build connected payload
   const payload: Record<string, unknown> = {
@@ -199,14 +180,13 @@ function completeConnection(
   console.log(`[Web] Client ${clientId.slice(0, 8)} connected to session ${sessionId}, agent: ${agent ? agent.name : 'none'}${authToken ? ' (authenticated)' : ''}`);
 
   ws.on('message', (data) => {
-    const prev = clientSendQueues.get(clientId) || Promise.resolve();
-    clientSendQueues.set(clientId, prev.then(() => handleWebMessage(clientId, data.toString())).catch(() => {}));
+    clientRelay.enqueue(clientId, () => handleWebMessage(clientId, data.toString()));
   });
 
   ws.on('close', () => {
     console.log(`[Web] Client ${clientId.slice(0, 8)} disconnected`);
-    clientSendQueues.delete(clientId);
-    webClients.delete(clientId);
+    clientRelay.cleanup(clientId);
+    sessions.removeClient(clientId);
   });
 
   ws.on('pong', () => {
@@ -215,7 +195,7 @@ function completeConnection(
 }
 
 async function handleWebMessage(clientId: string, raw: string): Promise<void> {
-  const client = webClients.get(clientId);
+  const client = sessions.getClient(clientId);
   if (!client) return;
 
   const msg = await parseMessage(raw, client.sessionKey);
@@ -229,8 +209,7 @@ async function handleWebMessage(clientId: string, raw: string): Promise<void> {
   }
 
   // Find the agent for this session and forward
-  const agentId = sessionToAgent.get(client.sessionId);
-  const agent = agentId ? agents.get(agentId) : undefined;
+  const agent = sessions.getAgentBySession(client.sessionId);
 
   if (!agent || agent.ws.readyState !== WebSocket.OPEN) {
     await encryptAndSend(client.ws, { type: 'error', message: 'Agent not connected' }, client.sessionKey);

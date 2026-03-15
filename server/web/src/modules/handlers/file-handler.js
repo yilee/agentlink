@@ -5,13 +5,13 @@ export function createFileHandlers(deps) {
     folderPickerLoading, folderPickerEntries, folderPickerPath,
     memoryFiles, memoryDir, memoryLoading,
     memoryEditing, memoryEditContent, memorySaving,
-    wsSend, fileBrowser, filePreview,
+    wsSend,
   } = deps;
 
   return {
     directory_listing(msg) {
-      if (msg.source === 'file_browser' && fileBrowser) {
-        fileBrowser.handleDirectoryListing(msg);
+      if (msg.source === 'file_browser' && deps.fileBrowser) {
+        deps.fileBrowser.handleDirectoryListing(msg);
       } else {
         folderPickerLoading.value = false;
         folderPickerEntries.value = (msg.entries || [])
@@ -21,7 +21,7 @@ export function createFileHandlers(deps) {
       }
     },
     file_content(msg) {
-      if (filePreview) filePreview.handleFileContent(msg);
+      if (deps.filePreview) deps.filePreview.handleFileContent(msg);
     },
     memory_list(msg) {
       memoryLoading.value = false;
@@ -34,13 +34,13 @@ export function createFileHandlers(deps) {
         memoryEditing.value = false;
         memoryEditContent.value = '';
         wsSend({ type: 'list_memory' });
-        if (filePreview) filePreview.refreshPreview();
+        if (deps.filePreview) deps.filePreview.refreshPreview();
       }
     },
     memory_deleted(msg) {
       if (msg.success) {
         memoryFiles.value = memoryFiles.value.filter(f => f.name !== msg.filename);
-        if (filePreview) filePreview.closePreview();
+        if (deps.filePreview) deps.filePreview.closePreview();
       }
     },
   };

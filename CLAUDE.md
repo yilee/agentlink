@@ -28,8 +28,8 @@ agentlink/
     ├── agent/           # 17 tests (claude, encryption, history, stream, config, team, scheduler, btw, sdk, etc.)
     ├── server/          # 5 tests (auth, config, context, encryption, heartbeat)
     ├── web/             # 3 tests (appHelpers, loopTemplates, planMode)
-    ├── functional/      # 3 E2E tests (e2e, btw-side-question, btw-bugfix-verification)
-    └── e2e-workdir/     # Test fixtures (gitignored except .gitkeep)
+    ├── functional/      # Automated functional tests (mock agent + Playwright, `npm run test:functional`)
+    └── e2e-workdir/     # Working directory for manual E2E tests (gitignored except .gitkeep)
 ```
 
 ### Claude CLI Integration (agent/claude.ts)
@@ -187,7 +187,7 @@ Used by `agentlink stop`, `agentlink server stop`, and `agentlink status` to fin
 ```bash
 npm install && npm run build     # install + build all
 npm run dev                      # dev mode (both server + agent, hot reload)
-npm test                         # vitest, also: test:e2e, test:watch, test:coverage
+npm test                         # vitest, also: test:functional, test:watch, test:coverage
 ```
 
 **CLI commands:** `agentlink-server start [--daemon] [--port 8080] | stop | status` and `agentlink-client start [--daemon] [--server ws://...] | stop | status | config list/set/get | service install/uninstall`
@@ -223,13 +223,18 @@ git tag server-v0.1.86
 git push && git push origin server-v0.1.86
 ```
 
-### E2E Testing
+### Testing
 
-**Test plan:** [`docs/e2e-test-plan.md`](docs/e2e-test-plan.md) — 19 manual E2E tests covering multi-session parallel features. When asked to run a full E2E test, follow every test case in that document using Playwright against a live ephemeral server + agent.
+**Two types of tests with different names:**
 
-**Scope:** basic messaging, conversation switching, background routing, cancel/resume, simultaneous parallel processing, working directory changes, page refresh recovery, and session deletion.
+- **Functional tests** (`npm run test:functional`): Automated Vitest + Playwright tests in `test/functional/`. Use a mock agent (simulated WebSocket messages) to verify UI rendering and protocol handling. No real Claude subprocess.
+- **E2E tests** (`docs/e2e-test-plan.md`): Manual tests against a live ephemeral server + real agent + real Claude. When asked to "run E2E tests", follow every test case in that document using Playwright.
 
-**Working directory:** Always start the ephemeral agent with `--dir test/e2e-workdir` so that test session history (`~/.claude/projects/`) is isolated from real project sessions. The `test/e2e-workdir/` directory is gitignored (except `.gitkeep`).
+**E2E test plan:** [`docs/e2e-test-plan.md`](docs/e2e-test-plan.md) — 19 manual E2E tests covering multi-session parallel features.
+
+**Scope (E2E):** basic messaging, conversation switching, background routing, cancel/resume, simultaneous parallel processing, working directory changes, page refresh recovery, and session deletion.
+
+**Working directory (E2E):** Always start the ephemeral agent with `--dir test/e2e-workdir` so that test session history (`~/.claude/projects/`) is isolated from real project sessions. The `test/e2e-workdir/` directory is gitignored (except `.gitkeep`).
 
 ### Development Workflow
 

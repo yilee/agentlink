@@ -1,6 +1,9 @@
-# E2E Test Plan — Multi-Session Parallel
+# E2E Test Plan
 
-This document defines the full manual E2E test suite for the multi-session parallel feature. It covers core messaging, conversation switching, background processing, cancel/resume, working directory changes, and page refresh recovery.
+This document defines the full E2E test suite for AgentLink. It covers:
+
+- **Manual tests (TC-1 to TC-41):** Multi-session parallel, team mode, and plan mode flows requiring a live Claude CLI.
+- **Automated tests (P0/P1):** Playwright + mock agent tests in `test/functional/`, run with `npm run test:e2e`.
 
 ## Prerequisites
 
@@ -127,19 +130,20 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 8: Cancel Execution
+### Test 8: Cancel Execution and Isolation
 
 **Steps:**
 1. Create a new conversation.
 2. Send `Write a detailed explanation of quantum computing in 1000 words. Do not use any tools.`
 3. Wait for streaming to start (some text appears).
 4. Click "Stop generation".
+5. Switch to each other conversation (1+1, 2+2, counting, primes).
 
 **Expected:**
 - "Generation stopped." system message appears.
 - Partial content from the essay is visible.
 - The conversation is no longer in processing state.
-- Other conversations are not affected.
+- All previously completed conversations retain their full messages — no data loss from the cancel operation.
 
 **Key knowledge:**
 - Cancel sends `{ type: 'cancel_execution', conversationId }` to agent.
@@ -148,18 +152,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 9: Cancel Does Not Affect Other Conversations
-
-**Steps:**
-1. After Test 8, switch to each other conversation (1+1, 2+2, counting, primes).
-
-**Expected:**
-- All previously completed conversations retain their full messages.
-- No data loss from the cancel operation.
-
----
-
-### Test 10: Follow-up in Completed Conversation
+### Test 9: Follow-up in Completed Conversation
 
 **Steps:**
 1. Switch to the quantum computing conversation (from Test 8, which was cancelled).
@@ -172,7 +165,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 11: Cancel Mid-Stream Then Resume
+### Test 10: Cancel Mid-Stream Then Resume
 
 **Steps:**
 1. Create a new conversation.
@@ -192,7 +185,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 12: Rapid Switching Between Multiple Conversations
+### Test 11: Rapid Switching Between Multiple Conversations
 
 **Steps:**
 1. Rapidly click through 5 different conversations in the sidebar, switching between them quickly.
@@ -210,7 +203,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 13: Page Refresh Recovery
+### Test 12: Page Refresh Recovery
 
 **Steps:**
 1. Note which conversations exist and their content.
@@ -231,7 +224,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 14: Change Working Directory While Idle
+### Test 13: Change Working Directory While Idle
 
 **Steps:**
 1. Have an idle conversation in the current workdir (e.g., `Q:\src\agentlink`).
@@ -252,7 +245,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 15: Change Working Directory While Processing
+### Test 14: Change Working Directory While Processing
 
 **Steps:**
 1. Start a long-running conversation (e.g., `Count from 1 to 50`).
@@ -272,10 +265,10 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 16: Switch Back After Working Directory Change
+### Test 15: Switch Back After Working Directory Change
 
 **Steps:**
-1. After Test 15, change workdir back to the original directory.
+1. After Test 14, change workdir back to the original directory.
 2. Click on the counting conversation in the sidebar.
 
 **Expected:**
@@ -286,7 +279,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 17: New Message Uses New Working Directory
+### Test 16: New Message Uses New Working Directory
 
 **Steps:**
 1. Change working directory to `Q:\src` (or any different directory).
@@ -302,7 +295,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 18: Change Working Directory Back to Original
+### Test 17: Change Working Directory Back to Original
 
 **Steps:**
 1. After testing in a different workdir, change back to the original (e.g., `Q:\src\agentlink`).
@@ -314,7 +307,7 @@ This document defines the full manual E2E test suite for the multi-session paral
 
 ---
 
-### Test 19: Delete Session After Switching Conversations
+### Test 18: Delete Session After Switching Conversations
 
 **Steps:**
 1. Create at least 3 conversations (e.g., send simple math questions in each).
@@ -395,19 +388,19 @@ User changes workdir
 | 5 | Background processing (count 1-20 completes in background) | PASSED |
 | 6 | Session resume follow-up (count backwards 5-1 with context) | PASSED |
 | 7 | Simultaneous parallel processing (primes + 3+3 both complete) | PASSED |
-| 8 | Cancel execution mid-stream (quantum computing essay) | PASSED |
-| 9 | Cancel isolation — other conversations unaffected | PASSED |
-| 10 | Follow-up in completed/cancelled conversation (3-bullet summary) | PASSED |
-| 11 | Cancel before session_started, then resume with new message (5+5=10) | FAILED |
-| 12 | Rapid switching between 5 conversations — all state correct | PASSED |
-| 13 | Page refresh → sessions reload from JSONL history | PASSED |
-| 14 | Change workdir while idle — new conversation, session list refreshes | PASSED |
-| 15 | Change workdir while processing — background conversation keeps running | PASSED |
-| 16 | Switch back after workdir change — messages preserved | PASSED |
-| 17 | New message in changed workdir — confirms new cwd | PASSED |
-| 18 | Change workdir back to original — session list shows original sessions | PASSED |
+| 8 | Cancel execution and isolation (quantum computing essay) | PASSED |
+| 9 | Follow-up in completed/cancelled conversation (3-bullet summary) | PASSED |
+| 10 | Cancel before session_started, then resume with new message (5+5=10) | FAILED |
+| 11 | Rapid switching between 5 conversations — all state correct | PASSED |
+| 12 | Page refresh → sessions reload from JSONL history | PASSED |
+| 13 | Change workdir while idle — new conversation, session list refreshes | PASSED |
+| 14 | Change workdir while processing — background conversation keeps running | PASSED |
+| 15 | Switch back after workdir change — messages preserved | PASSED |
+| 16 | New message in changed workdir — confirms new cwd | PASSED |
+| 17 | Change workdir back to original — session list shows original sessions | PASSED |
+| 18 | Delete session after switching conversations | |
 
-17 of 18 tests passed. TC-11 FAILED — cancel before session_started breaks conversation permanently (known edge case, pre-existing). (2026-03-08)
+16 of 17 tested passed. TC-10 FAILED — cancel before session_started breaks conversation permanently (known edge case, pre-existing). (2026-03-08)
 
 ---
 
@@ -717,116 +710,82 @@ Same as above (ephemeral server + agent running, browser open to session URL), p
 
 ---
 
-### TC-37: Toggle Plan Mode on
+### TC-37: Toggle Plan Mode on/off and exit button
 
 **Steps:**
 1. Click the Plan Mode toggle button.
 2. Observe the button, status banner, and input card.
+3. Click the Plan Mode toggle button again to turn it off.
+4. Observe the button, banner, and input card return to default state.
+5. Click the toggle button again to turn Plan Mode back on.
+6. Click the "Exit" button/link in the status banner.
+7. Observe the Plan Mode state.
 
 **Expected:**
-- Button becomes active/highlighted with plan mode accent color (amber).
-- Status banner appears above the input card with text: "Plan Mode -- read-only, no file changes" and an "Exit" button.
-- Input card gets a plan-mode accent border (amber top border).
-- A `set_plan_mode` WebSocket message is sent to the agent with `enabled: true`.
-- Agent responds with `plan_mode_changed` confirmation.
+- Toggle on: button becomes active/highlighted with amber accent color; status banner appears with text "Plan Mode -- read-only, no file changes" and an "Exit" button; input card gets amber top border; `set_plan_mode` with `enabled: true` is sent.
+- Toggle off: button returns to default (subtle/gray); banner disappears; input card border returns to normal; `set_plan_mode` with `enabled: false` is sent.
+- Exit button: same behavior as toggling off — banner disappears, button returns to default state, `set_plan_mode` with `enabled: false` is sent.
 
 **Key knowledge:**
 - `togglePlanMode()` in `app.js` guards against toggling while `isProcessing === true`.
-- Web sends `{ type: 'set_plan_mode', enabled: true, conversationId }` to agent.
-- Agent calls `setPermissionMode(conversationId, 'plan')` which kills the current claude process and updates the conversation's `permissionMode`.
+- Web sends `{ type: 'set_plan_mode', enabled, conversationId }` to agent.
+- Agent calls `setPermissionMode(conversationId, 'plan'|'bypassPermissions')`.
 
 ---
 
-### TC-38: Toggle Plan Mode off
-
-**Steps:**
-1. Ensure Plan Mode is currently on (button highlighted, banner visible).
-2. Click the Plan Mode toggle button again.
-3. Observe the button, banner, and input card.
-
-**Expected:**
-- Button returns to its default (non-active) state: subtle/gray.
-- Status banner disappears.
-- Input card border returns to normal (no amber accent).
-- A `set_plan_mode` message is sent with `enabled: false`.
-- Agent responds with `plan_mode_changed` confirmation.
-
----
-
-### TC-39: Plan Mode disabled during processing
+### TC-38: Plan Mode disabled during processing
 
 **Steps:**
 1. Ensure Plan Mode is off (Normal Mode).
 2. Send a message that triggers a long response: `Count from 1 to 30, one number per line. Do not use any tools.`
-3. While Claude is streaming the response (numbers appearing), attempt to click the Plan Mode toggle button.
+3. While Claude is streaming the response, attempt to click the Plan Mode toggle button.
 4. Wait for the response to complete.
 5. Observe the Plan Mode toggle button again.
 
 **Expected:**
 - While processing, the Plan Mode toggle button is disabled (grayed out, `cursor: not-allowed`).
-- Clicking the disabled button has no effect (mode does not change, no WebSocket message sent).
-- After `turn_completed` is received and processing ends, the toggle button becomes enabled again.
-- The toggle button can now be clicked normally.
+- Clicking the disabled button has no effect.
+- After `turn_completed`, the toggle button becomes enabled again.
 
 **Key knowledge:**
 - `togglePlanMode()` returns early if `isProcessing.value === true`.
-- Button is disabled via the `isProcessing` reactive state.
 
 ---
 
-### TC-40: Send message in Plan Mode
+### TC-39: Plan Mode read-only behavior
 
 **Steps:**
-1. Toggle Plan Mode on (click the Plan Mode button, verify banner appears).
-2. Type `List the files in the current directory. Do not modify anything.` and press Enter.
+1. Toggle Plan Mode on (verify banner appears).
+2. Send `List the files in the current directory. Do not modify anything.`
 3. Wait for Claude's response.
+4. Send `Create a file called test-plan-mode.txt with the content 'hello'`.
+5. Wait for Claude's response.
+6. Check whether the file `test-plan-mode.txt` was created in the working directory.
 
 **Expected:**
-- The user message displays a `(Plan)` badge after the role label (e.g., "You (Plan)").
-- Claude's response displays a `(Plan)` badge after the role label (e.g., "Claude (Plan)").
-- Claude responds with a list of files (proving it can still read/analyze in plan mode).
-- The response does not contain errors about permission denial for read operations.
+- Both user and assistant messages display a `(Plan)` badge after the role label.
+- Step 2: Claude responds with a list of files (reads are allowed in plan mode).
+- Step 4: Claude is blocked from creating the file (write operations denied by `--permission-mode plan`).
+- No file named `test-plan-mode.txt` exists in `test/e2e-workdir/`.
 
 **Key knowledge:**
 - Messages are tagged with `planMode: true` when sent during Plan Mode.
-- The `(Plan)` badge uses the plan mode accent color.
-- Claude runs with `--permission-mode plan` which allows read operations but blocks writes.
+- `--permission-mode plan` allows read operations but blocks writes at the Claude CLI level.
 
 ---
 
-### TC-41: Plan Mode prevents file modifications
+### TC-40: Switch back to Normal Mode and execute
 
 **Steps:**
-1. Ensure Plan Mode is on (banner visible, button highlighted).
-2. Send `Create a file called test-plan-mode.txt with the content 'hello'`.
-3. Wait for Claude's response.
-4. Check whether the file `test-plan-mode.txt` was created in the working directory.
-
-**Expected:**
-- Claude attempts to create the file but is blocked by plan mode permissions.
-- Claude's response indicates it cannot create/write files in Plan Mode (permission denied or similar message).
-- No file named `test-plan-mode.txt` exists in the working directory (`test/e2e-workdir/`).
-- Both user and assistant messages show `(Plan)` badges.
-
-**Key knowledge:**
-- `--permission-mode plan` blocks write operations at the Claude CLI level.
-- Claude may report the restriction explicitly or attempt the tool call and receive a denial.
-
----
-
-### TC-42: Switch back to Normal Mode and execute
-
-**Steps:**
-1. After TC-41, toggle Plan Mode off (click the toggle button or click "Exit" in the banner).
+1. After TC-39, toggle Plan Mode off (click toggle button or "Exit" in banner).
 2. Verify the banner disappears and button returns to default state.
 3. Send `What is 1+1? Reply with just the number, do not use any tools.`
 4. Wait for Claude's response.
 
 **Expected:**
-- The user message does NOT show a `(Plan)` badge.
-- Claude's response does NOT show a `(Plan)` badge.
+- The user and assistant messages do NOT show `(Plan)` badges.
 - Claude responds normally with `2`.
-- The conversation context is preserved (prior plan mode messages from TC-40 and TC-41 are still visible above).
+- Prior plan mode messages (from TC-39) are still visible above — conversation context is preserved.
 - This proves the session was correctly resumed via `--resume` after switching back to `bypassPermissions` mode.
 
 **Key knowledge:**
@@ -835,7 +794,7 @@ Same as above (ephemeral server + agent running, browser open to session URL), p
 
 ---
 
-### TC-43: Plan Mode state preserved across conversation switch
+### TC-41: Plan Mode state isolation and refresh reset
 
 **Steps:**
 1. In the current conversation (conversation A), toggle Plan Mode on.
@@ -844,53 +803,20 @@ Same as above (ephemeral server + agent running, browser open to session URL), p
 4. Observe the Plan Mode state in conversation B.
 5. Switch back to conversation A by clicking its entry in the sidebar.
 6. Observe the Plan Mode state.
+7. Refresh the browser page (F5).
+8. Wait for the page to load and connect.
+9. Observe the Plan Mode state.
 
 **Expected:**
-- Conversation A: Plan Mode is on (banner visible, button highlighted) before switching away.
-- Conversation B: Plan Mode resets to off (no banner, button in default state) -- new conversations start in Normal Mode.
-- Switching back to conversation A: Plan Mode is restored to on (banner visible, button highlighted).
-- The toggle button and banner correctly reflect the per-conversation plan mode state after each switch.
+- Conversation A: Plan Mode is on before switching away.
+- Conversation B: Plan Mode resets to off — new conversations start in Normal Mode.
+- Switching back to A: Plan Mode is restored to on (per-conversation state preserved in cache).
+- After page refresh: Plan Mode is off (default) — `planMode` UI state is not persisted across page refreshes.
 
 **Key knowledge:**
 - `permissionMode` is per-conversation in `ConversationState` on the agent side.
-- The web UI saves/restores `planMode` state as part of `switchConversation()` cache operations.
-
----
-
-### TC-44: Plan Mode resets on page refresh
-
-**Steps:**
-1. Toggle Plan Mode on (verify banner visible, button highlighted).
-2. Refresh the browser page (F5 or navigate to the same URL).
-3. Wait for the page to load and connect.
-4. Observe the Plan Mode state.
-
-**Expected:**
-- After page refresh, Plan Mode is off (Normal Mode).
-- No status banner is visible.
-- Toggle button is in its default (non-active) state.
-- Input card has no amber accent border.
-- This is the intended safe default -- `planMode` UI state is not persisted across page refreshes.
-
-**Key knowledge:**
-- `planMode` is a `ref(false)` in `app.js` -- it reinitializes to `false` on page load.
-- The claude process is killed on WebSocket disconnect (page refresh), so the next spawn will use whatever mode the UI specifies.
-
----
-
-### TC-45: Exit button in banner
-
-**Steps:**
-1. Toggle Plan Mode on (verify banner appears with "Exit" button).
-2. Click the "Exit" button/link in the status banner.
-3. Observe the Plan Mode state.
-
-**Expected:**
-- Plan Mode turns off (same behavior as clicking the toggle button).
-- Status banner disappears.
-- Toggle button returns to default (non-active) state.
-- Input card border returns to normal.
-- A `set_plan_mode` message is sent with `enabled: false`.
+- The web UI saves/restores `planMode` as part of `switchConversation()` cache operations.
+- `planMode` is `ref(false)` — reinitializes on page load.
 
 ---
 
@@ -899,12 +825,59 @@ Same as above (ephemeral server + agent running, browser open to session URL), p
 | # | Test | Status |
 |---|------|--------|
 | 36 | Plan Mode toggle button visibility and initial state | |
-| 37 | Toggle Plan Mode on | |
-| 38 | Toggle Plan Mode off | |
-| 39 | Plan Mode disabled during processing | |
-| 40 | Send message in Plan Mode | |
-| 41 | Plan Mode prevents file modifications | |
-| 42 | Switch back to Normal Mode and execute | |
-| 43 | Plan Mode state preserved across conversation switch | |
-| 44 | Plan Mode resets on page refresh | |
-| 45 | Exit button in banner | |
+| 37 | Toggle Plan Mode on/off and exit button | |
+| 38 | Plan Mode disabled during processing | |
+| 39 | Plan Mode read-only behavior | |
+| 40 | Switch back to Normal Mode and execute | |
+| 41 | Plan Mode state isolation and refresh reset | |
+
+---
+
+## Automated E2E Tests — Priority Matrix
+
+Automated Playwright tests in `test/functional/` using mock agents over WebSocket. Run with `npm run test:e2e`.
+
+Shared helpers: `test/functional/e2e-helpers.ts` — encryption, `connectMockAgentEncrypted()`, `setupPageWithAgent()`, server lifecycle.
+
+### P0 — Critical Path (blocks primary user workflow if broken)
+
+| File | Test Area | TCs | Description |
+|------|-----------|-----|-------------|
+| `e2e.test.ts` | Server health | 1 | GET /api/health returns ok |
+| `e2e.test.ts` | Agent registration | 3 | Mock agent connect, session info API, invalid session 404 |
+| `e2e.test.ts` | Web UI basics | 4 | Connected status, waiting state, disconnect detection, landing page |
+| `e2e.test.ts` | Chat message flow | 2 | Send/receive with tool use, cancel execution |
+| `e2e.test.ts` | Session resume | 1 | Sidebar click resumes with history |
+| `e2e.test.ts` | Working directory change | 1 | Folder picker, workdir update |
+| `ask-user-question.test.ts` | AskUserQuestion | 5 | Single-select, multi-select, custom text, submit disabled, answered summary |
+| `context-compaction.test.ts` | Context compaction | 3 | Started/completed system messages, textarea placeholder changes |
+| `agent-disconnect.test.ts` | Disconnect/reconnect | 4 | Streaming disconnect, rapid reconnects, history persistence, AskQuestion during disconnect |
+| `e2e.test.ts` | Reconnect processing | 4 | query_active_conversations on connect/reconnect, restore/clear processing state, full cycle |
+
+**Subtotal: 28 TCs**
+
+### P1 — Important (secondary features and edge cases)
+
+| File | Test Area | TCs | Description |
+|------|-----------|-----|-------------|
+| `e2e.test.ts` | Delete session | 1 | Delete button, confirmation dialog |
+| `e2e.test.ts` | Password auth | 3 | Password dialog, auto-auth with token, no-auth sessions |
+| `e2e.test.ts` | File browser | 7 | Open/close panel, expand/collapse dirs, context menu, "Ask Claude to read", breadcrumb, refresh |
+| `e2e.test.ts` | Workdir dropdown | 3 | Toggle open/close, escape key, menu items |
+| `file-attachment.test.ts` | File attachment | 4 | Attach/remove/multi-file, files-only send |
+| `plan-mode.test.ts` | Plan mode rendering | 3 | EnterPlanMode/ExitPlanMode dividers, mixed tool+divider layout |
+| `loop-crud.test.ts` | Loop CRUD | 4 | Create, list, toggle enabled, delete |
+| `btw-side-question.test.ts` | BTW side question | 20 | Slash command, overlay, dismissal, edge cases, markdown, concurrent, dark mode |
+| `btw-bugfix-verification.test.ts` | BTW bug fixes | 7 | Empty question guard, escape key priority |
+
+**Subtotal: 52 TCs**
+
+### Coverage Summary
+
+| Priority | Automated TCs | Coverage |
+|----------|--------------|----------|
+| P0 | 28 | Core messaging, registration, connection, resume, workdir, AskUserQuestion, compaction, disconnect |
+| P1 | 52 | Password auth, file browser, file attachment, plan mode, loops, BTW, delete session, dropdown |
+| **Total** | **80** | All automated functional tests |
+
+Manual-only tests (TC-1 through TC-41 above) cover multi-session parallel, team mode, and plan mode flows that require live Claude CLI integration and cannot be mocked.

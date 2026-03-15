@@ -39,6 +39,7 @@ server/web/node_modules/
 *.png
 .playwright-mcp/
 nul
+coverage/
 
 # E2E test workdir contents (keep the folder, ignore runtime files)
 test/e2e-workdir/*
