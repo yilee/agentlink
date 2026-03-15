@@ -36,6 +36,7 @@ const {
   startRename,
   confirmRename,
   cancelRename,
+  renameText,
   renamingTeamId,
   startTeamRename,
   renameTeamText,
@@ -87,7 +88,11 @@ const {
   previewFile,
   previewMarkdownRendered,
   team,
-  workDir
+  workDir,
+  fileTreeLoading,
+  isMemoryPreview,
+  previewLoading,
+  memoryFiles
 } = store;
 </script>
 

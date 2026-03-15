@@ -25,7 +25,20 @@ const {
   formatUsage,
   isCompacting,
   slashMenuIndex,
-  usageStats
+  usageStats,
+  queuedMessages,
+  removeQueuedMessage,
+  selectSlashCommand,
+  handleKeydown,
+  autoResize,
+  openSlashMenu,
+  togglePlanMode,
+  isProcessing,
+  cancelExecution,
+  hasInput,
+  canSend,
+  fileInputRef,
+  inputRef
 } = store;
 </script>
 

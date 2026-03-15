@@ -1,5 +1,6 @@
 <script setup>
-import { inject } from 'vue';
+import { provide } from 'vue';
+import { createStore } from './store.js';
 
 import BtwOverlay from './components/BtwOverlay.vue';
 import FolderPickerDialog from './components/FolderPickerDialog.vue';
@@ -14,10 +15,17 @@ import ChatView from './components/ChatView.vue';
 import ChatInput from './components/ChatInput.vue';
 import PreviewPanel from './components/PreviewPanel.vue';
 
-const store = inject('store');
+// Create store inside component setup() so onMounted/onUnmounted hooks fire correctly
+const store = createStore();
+provide('store', store);
 const {
   status,
   serverVersion,
+  displayStatus,
+  agentName,
+  workDir,
+  sessionId,
+  error,
   messages,
   inputText,
   slashMenuVisible,
@@ -86,6 +94,7 @@ const {
   handleDrop,
   handlePaste,
   filePanelOpen,
+  fileContextMenu,
   sidebarView,
   flattenedTree,
   previewPanelOpen,

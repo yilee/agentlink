@@ -530,14 +530,29 @@ export function createTeam(deps) {
     // State
     teamState, viewMode, activeAgentView, historicalTeam, teamsList,
     agentMessages,
+    // Panel state
+    teamInstruction, selectedTemplate, editedLeadPrompt,
+    leadPromptExpanded, kanbanExpanded, instructionExpanded,
+    // Rename/delete state
+    renamingTeamId, renameTeamText,
+    deleteTeamConfirmOpen, deleteTeamConfirmTitle, pendingDeleteTeamId,
     // Computed
     isTeamActive, isTeamRunning, displayTeam,
     pendingTasks, activeTasks, doneTasks, failedTasks,
+    // Constants
+    TEMPLATES, TEMPLATE_KEYS, teamExamples,
     // Methods
     launchTeam, dissolveTeam, viewAgent, viewDashboard,
     viewHistoricalTeam, requestTeamsList, deleteTeamById, renameTeamById,
     requestAgentHistory,
     getAgentColor, findAgent, getAgentMessages, backToChat, newTeam,
+    // Rename/delete methods
+    startTeamRename, confirmTeamRename, cancelTeamRename,
+    requestDeleteTeam, confirmDeleteTeam, cancelDeleteTeam,
+    // Template methods
+    onTemplateChange, resetLeadPrompt, leadPromptPreview, launchTeamFromPanel,
+    // Utility methods
+    formatTeamTime, getTaskAgent, viewAgentWithHistory, getLatestAgentActivity,
     // Message handling
     handleTeamMessage, handleTeamAgentOutput, handleActiveTeamRestore,
   };

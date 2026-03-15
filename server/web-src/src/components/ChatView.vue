@@ -25,7 +25,17 @@ const {
   getQuestionResponseSummary,
   pendingPlanMode,
   team,
-  workDir
+  workDir,
+  visibleMessages,
+  hasMoreMessages,
+  loadMoreMessages,
+  isProcessing,
+  hasStreamingMessage,
+  formatTimestamp,
+  copyMessage,
+  toggleTool,
+  isEditTool,
+  getFormattedToolInput
 } = store;
 </script>
 

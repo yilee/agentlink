@@ -4,6 +4,7 @@ import { inject } from 'vue';
 const store = inject('store');
 const {
   LOOP_TEMPLATES,
+  LOOP_TEMPLATE_KEYS,
   t,
   selectedLoop,
   selectedExecution,
@@ -63,7 +64,10 @@ const {
   resetLoopForm,
   error,
   getEditDiffHtml,
-  loop
+  loop,
+  toggleTool,
+  isEditTool,
+  getFormattedToolInput
 } = store;
 </script>
 

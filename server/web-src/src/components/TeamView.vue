@@ -51,7 +51,10 @@ const {
   launchTeam,
   getToolSummary,
   getEditDiffHtml,
-  team
+  team,
+  toggleTool,
+  isEditTool,
+  getFormattedToolInput
 } = store;
 </script>
 

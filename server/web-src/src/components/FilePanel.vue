@@ -16,7 +16,9 @@ const {
   deleteMemoryFile,
   filePanelWidth,
   fileTreeRoot,
-  workDir
+  workDir,
+  fileTreeLoading,
+  memoryFiles
 } = store;
 </script>
 

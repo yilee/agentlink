@@ -6,6 +6,7 @@ export default defineConfig({
   build: {
     outDir: '../web',
     emptyOutDir: false,
+    sourcemap: true,
   },
   server: {
     proxy: {

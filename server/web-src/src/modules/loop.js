@@ -523,6 +523,15 @@ export function createLoop(deps) {
     executionHistory, executionMessages, runningLoops,
     loadingExecutions, loadingExecution, editingLoopId,
     loopError, hasMoreExecutions, loadingMoreExecutions,
+    // Form state
+    loopName, loopPrompt, loopScheduleType,
+    loopScheduleHour, loopScheduleMinute, loopScheduleDayOfWeek,
+    loopCronExpr, loopSelectedTemplate,
+    // Delete/rename state
+    loopDeleteConfirmOpen, loopDeleteConfirmId, loopDeleteConfirmName,
+    renamingLoopId, renameLoopText,
+    // Constants
+    LOOP_TEMPLATES, LOOP_TEMPLATE_KEYS, formatSchedule,
     // Computed
     hasRunningLoop, firstRunningLoop,
     // CRUD
@@ -532,6 +541,14 @@ export function createLoop(deps) {
     viewLoopDetail, viewExecution,
     backToLoopsList, backToLoopDetail,
     startEditing, cancelEditing,
+    // Panel methods
+    startLoopRename, confirmLoopRename, cancelLoopRename,
+    newLoop, viewLoop, selectLoopTemplate, resetLoopForm,
+    createLoopFromPanel, startEditingLoop, saveLoopEdits, cancelEditingLoop,
+    requestDeleteLoop, confirmDeleteLoop, cancelDeleteLoop,
+    // Display helpers
+    loopScheduleDisplay, loopLastRunDisplay, formatExecTime, formatDuration,
+    isLoopRunning, padTwo,
     // Pagination & errors
     loadMoreExecutions, clearLoopError,
     // Message routing

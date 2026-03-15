@@ -16,7 +16,9 @@ const {
   startMemoryEdit,
   previewPanelWidth,
   previewFile,
-  previewMarkdownRendered
+  previewMarkdownRendered,
+  isMemoryPreview,
+  previewLoading
 } = store;
 </script>
 
