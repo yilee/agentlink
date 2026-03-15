@@ -97,7 +97,7 @@ agentlink-client start --daemon --server ws://your-server:3456
 |-----------|------|
 | Agent | TypeScript, Commander.js, `ws` |
 | Server | Express, `ws`, static file serving |
-| Web UI | Vue 3 (browser ES modules), marked.js, highlight.js |
+| Web UI | Vue 3 SFC + Vite, marked.js, highlight.js |
 | Encryption | TweetNaCl (XSalsa20-Poly1305 secretbox) |
 
 ## Links
