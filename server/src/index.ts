@@ -7,7 +7,7 @@ import { sessions } from './session-manager.js';
 import { createApp } from './http.js';
 import { handleAgentConnection } from './ws-agent.js';
 import { handleWebConnection } from './ws-client.js';
-import { saveServerRuntimeState, clearServerRuntimeState } from './config.js';
+import { saveServerRuntimeState, clearServerRuntimeState, writePidFile } from './config.js';
 import { encryptAndSend } from './encryption.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -56,6 +56,11 @@ server.listen(PORT, () => {
     port: PORT,
     startedAt: new Date().toISOString(),
   });
+
+  // PID file for test harness
+  if (process.env.AGENTLINK_PID_FILE) {
+    writePidFile(process.env.AGENTLINK_PID_FILE, { pid: process.pid, port: PORT });
+  }
 });
 
 // Clean up runtime state on exit

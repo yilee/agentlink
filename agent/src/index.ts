@@ -1,6 +1,6 @@
 import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
-import { saveRuntimeState, clearRuntimeState } from './config.js';
+import { saveRuntimeState, clearRuntimeState, writePidFile } from './config.js';
 import { connect, disconnect } from './connection.js';
 import { startAutoUpdate, stopAutoUpdate } from './auto-update.js';
 import { shutdownScheduler } from './scheduler.js';
@@ -14,7 +14,7 @@ function highlightUrl(url: string): string {
   return `\x1b[1;4;36m${url}\x1b[0m`;
 }
 
-export async function start(config: AgentConfig, daemon = false): Promise<void> {
+export async function start(config: AgentConfig, daemon = false, pidFile?: string): Promise<void> {
   console.log('[AgentLink] Starting agent...');
   console.log(`[AgentLink] Working directory: ${config.dir}`);
   console.log(`[AgentLink] Relay server: ${config.server}`);
@@ -46,6 +46,11 @@ export async function start(config: AgentConfig, daemon = false): Promise<void> 
       console.log(code);
     });
     console.log('[AgentLink] Waiting for connections...');
+
+    // Write PID file for test harness (foreground mode)
+    if (pidFile) {
+      writePidFile(pidFile, { pid: process.pid, sessionUrl, password: config.password });
+    }
 
     // Start auto-update checker (opt-in, disabled by default)
     if (config.autoUpdate === true) {

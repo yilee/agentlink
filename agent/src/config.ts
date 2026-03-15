@@ -56,10 +56,12 @@ export function getConfigPath(): string {
 }
 
 /**
- * Resolve final config: CLI flags > config file > defaults
+ * Resolve final config: CLI flags > config file > defaults.
+ * When ignoreConfigFile is true, skip reading ~/.agentlink/config.json
+ * (used by --ephemeral to avoid inheriting production config).
  */
-export function resolveConfig(cliOptions: Partial<AgentConfig>): AgentConfig {
-  const fileConfig = loadConfig();
+export function resolveConfig(cliOptions: Partial<AgentConfig>, ignoreConfigFile = false): AgentConfig {
+  const fileConfig = ignoreConfigFile ? {} : loadConfig();
   const dir = cliOptions.dir || fileConfig.dir || DEFAULTS.dir;
   return {
     server: cliOptions.server || fileConfig.server || DEFAULTS.server,
@@ -167,5 +169,26 @@ export function isProcessAlive(pid: number): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+// ── PID file for test harness ──
+
+export interface PidFileInfo {
+  pid: number;
+  sessionUrl?: string;
+  password?: string;
+}
+
+export function writePidFile(filePath: string, info: PidFileInfo): void {
+  writeFileSync(filePath, JSON.stringify(info, null, 2) + '\n', 'utf-8');
+}
+
+export function readPidFile(filePath: string): PidFileInfo | null {
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    return JSON.parse(raw) as PidFileInfo;
+  } catch {
+    return null;
   }
 }

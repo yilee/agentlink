@@ -180,7 +180,7 @@ Priority: **CLI flags > config file > defaults**
 | `server` | `wss://msclaude.ai` | Relay server WebSocket URL |
 | `dir` | `process.cwd()` | Working directory |
 | `name` | `Agent-{platform}-{pid}` | Agent display name |
-| `autoUpdate` | `true` | Auto-install npm updates in daemon mode (`--no-auto-update` to disable) |
+| `autoUpdate` | `false` | Auto-install npm updates in daemon mode (`--auto-update` to enable) |
 
 **Runtime & data files (`~/.agentlink/`):**
 
@@ -205,12 +205,31 @@ npm test                         # vitest, also: test:functional, test:watch, te
 
 **Local dev build** (run from source):
 ```bash
-node Q:/src/agentlink/server/dist/cli.js start [--daemon] [--ephemeral]
-node Q:/src/agentlink/agent/dist/cli.js start --server ws://localhost:3456 [--ephemeral]
+node Q:/src/agentlink/server/dist/cli.js start [--daemon] [--ephemeral] [--pid-file /tmp/server.pid]
+node Q:/src/agentlink/agent/dist/cli.js start --server ws://localhost:3456 [--ephemeral] [--pid-file /tmp/agent.pid]
 ```
 **Note:** Do NOT use `--daemon` for the agent (client) in local dev — it must run in the foreground so it can spawn interactive `claude` subprocesses with stdio.
 
-`--ephemeral` sets `AGENTLINK_NO_STATE=1` so local dev doesn't overwrite prod daemon's `~/.agentlink/*.json`. **Do NOT use `agentlink-server stop` / `agentlink-client stop` to kill ephemeral processes** — those commands target prod daemons via `~/.agentlink/*.json`. Instead, kill ephemeral processes by PID:
+`--ephemeral` isolates local dev from the production daemon: skips reading `config.json` (uses defaults + CLI flags only), skips writing `~/.agentlink/*.json` runtime state, and skips the "already running" check. **Do NOT use `agentlink-server stop` / `agentlink-client stop` to kill ephemeral processes** — those commands target prod daemons via `~/.agentlink/*.json`. Instead, kill ephemeral processes by PID:
+
+`--pid-file <path>` writes `{ pid, sessionUrl, password? }` (client) or `{ pid, port }` (server) to a JSON file for easy test harness integration. Client includes `password` if `--password` was set. Use it with `--ephemeral` to get PID and session URL without grepping logs:
+```bash
+# Start server with pid-file
+node server/dist/cli.js start --ephemeral --pid-file /tmp/server.pid
+# Read PID and port
+cat /tmp/server.pid   # → { "pid": 12345, "port": 3456 }
+
+# Start agent with pid-file
+node agent/dist/cli.js start --server ws://localhost:3456 --ephemeral --pid-file /tmp/agent.pid
+# Read PID and session URL
+cat /tmp/agent.pid    # → { "pid": 12346, "sessionUrl": "http://localhost:3456/s/abc123", "password": "mypass" }
+
+# Clean up by PID
+cmd //c "taskkill /pid 12346 /f /t"   # Windows
+cmd //c "taskkill /pid 12345 /f /t"
+```
+
+Alternatively, find and kill ephemeral processes without pid-file:
 ```bash
 # macOS/Linux: find and kill ephemeral processes
 ps aux | grep ephemeral | grep -v grep

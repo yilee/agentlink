@@ -13,7 +13,13 @@ if (!configArg) {
 
 let config: AgentConfig;
 try {
-  config = JSON.parse(configArg) as AgentConfig;
+  const parsed = JSON.parse(configArg);
+  // Handle ephemeral flag passed from CLI — set env before start()
+  if (parsed.ephemeral) {
+    process.env.AGENTLINK_NO_STATE = '1';
+    delete parsed.ephemeral;
+  }
+  config = parsed as AgentConfig;
 } catch {
   console.error('daemon: invalid config JSON');
   process.exit(1);

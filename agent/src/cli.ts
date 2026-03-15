@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import {
   resolveConfig, loadConfig, saveConfig, getConfigPath,
   loadRuntimeState, clearRuntimeState, getLogDir, getLogDate, cleanOldLogs,
-  killProcess, isProcessAlive,
+  killProcess, isProcessAlive, writePidFile,
 } from './config.js';
 import { serviceInstall, serviceUninstall } from './service.js';
 import { spawn, execSync } from 'child_process';
@@ -40,6 +40,7 @@ program
   .option('-p, --password <password>', 'Session password (clients must authenticate)')
   .option('--auto-update', 'Enable automatic update checks (disabled by default)')
   .option('--ephemeral', 'Skip writing runtime state (for running alongside a daemon)')
+  .option('--pid-file <path>', 'Write PID and session URL to a file (for test harness)')
   .action(async (options) => {
     // Only persist config values the user explicitly passed on the CLI.
     // Don't touch existing config.json values when flags are omitted —
@@ -51,25 +52,29 @@ program
     if (options.autoUpdate) {
       configUpdates.autoUpdate = true;
     }
-    if (Object.keys(configUpdates).length > 0) {
+    if (Object.keys(configUpdates).length > 0 && !options.ephemeral) {
       saveConfig(configUpdates);
     }
 
-    const config = resolveConfig(options);
+    const config = resolveConfig(options, !!options.ephemeral);
 
     if (options.daemon) {
-      // Check if agent is already running
-      const existing = loadRuntimeState();
-      if (existing) {
-        let alive = false;
-        try { process.kill(existing.pid, 0); alive = true; } catch {}
-        if (alive) {
-          console.log(`Agent is already running (PID ${existing.pid}).`);
-          console.log(`  URL: ${highlightUrl(existing.sessionUrl)}`);
-          console.log('Use "agentlink-client stop" to stop it first.');
-          process.exit(1);
+      const isEphemeral = !!options.ephemeral;
+
+      // Check if agent is already running (skip for ephemeral — no shared state)
+      if (!isEphemeral) {
+        const existing = loadRuntimeState();
+        if (existing) {
+          let alive = false;
+          try { process.kill(existing.pid, 0); alive = true; } catch {}
+          if (alive) {
+            console.log(`Agent is already running (PID ${existing.pid}).`);
+            console.log(`  URL: ${highlightUrl(existing.sessionUrl)}`);
+            console.log('Use "agentlink-client stop" to stop it first.');
+            process.exit(1);
+          }
+          // Stale state — leave it so the new process can restore sessionId
         }
-        // Stale state — leave it so the new process can restore sessionId
       }
 
       // Spawn detached child process running daemon.js
@@ -86,38 +91,87 @@ program
       const out = openSync(logFile, 'a');
       const err = openSync(errFile, 'a');
 
-      const child = spawn(process.execPath, [daemonScript, JSON.stringify(config)], {
+      // Pass ephemeral flag through config JSON so daemon.ts sets AGENTLINK_NO_STATE
+      const daemonConfig = isEphemeral ? { ...config, ephemeral: true } : config;
+      const spawnEnv = isEphemeral
+        ? { ...process.env, AGENTLINK_NO_STATE: '1' }
+        : { ...process.env };
+
+      const child = spawn(process.execPath, [daemonScript, JSON.stringify(daemonConfig)], {
         detached: true,
         stdio: ['ignore', out, err],
         cwd: config.dir,
+        env: spawnEnv,
         windowsHide: true,
       });
 
       child.unref();
 
-      // Wait briefly for the daemon to write its runtime state
-      const maxWait = 5000;
-      const interval = 300;
-      let waited = 0;
-      let state = null;
-      while (waited < maxWait) {
-        await new Promise(r => setTimeout(r, interval));
-        waited += interval;
-        state = loadRuntimeState();
-        if (state && state.pid !== process.pid) break;
-      }
+      if (isEphemeral) {
+        // Ephemeral daemon: poll log file for "Session URL:" line
+        const maxWait = 10000;
+        const interval = 300;
+        let waited = 0;
+        let sessionUrl: string | null = null;
 
-      if (state && state.pid !== process.pid) {
-        console.log(`Agent started in background (PID ${state.pid}).`);
-        console.log(`  URL: ${highlightUrl(state.sessionUrl)}`);
-        qrcode.generate(state.sessionUrl, { small: true }, (code: string) => {
-          console.log(code);
-        });
-        console.log(`  Log: ${logFile}`);
+        while (waited < maxWait) {
+          await new Promise(r => setTimeout(r, interval));
+          waited += interval;
+          try {
+            const logContent = readFileSync(logFile, 'utf-8');
+            const match = logContent.match(/Session URL:\s+(\S+)/);
+            if (match) {
+              // Strip ANSI escape codes from the URL
+              sessionUrl = match[1].replace(/\x1b\[[0-9;]*m/g, '');
+              break;
+            }
+          } catch {}
+        }
+
+        if (sessionUrl) {
+          console.log(`Agent started in background (PID ${child.pid}).`);
+          console.log(`  URL: ${highlightUrl(sessionUrl)}`);
+          console.log(`  Log: ${logFile}`);
+          if (options.pidFile) {
+            writePidFile(resolve(options.pidFile), { pid: child.pid!, sessionUrl, password: config.password });
+          }
+        } else {
+          console.error('Agent may have failed to start. Check logs:');
+          console.error(`  ${errFile}`);
+          // Still write pid-file with PID so caller can clean up
+          if (options.pidFile) {
+            writePidFile(resolve(options.pidFile), { pid: child.pid!, password: config.password });
+          }
+          process.exit(1);
+        }
       } else {
-        console.error('Agent may have failed to start. Check logs:');
-        console.error(`  ${errFile}`);
-        process.exit(1);
+        // Non-ephemeral daemon: poll runtime state file (original logic)
+        const maxWait = 5000;
+        const interval = 300;
+        let waited = 0;
+        let state = null;
+        while (waited < maxWait) {
+          await new Promise(r => setTimeout(r, interval));
+          waited += interval;
+          state = loadRuntimeState();
+          if (state && state.pid !== process.pid) break;
+        }
+
+        if (state && state.pid !== process.pid) {
+          console.log(`Agent started in background (PID ${state.pid}).`);
+          console.log(`  URL: ${highlightUrl(state.sessionUrl)}`);
+          qrcode.generate(state.sessionUrl, { small: true }, (code: string) => {
+            console.log(code);
+          });
+          console.log(`  Log: ${logFile}`);
+          if (options.pidFile) {
+            writePidFile(resolve(options.pidFile), { pid: state.pid, sessionUrl: state.sessionUrl, password: config.password });
+          }
+        } else {
+          console.error('Agent may have failed to start. Check logs:');
+          console.error(`  ${errFile}`);
+          process.exit(1);
+        }
       }
       return;
     }
@@ -125,7 +179,7 @@ program
     // Foreground mode (default)
     if (options.ephemeral) process.env.AGENTLINK_NO_STATE = '1';
     const { start } = await import('./index.js');
-    await start(config);
+    await start(config, false, options.pidFile ? resolve(options.pidFile) : undefined);
   });
 
 program

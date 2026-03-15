@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { spawn, execSync } from 'child_process';
-import { openSync, existsSync, readFileSync, statSync, createReadStream } from 'fs';
+import { openSync, existsSync, readFileSync, statSync, createReadStream, readdirSync } from 'fs';
 import { watchFile, unwatchFile } from 'fs';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import {
-  loadServerRuntimeState, clearServerRuntimeState, getLogDir,
-  killProcess, isProcessAlive,
+  loadServerRuntimeState, clearServerRuntimeState, getLogDir, getLogDate, cleanOldLogs,
+  killProcess, isProcessAlive, writePidFile,
 } from './config.js';
 import { serverServiceInstall, serverServiceUninstall } from './service.js';
 
@@ -28,19 +28,26 @@ program
   .option('-p, --port <port>', 'Server port', '3456')
   .option('-D, --daemon', 'Run server in the background as a daemon')
   .option('--ephemeral', 'Skip writing runtime state (for running alongside a daemon)')
+  .option('--pid-file <path>', 'Write PID and port to a file (for test harness)')
   .action(async (options) => {
-    const existing = loadServerRuntimeState();
-    if (existing && isProcessAlive(existing.pid)) {
-      console.log(`Server is already running (PID ${existing.pid}, port ${existing.port}).`);
-      console.log('Use "agentlink-server stop" to stop it first.');
-      process.exit(1);
+    const isEphemeral = !!options.ephemeral;
+
+    // Check if server is already running (skip for ephemeral — no shared state)
+    if (!isEphemeral) {
+      const existing = loadServerRuntimeState();
+      if (existing && isProcessAlive(existing.pid)) {
+        console.log(`Server is already running (PID ${existing.pid}, port ${existing.port}).`);
+        console.log('Use "agentlink-server stop" to stop it first.');
+        process.exit(1);
+      }
+      if (existing) clearServerRuntimeState();
     }
-    if (existing) clearServerRuntimeState();
 
     if (!options.daemon) {
       // Foreground mode: run server directly
-      if (options.ephemeral) process.env.AGENTLINK_NO_STATE = '1';
+      if (isEphemeral) process.env.AGENTLINK_NO_STATE = '1';
       process.env.PORT = options.port;
+      if (options.pidFile) process.env.AGENTLINK_PID_FILE = resolve(options.pidFile);
       await import('./index.js');
       return;
     }
@@ -49,41 +56,92 @@ program
     const __filename = fileURLToPath(import.meta.url);
     const serverScript = resolve(dirname(__filename), 'index.js');
     const logDir = getLogDir();
-    const logFile = join(logDir, 'server.log');
-    const errFile = join(logDir, 'server.err');
+    const dateTag = getLogDate();
+    const logFile = join(logDir, `server-${dateTag}.log`);
+    const errFile = join(logDir, `server-${dateTag}.err`);
+
+    // Clean up log files older than 7 days
+    cleanOldLogs(7);
 
     const out = openSync(logFile, 'a');
     const err = openSync(errFile, 'a');
 
+    const spawnEnv: Record<string, string | undefined> = {
+      ...process.env,
+      PORT: options.port,
+    };
+    if (isEphemeral) spawnEnv.AGENTLINK_NO_STATE = '1';
+    if (options.pidFile) spawnEnv.AGENTLINK_PID_FILE = resolve(options.pidFile);
+
     const child = spawn(process.execPath, [serverScript], {
       detached: true,
       stdio: ['ignore', out, err],
-      env: { ...process.env, PORT: options.port },
+      env: spawnEnv,
       windowsHide: true,
     });
 
     child.unref();
 
-    // Wait for server to write its runtime state
-    const maxWait = 5000;
-    const interval = 300;
-    let waited = 0;
-    let state = null;
-    while (waited < maxWait) {
-      await new Promise(r => setTimeout(r, interval));
-      waited += interval;
-      state = loadServerRuntimeState();
-      if (state && state.pid !== process.pid) break;
-    }
+    if (isEphemeral) {
+      // Ephemeral daemon: poll log file for "Server listening" line
+      const maxWait = 10000;
+      const interval = 300;
+      let waited = 0;
+      let port: number | null = null;
 
-    if (state && state.pid !== process.pid) {
-      console.log(`Server started (PID ${state.pid}, port ${state.port}).`);
-      console.log(`  URL: http://localhost:${state.port}`);
-      console.log(`  Log: ${logFile}`);
+      while (waited < maxWait) {
+        await new Promise(r => setTimeout(r, interval));
+        waited += interval;
+        try {
+          const logContent = readFileSync(logFile, 'utf-8');
+          const match = logContent.match(/Server listening on http:\/\/localhost:(\d+)/);
+          if (match) {
+            port = parseInt(match[1], 10);
+            break;
+          }
+        } catch {}
+      }
+
+      if (port) {
+        console.log(`Server started (PID ${child.pid}, port ${port}).`);
+        console.log(`  URL: http://localhost:${port}`);
+        console.log(`  Log: ${logFile}`);
+        if (options.pidFile) {
+          writePidFile(resolve(options.pidFile), { pid: child.pid!, port });
+        }
+      } else {
+        console.error('Server may have failed to start. Check logs:');
+        console.error(`  ${errFile}`);
+        if (options.pidFile) {
+          writePidFile(resolve(options.pidFile), { pid: child.pid! });
+        }
+        process.exit(1);
+      }
     } else {
-      console.error('Server may have failed to start. Check logs:');
-      console.error(`  ${errFile}`);
-      process.exit(1);
+      // Non-ephemeral daemon: poll runtime state file (original logic)
+      const maxWait = 5000;
+      const interval = 300;
+      let waited = 0;
+      let state = null;
+      while (waited < maxWait) {
+        await new Promise(r => setTimeout(r, interval));
+        waited += interval;
+        state = loadServerRuntimeState();
+        if (state && state.pid !== process.pid) break;
+      }
+
+      if (state && state.pid !== process.pid) {
+        console.log(`Server started (PID ${state.pid}, port ${state.port}).`);
+        console.log(`  URL: http://localhost:${state.port}`);
+        console.log(`  Log: ${logFile}`);
+        if (options.pidFile) {
+          writePidFile(resolve(options.pidFile), { pid: state.pid, port: state.port });
+        }
+      } else {
+        console.error('Server may have failed to start. Check logs:');
+        console.error(`  ${errFile}`);
+        process.exit(1);
+      }
     }
   });
 
@@ -180,9 +238,25 @@ program
   .option('--err', 'Show only stderr log')
   .action((options) => {
     const logDir = getLogDir();
-    const logFile = join(logDir, 'server.log');
-    const errFile = join(logDir, 'server.err');
     const lines = parseInt(options.lines, 10) || 100;
+
+    // Find the most recent dated log file, falling back to legacy name
+    function findLatestLog(ext: string): string {
+      const prefix = 'server-';
+      const suffix = `.${ext}`;
+      try {
+        const dated = readdirSync(logDir)
+          .filter(f => f.startsWith(prefix) && f.endsWith(suffix))
+          .sort()
+          .reverse();
+        if (dated.length > 0) return join(logDir, dated[0]);
+      } catch {}
+      // Fallback to legacy non-dated file
+      return join(logDir, `server.${ext}`);
+    }
+
+    const logFile = findLatestLog('log');
+    const errFile = findLatestLog('err');
 
     function tailLines(filePath: string, n: number): string {
       if (!existsSync(filePath)) return '';
@@ -292,7 +366,9 @@ program
       const portArg = port ? ` --port ${port}` : '';
       try {
         const npmPrefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
-        const newBin = join(npmPrefix, 'bin', 'agentlink-server');
+        const newBin = process.platform === 'win32'
+          ? join(npmPrefix, 'agentlink-server.cmd')
+          : join(npmPrefix, 'bin', 'agentlink-server');
         execSync(`"${newBin}" start --daemon${portArg}`, { stdio: 'inherit' });
       } catch {
         try {

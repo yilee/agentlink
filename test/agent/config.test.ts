@@ -22,6 +22,8 @@ const {
   getLogDir,
   getLogDate,
   cleanOldLogs,
+  writePidFile,
+  readPidFile,
   CONFIG_DIR,
 } = await import('../../agent/src/config.js');
 
@@ -219,6 +221,56 @@ describe('Agent Config', () => {
 
       expect(existsSync(join(logDir, 'agent.log'))).toBe(true);
       expect(existsSync(join(logDir, 'other.txt'))).toBe(true);
+    });
+  });
+
+  describe('resolveConfig ignoreConfigFile', () => {
+    it('ignores config file when ignoreConfigFile is true', () => {
+      saveConfig({ server: 'ws://file-server', password: 'file-pass', name: 'FileAgent' });
+      const config = resolveConfig({}, true);
+      expect(config.server).toBe('wss://msclaude.ai');
+      expect(config.password).toBeUndefined();
+      expect(config.name).toMatch(/^Agent-/);
+      expect(config.autoUpdate).toBe(false);
+    });
+
+    it('CLI flags still work with ignoreConfigFile', () => {
+      saveConfig({ server: 'ws://file-server' });
+      const config = resolveConfig({ server: 'ws://cli-server', password: 'cli-pass' }, true);
+      expect(config.server).toBe('ws://cli-server');
+      expect(config.password).toBe('cli-pass');
+    });
+
+    it('does not inherit password from config file when ignoreConfigFile is true', () => {
+      saveConfig({ password: 'production-secret' });
+      const config = resolveConfig({}, true);
+      expect(config.password).toBeUndefined();
+    });
+
+    it('does not inherit autoUpdate from config file when ignoreConfigFile is true', () => {
+      saveConfig({ autoUpdate: true });
+      const config = resolveConfig({}, true);
+      expect(config.autoUpdate).toBe(false);
+    });
+  });
+
+  describe('PidFile', () => {
+    it('writePidFile / readPidFile round-trips', () => {
+      const pidFilePath = join(tempHome, 'test.pid');
+      writePidFile(pidFilePath, { pid: 9999, sessionUrl: 'http://localhost:3456/s/abc' });
+      const info = readPidFile(pidFilePath);
+      expect(info).toEqual({ pid: 9999, sessionUrl: 'http://localhost:3456/s/abc' });
+    });
+
+    it('readPidFile returns null when file does not exist', () => {
+      expect(readPidFile(join(tempHome, 'nonexistent.pid'))).toBeNull();
+    });
+
+    it('writePidFile works without sessionUrl', () => {
+      const pidFilePath = join(tempHome, 'test2.pid');
+      writePidFile(pidFilePath, { pid: 1234 });
+      const info = readPidFile(pidFilePath);
+      expect(info!.pid).toBe(1234);
     });
   });
 });
