@@ -23,14 +23,8 @@ import { createMemory } from './modules/memory.js';
 import { createLoop } from './modules/loop.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
-
-// ── Slash commands ──────────────────────────────────────────────────────────
-const SLASH_COMMANDS = [
-  { command: '/btw', descKey: 'slash.btw', isPrefix: true },
-  { command: '/cost', descKey: 'slash.cost' },
-  { command: '/context', descKey: 'slash.context' },
-  { command: '/compact', descKey: 'slash.compact' },
-];
+import { useTheme } from './composables/useTheme.js';
+import { useSlashMenu } from './composables/useSlashMenu.js';
 
 /**
  * Creates the application store.
@@ -68,8 +62,6 @@ export function createStore() {
   const queuedMessages = ref([]);
   const usageStats = ref(null);
   const inputRef = ref(null);
-  const slashMenuIndex = ref(0);
-  const slashMenuOpen = ref(false);
 
   // Side question (/btw) state
   const btwState = ref(null);
@@ -230,20 +222,7 @@ export function createStore() {
   }
 
   // Theme
-  const theme = ref(localStorage.getItem('agentlink-theme') || 'light');
-  function applyTheme() {
-    document.documentElement.setAttribute('data-theme', theme.value);
-    const link = document.getElementById('hljs-theme');
-    if (link) link.href = theme.value === 'light'
-      ? '/vendor/github.min.css'
-      : '/vendor/github-dark.min.css';
-  }
-  function toggleTheme() {
-    theme.value = theme.value === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('agentlink-theme', theme.value);
-    applyTheme();
-  }
-  applyTheme();
+  const { theme, toggleTheme } = useTheme();
 
   // ── i18n ──
   const { t, locale, setLocale, toggleLocale, localeLabel } = createI18n();
@@ -269,6 +248,14 @@ export function createStore() {
 
   // ── Highlight.js scheduling ──
   const { scheduleHighlight, cleanup: cleanupHighlight } = createHighlightScheduler();
+
+  // ── Slash command menu ──
+  // sendMessage defined later, resolve via forwarding
+  let _sendMessage = () => {};
+  const {
+    slashMenuIndex, slashMenuOpen, slashMenuVisible, filteredSlashCommands,
+    selectSlashCommand, openSlashMenu, handleSlashMenuKeydown,
+  } = useSlashMenu({ inputText, inputRef, sendMessage: () => _sendMessage() });
 
   // ── Create module instances ──
 
@@ -410,20 +397,6 @@ export function createStore() {
   );
   const hasStreamingMessage = computed(() => messages.value.some(m => m.isStreaming));
 
-  // ── Slash command menu ──
-  const slashMenuVisible = computed(() => {
-    if (slashMenuOpen.value) return true;
-    const txt = inputText.value;
-    return txt.startsWith('/') && !/\s/.test(txt.slice(1));
-  });
-  const filteredSlashCommands = computed(() => {
-    if (slashMenuOpen.value && !inputText.value.startsWith('/')) return SLASH_COMMANDS;
-    if (!inputText.value.startsWith('/')) return SLASH_COMMANDS;
-    const txt = inputText.value.toLowerCase();
-    return SLASH_COMMANDS.filter(c => c.command.startsWith(txt));
-  });
-  watch(filteredSlashCommands, () => { slashMenuIndex.value = 0; });
-
   // ── Auto-resize textarea ──
   let _autoResizeRaf = null;
   function autoResize() {
@@ -500,6 +473,7 @@ export function createStore() {
     scrollToBottom(true);
     attachments.value = [];
   }
+  _sendMessage = sendMessage;
 
   function cancelExecution() {
     if (!isProcessing.value) return;
@@ -559,60 +533,9 @@ export function createStore() {
     pendingPlanMode.value = null;
   }
 
-  function selectSlashCommand(cmd) {
-    slashMenuOpen.value = false;
-    if (cmd.isPrefix) {
-      inputText.value = cmd.command + ' ';
-      nextTick(() => inputRef.value?.focus());
-    } else {
-      inputText.value = cmd.command;
-      sendMessage();
-    }
-  }
-
-  function openSlashMenu() {
-    slashMenuOpen.value = !slashMenuOpen.value;
-    slashMenuIndex.value = 0;
-  }
-
-  function _slashMenuClickOutside(e) {
-    if (slashMenuOpen.value && !e.target.closest('.slash-btn') && !e.target.closest('.slash-menu')) {
-      slashMenuOpen.value = false;
-    }
-  }
-  document.addEventListener('click', _slashMenuClickOutside);
-
   function handleKeydown(e) {
     // Slash menu key handling (must come before btw overlay so Escape closes menu first)
-    if (slashMenuVisible.value && filteredSlashCommands.value.length > 0 && !e.isComposing) {
-      const len = filteredSlashCommands.value.length;
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        slashMenuIndex.value = (slashMenuIndex.value + 1) % len;
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        slashMenuIndex.value = (slashMenuIndex.value - 1 + len) % len;
-        return;
-      }
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        selectSlashCommand(filteredSlashCommands.value[slashMenuIndex.value]);
-        return;
-      }
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        inputText.value = filteredSlashCommands.value[slashMenuIndex.value].command;
-        return;
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        slashMenuOpen.value = false;
-        inputText.value = '';
-        return;
-      }
-    }
+    if (handleSlashMenuKeydown(e)) return;
     // Btw overlay dismiss (after slash menu so menu Escape takes priority)
     if (e.key === 'Escape' && btwState.value) {
       dismissBtw();
@@ -705,7 +628,6 @@ export function createStore() {
     closeWs(); streaming.cleanup(); cleanupScroll(); cleanupHighlight();
     window.removeEventListener('resize', _resizeHandler);
     document.removeEventListener('click', _workdirMenuClickHandler);
-    document.removeEventListener('click', _slashMenuClickOutside);
     document.removeEventListener('keydown', _workdirMenuKeyHandler);
     document.removeEventListener('visibilitychange', _onVisibilityChange);
   });
