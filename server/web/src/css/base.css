@@ -257,6 +257,11 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  /* Processing indicator must keep pulsing — it's a functional status signal */
+  .session-item.processing .session-title::before {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 /* ── Main body (sidebar + chat) ── */

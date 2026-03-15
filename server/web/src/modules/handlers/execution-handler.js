@@ -11,10 +11,22 @@ export function createExecutionHandlers(deps) {
   const {
     messages, isProcessing, isCompacting, streaming, scrollToBottom,
     needsResume, usageStats, toolMsgMap, sidebar,
-    currentConversationId, processingConversations,
+    currentConversationId, processingConversations, activeClaudeSessions,
+    currentClaudeSessionId,
     clearIdleCheck, t,
     finalizeStreamingMsg,
   } = deps;
+
+  function clearActiveSession() {
+    if (activeClaudeSessions && currentClaudeSessionId && currentClaudeSessionId.value) {
+      const s = activeClaudeSessions.value;
+      if (s instanceof Set && s.has(currentClaudeSessionId.value)) {
+        const next = new Set(s);
+        next.delete(currentClaudeSessionId.value);
+        activeClaudeSessions.value = next;
+      }
+    }
+  }
 
   return {
     turn_completed(msg, scheduleHighlight) {
@@ -28,6 +40,7 @@ export function createExecutionHandlers(deps) {
       if (currentConversationId && currentConversationId.value) {
         processingConversations.value[currentConversationId.value] = false;
       }
+      clearActiveSession();
       sidebar.requestSessionList();
       deps.dequeueNext();
     },
@@ -42,6 +55,7 @@ export function createExecutionHandlers(deps) {
       if (currentConversationId && currentConversationId.value) {
         processingConversations.value[currentConversationId.value] = false;
       }
+      clearActiveSession();
       needsResume.value = true;
       messages.value.push({
         id: streaming.nextId(), role: 'system',

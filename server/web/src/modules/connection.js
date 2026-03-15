@@ -223,7 +223,7 @@ export function createConnection(deps) {
       if (msg.conversationId && currentConversationId
           && currentConversationId.value
           && msg.conversationId !== currentConversationId.value) {
-        routeToBackgroundConversation({ conversationCache, processingConversations, sidebar, wsSend }, msg.conversationId, msg);
+        routeToBackgroundConversation({ conversationCache, processingConversations, activeClaudeSessions: deps.activeClaudeSessions, sidebar, wsSend }, msg.conversationId, msg);
         return;
       }
 
@@ -324,6 +324,9 @@ export function createConnection(deps) {
     if (currentConversationId && currentConversationId.value) {
       processingConversations.value[currentConversationId.value] = false;
     }
+    if (deps.activeClaudeSessions) {
+      deps.activeClaudeSessions.value = new Set();
+    }
   }
 
   function handleAgentReconnected(msg, scheduleHighlight) {
@@ -377,6 +380,9 @@ export function createConnection(deps) {
       if (currentConversationId && currentConversationId.value === convId) {
         isProcessing.value = true;
         isCompacting.value = !!entry.isCompacting;
+        if (entry.claudeSessionId && deps.currentClaudeSessionId) {
+          deps.currentClaudeSessionId.value = entry.claudeSessionId;
+        }
       } else if (conversationCache && conversationCache.value[convId]) {
         const cached = conversationCache.value[convId];
         cached.isProcessing = true;
@@ -385,6 +391,17 @@ export function createConnection(deps) {
       if (processingConversations) {
         processingConversations.value[convId] = true;
       }
+    }
+
+    // Track active claudeSessionIds so sidebar can show processing indicators
+    // even for conversations that don't match the current foreground conversationId
+    // (e.g. after page refresh when the conversationId is new but claude is still processing)
+    if (deps.activeClaudeSessions) {
+      const activeSet = new Set();
+      for (const entry of convs) {
+        if (entry.claudeSessionId) activeSet.add(entry.claudeSessionId);
+      }
+      deps.activeClaudeSessions.value = activeSet;
     }
 
     if (team && msg.activeTeam) {
