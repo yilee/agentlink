@@ -103,18 +103,23 @@ export function createConnection(deps) {
   }
 
   // ── Create handler modules ──
-  // Shared deps object for handlers (uses getters for late-bound refs)
+  // Shared deps object for handlers.
+  // ⚠️  The getters below are LATE-BOUND — the underlying variables are set
+  //    AFTER the handler factories run (via setDequeueNext / setFileBrowser / …).
+  //    DO NOT destructure or spread these properties (e.g. `const { fileBrowser } = deps`
+  //    or `{ ...handlerDeps }`), as that evaluates the getter once and captures a
+  //    stale null / no-op value. Always access them as `deps.xxx` at call time.
   const handlerDeps = {
     ...deps,
     toolMsgMap,
     resetIdleCheck,
     clearIdleCheck,
     wsSend,
-    get dequeueNext() { return _dequeueNext; },
-    get fileBrowser() { return fileBrowser; },
-    get filePreview() { return filePreview; },
-    get team() { return team; },
-    get loop() { return loop; },
+    get dequeueNext() { return _dequeueNext; },   // late-bound — see warning above
+    get fileBrowser() { return fileBrowser; },     // late-bound
+    get filePreview() { return filePreview; },     // late-bound
+    get team() { return team; },                   // late-bound
+    get loop() { return loop; },                   // late-bound
   };
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
