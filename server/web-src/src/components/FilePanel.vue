@@ -2,13 +2,15 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const filesStore = inject('files');
+
+const { t, isMobile, workDir } = store;
+
 const {
   filePanelOpen,
-  isMobile,
   fileBrowser,
   filePreview,
   flattenedTree,
-  t,
   memoryPanelOpen,
   memoryLoading,
   openMemoryFile,
@@ -16,10 +18,9 @@ const {
   deleteMemoryFile,
   filePanelWidth,
   fileTreeRoot,
-  workDir,
   fileTreeLoading,
-  memoryFiles
-} = store;
+  memoryFiles,
+} = filesStore;
 </script>
 
 <template>

@@ -2,10 +2,11 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const sidebar = inject('sidebar');
+
 const {
   status,
   theme,
-  toggleSidebar,
   viewMode,
   agentName,
   latency,
@@ -15,6 +16,8 @@ const {
   localeLabel,
   t
 } = store;
+
+const { toggleSidebar } = sidebar;
 </script>
 
 <template>

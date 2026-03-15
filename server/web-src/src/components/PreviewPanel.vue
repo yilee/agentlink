@@ -2,24 +2,25 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const filesStore = inject('files');
+
+const { t, isMobile } = store;
+
 const {
   previewPanelOpen,
-  isMobile,
   filePreview,
-  formatFileSize,
-  t,
+  previewPanelWidth,
+  previewFile,
+  previewMarkdownRendered,
+  isMemoryPreview,
+  previewLoading,
   memoryEditing,
   memoryEditContent,
   memorySaving,
   cancelMemoryEdit,
   saveMemoryEdit,
   startMemoryEdit,
-  previewPanelWidth,
-  previewFile,
-  previewMarkdownRendered,
-  isMemoryPreview,
-  previewLoading
-} = store;
+} = filesStore;
 </script>
 
 <template>

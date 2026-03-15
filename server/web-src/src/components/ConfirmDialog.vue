@@ -2,11 +2,18 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const sidebarStore = inject('sidebar');
+const teamStore = inject('team');
+
+const { t } = store;
+
 const {
   deleteConfirmOpen, deleteConfirmTitle, cancelDeleteSession, confirmDeleteSession,
+} = sidebarStore;
+
+const {
   deleteTeamConfirmOpen, deleteTeamConfirmTitle, cancelDeleteTeam, confirmDeleteTeam,
-  t
-} = store;
+} = teamStore;
 </script>
 
 <template>

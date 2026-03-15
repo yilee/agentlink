@@ -710,21 +710,75 @@ export function createStore() {
     document.removeEventListener('visibilitychange', _onVisibilityChange);
   });
 
+  // ── Public API ──
+  // Domain modules exposed for App.vue to provide() separately
+  const _team = team;
+  const _loop = loop;
+  const _sidebar = {
+    ...sidebar,
+    // State refs owned by store but used by sidebar consumers
+    sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
+    processingConversations,
+    // Folder picker state
+    folderPickerOpen, folderPickerPath, folderPickerEntries,
+    folderPickerLoading, folderPickerSelected,
+    // Delete/rename session state
+    deleteConfirmOpen, deleteConfirmTitle,
+    renamingSessionId, renameText,
+    // Working directory
+    workdirHistory, workdirSwitching, workdirMenuOpen,
+    // Sidebar collapse states
+    teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
+    formatRelativeTime: (ts) => formatRelativeTime(ts, t),
+  };
+  const _files = {
+    fileBrowser, filePreview,
+    flattenedTree: fileBrowser.flattenedTree,
+    // File browser state
+    filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
+    // File preview state
+    previewPanelOpen, previewPanelWidth, previewFile, previewLoading, previewMarkdownRendered,
+    isMemoryPreview,
+    // Memory management
+    memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
+    memoryEditing, memoryEditContent, memorySaving,
+    workdirMenuMemory: memory.workdirMenuMemory,
+    refreshMemory: memory.refreshMemory,
+    openMemoryFile: memory.openMemoryFile,
+    startMemoryEdit: memory.startMemoryEdit,
+    cancelMemoryEdit: memory.cancelMemoryEdit,
+    saveMemoryEdit: memory.saveMemoryEdit,
+    deleteMemoryFile: memory.deleteMemoryFile,
+  };
+
   return {
+    // Connection
     status, agentName, hostname, workDir, sessionId, error,
-    serverVersion, agentVersion, latency,
+    serverVersion, agentVersion, latency, wsSend,
+    // Messages
     messages, visibleMessages, hasMoreMessages, loadMoreMessages,
-    inputText, isProcessing, isCompacting, canSend, hasInput, hasStreamingMessage, inputRef, queuedMessages, usageStats,
-    slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen, selectSlashCommand, openSlashMenu,
-    sendMessage, handleKeydown, cancelExecution, removeQueuedMessage, onMessageListScroll,
+    inputText, isProcessing, isCompacting, canSend, hasInput, hasStreamingMessage,
+    inputRef, queuedMessages, usageStats,
+    // Slash menu
+    slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen,
+    selectSlashCommand, openSlashMenu,
+    // Actions
+    sendMessage, handleKeydown, cancelExecution, removeQueuedMessage,
+    onMessageListScroll, autoResize,
     // Plan mode
     planMode, pendingPlanMode, togglePlanMode,
     // Side question (/btw)
-    btwState, btwPending, dismissBtw, renderMarkdown,
-    getRenderedContent, copyMessage, toggleTool,
+    btwState, btwPending, dismissBtw,
+    // Message rendering helpers
+    renderMarkdown, getRenderedContent, copyMessage, toggleTool,
     isPrevAssistant: _isPrevAssistant,
-    toggleContextSummary, formatTimestamp, formatUsage: (u) => formatUsage(u, t),
-    getToolIcon, getToolSummary: (msg) => getToolSummary(msg, t), isEditTool, getEditDiffHtml: (msg) => getEditDiffHtml(msg, t), getFormattedToolInput: (msg) => getFormattedToolInput(msg, t), autoResize,
+    toggleContextSummary, formatTimestamp,
+    formatUsage: (u) => formatUsage(u, t),
+    getToolIcon,
+    getToolSummary: (msg) => getToolSummary(msg, t),
+    isEditTool,
+    getEditDiffHtml: (msg) => getEditDiffHtml(msg, t),
+    getFormattedToolInput: (msg) => getFormattedToolInput(msg, t),
     // AskUserQuestion
     selectQuestionOption,
     submitQuestionAnswer: _submitQuestionAnswer,
@@ -733,42 +787,7 @@ export function createStore() {
     theme, toggleTheme,
     // i18n
     t, locale, toggleLocale, localeLabel, displayStatus,
-    // Sidebar
-    sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
-    toggleSidebar: sidebar.toggleSidebar,
-    resumeSession: sidebar.resumeSession,
-    newConversation: sidebar.newConversation,
-    requestSessionList: sidebar.requestSessionList,
-    formatRelativeTime: (ts) => formatRelativeTime(ts, t),
-    groupedSessions: sidebar.groupedSessions,
-    isSessionProcessing: sidebar.isSessionProcessing,
-    processingConversations,
-    // Folder picker
-    folderPickerOpen, folderPickerPath, folderPickerEntries,
-    folderPickerLoading, folderPickerSelected,
-    openFolderPicker: sidebar.openFolderPicker,
-    folderPickerNavigateUp: sidebar.folderPickerNavigateUp,
-    folderPickerSelectItem: sidebar.folderPickerSelectItem,
-    folderPickerEnter: sidebar.folderPickerEnter,
-    folderPickerGoToPath: sidebar.folderPickerGoToPath,
-    confirmFolderPicker: sidebar.confirmFolderPicker,
-    // Delete session
-    deleteConfirmOpen, deleteConfirmTitle,
-    deleteSession: sidebar.deleteSession,
-    confirmDeleteSession: sidebar.confirmDeleteSession,
-    cancelDeleteSession: sidebar.cancelDeleteSession,
-    // Rename session
-    renamingSessionId, renameText,
-    startRename: sidebar.startRename,
-    confirmRename: sidebar.confirmRename,
-    cancelRename: sidebar.cancelRename,
-    // Team rename/delete (forwarded from team module above)
-    // Working directory history
-    filteredWorkdirHistory: sidebar.filteredWorkdirHistory,
-    switchToWorkdir: sidebar.switchToWorkdir,
-    removeFromWorkdirHistory: sidebar.removeFromWorkdirHistory,
-    workdirSwitching,
-    // Authentication
+    // Auth
     authRequired, authPassword, authError, authAttempts, authLocked,
     submitPassword,
     // File attachments
@@ -781,167 +800,14 @@ export function createStore() {
     handleDragLeave: fileAttach.handleDragLeave,
     handleDrop: fileAttach.handleDrop,
     handlePaste: fileAttach.handlePaste,
-    // File browser
-    filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
-    sidebarView, isMobile, fileBrowser,
-    flattenedTree: fileBrowser.flattenedTree,
-    // File preview
-    previewPanelOpen, previewPanelWidth, previewFile, previewLoading, previewMarkdownRendered, filePreview,
-    workdirMenuOpen,
-    // Memory management
-    memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
-    memoryEditing, memoryEditContent, memorySaving, isMemoryPreview,
-    workdirMenuMemory: memory.workdirMenuMemory,
-    refreshMemory: memory.refreshMemory,
-    openMemoryFile: memory.openMemoryFile,
-    startMemoryEdit: memory.startMemoryEdit,
-    cancelMemoryEdit: memory.cancelMemoryEdit,
-    saveMemoryEdit: memory.saveMemoryEdit,
-    deleteMemoryFile: memory.deleteMemoryFile,
-    teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
-    toggleWorkdirMenu: sidebar.toggleWorkdirMenu,
-    workdirMenuBrowse: sidebar.workdirMenuBrowse,
-    workdirMenuChangeDir: sidebar.workdirMenuChangeDir,
-    workdirMenuCopyPath: sidebar.workdirMenuCopyPath,
-    // Team mode
-    team,
-    teamState: team.teamState,
-    viewMode: team.viewMode,
-    activeAgentView: team.activeAgentView,
-    historicalTeam: team.historicalTeam,
-    teamsList: team.teamsList,
-    agentMessages: team.agentMessages,
-    isTeamActive: team.isTeamActive,
-    isTeamRunning: team.isTeamRunning,
-    displayTeam: team.displayTeam,
-    pendingTasks: team.pendingTasks,
-    activeTasks: team.activeTasks,
-    doneTasks: team.doneTasks,
-    failedTasks: team.failedTasks,
-    launchTeam: team.launchTeam,
-    dissolveTeam: team.dissolveTeam,
-    viewAgent: team.viewAgent,
-    viewDashboard: team.viewDashboard,
-    viewHistoricalTeam: team.viewHistoricalTeam,
-    requestTeamsList() {
-      team.requestTeamsList();
-    },
-    deleteTeamById: team.deleteTeamById,
-    renameTeamById: team.renameTeamById,
-    requestAgentHistory: team.requestAgentHistory,
-    getAgentColor: team.getAgentColor,
-    findAgent: team.findAgent,
-    getAgentMessages: team.getAgentMessages,
-    backToChat: team.backToChat,
-    newTeam: team.newTeam,
-    // Team panel state
-    teamInstruction: team.teamInstruction,
-    selectedTemplate: team.selectedTemplate,
-    editedLeadPrompt: team.editedLeadPrompt,
-    leadPromptExpanded: team.leadPromptExpanded,
-    kanbanExpanded: team.kanbanExpanded,
-    instructionExpanded: team.instructionExpanded,
-    // Team rename/delete state
-    renamingTeamId: team.renamingTeamId,
-    renameTeamText: team.renameTeamText,
-    deleteTeamConfirmOpen: team.deleteTeamConfirmOpen,
-    deleteTeamConfirmTitle: team.deleteTeamConfirmTitle,
-    pendingDeleteTeamId: team.pendingDeleteTeamId,
-    // Team constants
-    TEMPLATES: team.TEMPLATES,
-    TEMPLATE_KEYS: team.TEMPLATE_KEYS,
-    teamExamples: team.teamExamples,
-    // Team rename/delete methods
-    startTeamRename: team.startTeamRename,
-    confirmTeamRename: team.confirmTeamRename,
-    cancelTeamRename: team.cancelTeamRename,
-    requestDeleteTeam: team.requestDeleteTeam,
-    confirmDeleteTeam: team.confirmDeleteTeam,
-    cancelDeleteTeam: team.cancelDeleteTeam,
-    // Team template methods
-    onTemplateChange: team.onTemplateChange,
-    resetLeadPrompt: team.resetLeadPrompt,
-    leadPromptPreview: team.leadPromptPreview,
-    launchTeamFromPanel: team.launchTeamFromPanel,
-    // Team utility methods
-    formatTeamTime: team.formatTeamTime,
-    getTaskAgent: team.getTaskAgent,
-    viewAgentWithHistory: team.viewAgentWithHistory,
-    getLatestAgentActivity: team.getLatestAgentActivity,
-    feedAgentName,
-    feedContentRest,
-    // Loop mode
-    loop,
-    loopsList: loop.loopsList,
-    selectedLoop: loop.selectedLoop,
-    selectedExecution: loop.selectedExecution,
-    executionHistory: loop.executionHistory,
-    executionMessages: loop.executionMessages,
-    runningLoops: loop.runningLoops,
-    loadingExecutions: loop.loadingExecutions,
-    loadingExecution: loop.loadingExecution,
-    editingLoopId: loop.editingLoopId,
-    hasRunningLoop: loop.hasRunningLoop,
-    firstRunningLoop: loop.firstRunningLoop,
-    loopError: loop.loopError,
-    hasMoreExecutions: loop.hasMoreExecutions,
-    loadingMoreExecutions: loop.loadingMoreExecutions,
-    toggleLoop: loop.toggleLoop,
-    runNow: loop.runNow,
-    cancelLoopExecution: loop.cancelExecution,
-    requestLoopsList: loop.requestLoopsList,
-    viewLoopDetail: loop.viewLoopDetail,
-    viewExecution: loop.viewExecution,
-    backToLoopsList: loop.backToLoopsList,
-    backToLoopDetail: loop.backToLoopDetail,
-    // Loop form state
-    loopName: loop.loopName,
-    loopPrompt: loop.loopPrompt,
-    loopScheduleType: loop.loopScheduleType,
-    loopScheduleHour: loop.loopScheduleHour,
-    loopScheduleMinute: loop.loopScheduleMinute,
-    loopScheduleDayOfWeek: loop.loopScheduleDayOfWeek,
-    loopCronExpr: loop.loopCronExpr,
-    loopSelectedTemplate: loop.loopSelectedTemplate,
-    // Loop delete/rename state
-    loopDeleteConfirmOpen: loop.loopDeleteConfirmOpen,
-    loopDeleteConfirmId: loop.loopDeleteConfirmId,
-    loopDeleteConfirmName: loop.loopDeleteConfirmName,
-    renamingLoopId: loop.renamingLoopId,
-    renameLoopText: loop.renameLoopText,
-    // Loop constants
-    LOOP_TEMPLATES: loop.LOOP_TEMPLATES,
-    LOOP_TEMPLATE_KEYS: loop.LOOP_TEMPLATE_KEYS,
-    formatSchedule: loop.formatSchedule,
-    // Loop panel methods
-    startLoopRename: loop.startLoopRename,
-    confirmLoopRename: loop.confirmLoopRename,
-    cancelLoopRename: loop.cancelLoopRename,
-    newLoop: loop.newLoop,
-    viewLoop: loop.viewLoop,
-    selectLoopTemplate: loop.selectLoopTemplate,
-    resetLoopForm: loop.resetLoopForm,
-    createLoopFromPanel: loop.createLoopFromPanel,
-    startEditingLoop: loop.startEditingLoop,
-    saveLoopEdits: loop.saveLoopEdits,
-    cancelEditingLoop: loop.cancelEditingLoop,
-    requestDeleteLoop: loop.requestDeleteLoop,
-    confirmDeleteLoop: loop.confirmDeleteLoop,
-    cancelDeleteLoop: loop.cancelDeleteLoop,
-    // Loop display helpers
-    loopScheduleDisplay: loop.loopScheduleDisplay,
-    loopLastRunDisplay: loop.loopLastRunDisplay,
-    formatExecTime: loop.formatExecTime,
+    // Shared utility
     formatDuration: loop.formatDuration,
-    isLoopRunning: loop.isLoopRunning,
-    padTwo: loop.padTwo,
-    // Loop editing
-    startEditing: loop.startEditing,
-    cancelEditing: loop.cancelEditing,
-    createNewLoop: loop.createNewLoop,
-    updateExistingLoop: loop.updateExistingLoop,
-    deleteExistingLoop: loop.deleteExistingLoop,
-    clearLoopError: loop.clearLoopError,
-    loadMoreExecutions: loop.loadMoreExecutions,
+    // UI state
+    viewMode: team.viewMode,
+    sidebarView, isMobile, loadingHistory,
+    // Team feed helpers (depend on both store + team)
+    feedAgentName, feedContentRest,
+    // Domain modules (for App.vue to provide separately)
+    _team, _loop, _sidebar, _files,
   };
 }

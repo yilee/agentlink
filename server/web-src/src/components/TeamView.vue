@@ -2,10 +2,28 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const teamStore = inject('team');
+
+const {
+  t,
+  getRenderedContent,
+  getToolIcon,
+  getToolSummary,
+  getEditDiffHtml,
+  toggleTool,
+  isEditTool,
+  getFormattedToolInput,
+  messages,
+  status,
+  viewMode,
+  feedAgentName,
+  feedContentRest,
+  formatDuration
+} = store;
+
 const {
   TEMPLATES,
   TEMPLATE_KEYS,
-  t,
   displayTeam,
   historicalTeam,
   teamsList,
@@ -17,7 +35,7 @@ const {
   isTeamActive,
   isTeamRunning,
   teamInstruction,
-  teamExamples,
+  teamExamples: teamExamplesComputed,
   selectedTemplate,
   onTemplateChange,
   editedLeadPrompt,
@@ -38,24 +56,13 @@ const {
   getAgentColor,
   getAgentMessages,
   getLatestAgentActivity,
-  feedAgentName,
-  feedContentRest,
   formatTeamTime,
-  formatDuration,
-  getRenderedContent,
-  getToolIcon,
-  messages,
-  status,
-  viewMode,
   viewHistoricalTeam,
   launchTeam,
-  getToolSummary,
-  getEditDiffHtml,
-  team,
-  toggleTool,
-  isEditTool,
-  getFormattedToolInput
-} = store;
+  teamState: team
+} = teamStore;
+
+const teamExamples = teamExamplesComputed;
 </script>
 
 <template>

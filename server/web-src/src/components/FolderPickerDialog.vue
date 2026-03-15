@@ -2,12 +2,16 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const sidebarStore = inject('sidebar');
+
+const { t } = store;
+
 const {
   folderPickerOpen, folderPickerLoading, folderPickerPath,
   folderPickerEntries, folderPickerSelected,
   folderPickerNavigateUp, folderPickerSelectItem, folderPickerEnter,
-  folderPickerGoToPath, confirmFolderPicker, t
-} = store;
+  folderPickerGoToPath, confirmFolderPicker,
+} = sidebarStore;
 </script>
 
 <template>

@@ -2,26 +2,25 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const sidebarStore = inject('sidebar');
+const teamStore = inject('team');
+const loopStore = inject('loop');
+const filesStore = inject('files');
+
 const {
-  sidebarOpen,
-  sidebarView,
-  toggleSidebar,
   status,
   serverVersion,
+  agentVersion,
   t,
-  fileBrowser,
-  filePreview,
-  flattenedTree,
   isMobile,
-  memoryEditing,
-  memoryEditContent,
-  memoryLoading,
-  memorySaving,
-  cancelMemoryEdit,
-  saveMemoryEdit,
-  openMemoryFile,
-  refreshMemory,
-  startMemoryEdit,
+  sidebarView,
+  workDir,
+  hostname,
+} = store;
+
+const {
+  sidebarOpen,
+  toggleSidebar,
   groupedSessions,
   resumeSession,
   deleteSession,
@@ -30,13 +29,31 @@ const {
   processingConversations,
   formatRelativeTime,
   requestSessionList,
-  requestTeamsList,
-  requestLoopsList,
   renamingSessionId,
   startRename,
   confirmRename,
   cancelRename,
   renameText,
+  filteredWorkdirHistory,
+  switchToWorkdir,
+  removeFromWorkdirHistory,
+  toggleWorkdirMenu,
+  workdirMenuOpen,
+  workdirMenuBrowse,
+  workdirMenuChangeDir,
+  workdirMenuCopyPath,
+  chatsCollapsed,
+  currentClaudeSessionId,
+  historySessions,
+  loadingSessions,
+  teamsCollapsed,
+  loopsCollapsed,
+  loadingTeams,
+  loadingLoops,
+  folderPickerOpen,
+} = sidebarStore;
+
+const {
   renamingTeamId,
   startTeamRename,
   renameTeamText,
@@ -44,11 +61,14 @@ const {
   cancelTeamRename,
   requestDeleteTeam,
   teamsList,
-  teamsCollapsed,
   viewHistoricalTeam,
   isTeamActive,
   displayTeam,
   newTeam,
+  requestTeamsList,
+} = teamStore;
+
+const {
   loopsList,
   selectedLoop,
   viewLoop,
@@ -59,41 +79,37 @@ const {
   confirmLoopRename,
   cancelLoopRename,
   requestDeleteLoop,
-  filteredWorkdirHistory,
-  switchToWorkdir,
-  removeFromWorkdirHistory,
-  toggleWorkdirMenu,
-  workdirMenuOpen,
-  workdirMenuBrowse,
-  workdirMenuChangeDir,
-  workdirMenuCopyPath,
-  workdirMenuMemory,
-  formatFileSize,
-  previewPanelOpen,
-  filePanelOpen,
-  memoryPanelOpen,
   formatSchedule,
   loopScheduleDisplay,
   isLoopRunning,
-  agentVersion,
-  chatsCollapsed,
-  currentClaudeSessionId,
-  fileTreeRoot,
-  historySessions,
-  hostname,
-  loadingLoops,
-  loadingSessions,
-  loadingTeams,
-  loopsCollapsed,
+  requestLoopsList,
+} = loopStore;
+
+const {
+  fileBrowser,
+  filePreview,
+  flattenedTree,
+  previewPanelOpen,
+  filePanelOpen,
+  memoryPanelOpen,
   previewFile,
   previewMarkdownRendered,
-  team,
-  workDir,
+  fileTreeRoot,
   fileTreeLoading,
   isMemoryPreview,
   previewLoading,
-  memoryFiles
-} = store;
+  memoryFiles,
+  memoryEditing,
+  memoryEditContent,
+  memoryLoading,
+  memorySaving,
+  cancelMemoryEdit,
+  saveMemoryEdit,
+  openMemoryFile,
+  refreshMemory,
+  startMemoryEdit,
+  workdirMenuMemory,
+} = filesStore;
 </script>
 
 <template>

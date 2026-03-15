@@ -2,6 +2,8 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const teamStore = inject('team');
+
 const {
   messages,
   status,
@@ -24,7 +26,6 @@ const {
   getEditDiffHtml,
   getQuestionResponseSummary,
   pendingPlanMode,
-  team,
   workDir,
   visibleMessages,
   hasMoreMessages,
@@ -37,6 +38,8 @@ const {
   isEditTool,
   getFormattedToolInput
 } = store;
+
+const { teamState: team } = teamStore;
 </script>
 
 <template>

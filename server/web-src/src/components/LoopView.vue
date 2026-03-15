@@ -2,10 +2,26 @@
 import { inject } from 'vue';
 
 const store = inject('store');
+const loopStore = inject('loop');
+
+const {
+  t,
+  getRenderedContent,
+  getToolIcon,
+  getToolSummary,
+  getEditDiffHtml,
+  toggleTool,
+  isEditTool,
+  getFormattedToolInput,
+  messages,
+  status,
+  viewMode,
+  error
+} = store;
+
 const {
   LOOP_TEMPLATES,
   LOOP_TEMPLATE_KEYS,
-  t,
   selectedLoop,
   selectedExecution,
   executionHistory,
@@ -22,7 +38,7 @@ const {
   hasMoreExecutions,
   toggleLoop,
   runNow,
-  cancelLoopExecution,
+  cancelExecution: cancelLoopExecution,
   viewLoopDetail,
   viewExecution,
   backToLoopsList,
@@ -54,21 +70,9 @@ const {
   formatDuration,
   isLoopRunning,
   padTwo,
-  getRenderedContent,
-  getToolIcon,
-  getToolSummary,
   viewLoop,
-  messages,
-  status,
-  viewMode,
-  resetLoopForm,
-  error,
-  getEditDiffHtml,
-  loop,
-  toggleTool,
-  isEditTool,
-  getFormattedToolInput
-} = store;
+  resetLoopForm
+} = loopStore;
 </script>
 
 <template>
