@@ -27,7 +27,7 @@
     "build:web": "cd server/web && npm install && npm run build",
     "clean": "rimraf server/dist agent/dist",
     "test": "vitest run",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:functional": "vitest run --config vitest.functional.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },

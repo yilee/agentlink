@@ -5,36 +5,22 @@
  * and uses Playwright to verify the web UI. No Claude CLI needed.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { spawn, type ChildProcess } from 'child_process';
-import { resolve } from 'path';
+import { type ChildProcess } from 'child_process';
 import WebSocket from 'ws';
 import { chromium, type Browser, type Page } from 'playwright';
-import tweetnacl from 'tweetnacl';
-import tweetnaclUtil from 'tweetnacl-util';
+import {
+  type MockAgent,
+  waitForServer, startServer, stopServer,
+  connectMockAgentEncrypted,
+} from './e2e-helpers';
 
-const { encodeBase64, decodeBase64, encodeUTF8, decodeUTF8 } = tweetnaclUtil;
-
-const SERVER_SCRIPT = resolve('server/dist/index.js');
 const PORT = 19876; // High port unlikely to conflict
 const BASE_URL = `http://localhost:${PORT}`;
 
 let serverProc: ChildProcess;
 let browser: Browser;
 
-/** Wait until the server health endpoint responds */
-async function waitForServer(maxMs = 8000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    try {
-      const res = await fetch(`${BASE_URL}/api/health`);
-      if (res.ok) return;
-    } catch { /* not ready yet */ }
-    await new Promise(r => setTimeout(r, 200));
-  }
-  throw new Error('Server did not start');
-}
-
-/** Connect a mock agent via WebSocket. Returns { ws, sessionId, sessionKey }. */
+/** Connect a mock agent via WebSocket (unencrypted, for basic registration tests). */
 function connectMockAgent(name = 'TestAgent', workDir = '/test'): Promise<{ ws: WebSocket; sessionId: string }> {
   return new Promise((resolve, reject) => {
     const params = new URLSearchParams({ type: 'agent', id: name, name, workDir, hostname: 'test-host' });
@@ -51,30 +37,14 @@ function connectMockAgent(name = 'TestAgent', workDir = '/test'): Promise<{ ws: 
 }
 
 beforeAll(async () => {
-  // Start server as child process
-  serverProc = spawn(process.execPath, [SERVER_SCRIPT], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PORT: String(PORT) },
-  });
-
-  await waitForServer();
-
-  // Launch headless browser
+  serverProc = startServer(PORT);
+  await waitForServer(PORT);
   browser = await chromium.launch({ headless: true });
 }, 15000);
 
 afterAll(async () => {
   if (browser) await browser.close();
-  if (serverProc) {
-    serverProc.kill();
-    // On Windows, ensure child tree is killed
-    if (process.platform === 'win32') {
-      try {
-        const { execSync } = await import('child_process');
-        execSync(`taskkill /pid ${serverProc.pid} /f /t`, { stdio: 'ignore', windowsHide: true });
-      } catch { /* already dead */ }
-    }
-  }
+  await stopServer(serverProc);
 });
 
 describe('Functional: Server Health', () => {
@@ -165,95 +135,15 @@ describe('Functional: Web UI', () => {
   });
 });
 
-// ── Encryption helpers for mock agent ──
+// ── Local helper for encrypted agent connection (wraps shared helper with local port) ──
 
-function encryptMsg(data: unknown, key: Uint8Array): { n: string; c: string } {
-  const nonce = tweetnacl.randomBytes(24);
-  const jsonStr = JSON.stringify(data);
-  const message = decodeUTF8(jsonStr);
-  const encrypted = tweetnacl.secretbox(message, nonce, key);
-  return { n: encodeBase64(nonce), c: encodeBase64(encrypted) };
-}
-
-function decryptMsg(encrypted: { n: string; c: string }, key: Uint8Array): unknown | null {
-  try {
-    const nonce = decodeBase64(encrypted.n);
-    const ciphertext = decodeBase64(encrypted.c);
-    const decrypted = tweetnacl.secretbox.open(ciphertext, nonce, key);
-    if (!decrypted) return null;
-    return JSON.parse(encodeUTF8(decrypted));
-  } catch {
-    return null;
-  }
-}
-
-/** Connect a mock agent with encryption support */
-function connectMockAgentEncrypted(name = 'TestAgent', workDir = '/test', password?: string, sessionId?: string): Promise<{
-  ws: WebSocket;
-  sessionId: string;
-  sessionKey: Uint8Array;
-  sendEncrypted: (msg: unknown) => void;
-  waitForMessage: (predicate: (msg: Record<string, unknown>) => boolean, timeoutMs?: number) => Promise<Record<string, unknown>>;
-}> {
-  return new Promise((resolve, reject) => {
-    const params = new URLSearchParams({ type: 'agent', id: name, name, workDir, hostname: 'test-host' });
-    if (password) params.set('password', password);
-    if (sessionId) params.set('sessionId', sessionId);
-    const ws = new WebSocket(`ws://localhost:${PORT}/?${params}`);
-    let sessionKey: Uint8Array;
-
-    // Queue decrypted messages from the moment the key is available
-    const messageQueue: Record<string, unknown>[] = [];
-    const messageListeners: Array<(msg: Record<string, unknown>) => void> = [];
-
-    function dispatchMessage(msg: Record<string, unknown>) {
-      // Check existing listeners first
-      let handled = false;
-      for (let i = messageListeners.length - 1; i >= 0; i--) {
-        messageListeners[i](msg);
-      }
-      // Always queue for future waitForMessage calls that search history
-      messageQueue.push(msg);
-    }
-
-    ws.on('message', (data) => {
-      const parsed = JSON.parse(data.toString());
-      if (parsed.type === 'registered') {
-        sessionKey = decodeBase64(parsed.sessionKey);
-        const sendEncrypted = (msg: unknown) => {
-          ws.send(JSON.stringify(encryptMsg(msg, sessionKey)));
-        };
-        const waitForMessage = (predicate: (msg: Record<string, unknown>) => boolean, timeoutMs = 5000) => {
-          // Check already-queued messages first
-          for (const queued of messageQueue) {
-            if (predicate(queued)) return Promise.resolve(queued);
-          }
-          return new Promise<Record<string, unknown>>((res, rej) => {
-            const timer = setTimeout(() => rej(new Error('waitForMessage timeout')), timeoutMs);
-            messageListeners.push((msg) => {
-              if (predicate(msg)) {
-                clearTimeout(timer);
-                res(msg);
-              }
-            });
-          });
-        };
-        resolve({ ws, sessionId: parsed.sessionId, sessionKey, sendEncrypted, waitForMessage });
-      } else if (parsed.n && parsed.c && sessionKey) {
-        const msg = decryptMsg(parsed, sessionKey) as Record<string, unknown>;
-        if (msg) {
-          dispatchMessage(msg);
-        }
-      }
-    });
-    ws.on('error', reject);
-    setTimeout(() => reject(new Error('Mock agent connect timeout')), 5000);
-  });
+function connectMockAgentEncryptedLocal(name = 'TestAgent', workDir = '/test', password?: string, sessionId?: string) {
+  return connectMockAgentEncrypted(PORT, name, workDir, password, sessionId);
 }
 
 describe('Functional: Delete Session', () => {
   it('delete button appears on non-active session and confirmation dialog works', async () => {
-    const agent = await connectMockAgentEncrypted('DeleteAgent', '/delete-test');
+    const agent = await connectMockAgentEncryptedLocal('DeleteAgent', '/delete-test');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -335,7 +225,7 @@ describe('Functional: Delete Session', () => {
 describe('Functional: Session Password Auth', () => {
   it('shows password dialog for protected session and authenticates', async () => {
     // Connect agent with password
-    const agent = await connectMockAgentEncrypted('AuthAgent', '/auth-test', 'mypassword');
+    const agent = await connectMockAgentEncryptedLocal('AuthAgent', '/auth-test', 'mypassword');
     const page = await browser.newPage();
     try {
       // Clear any saved auth token
@@ -385,7 +275,7 @@ describe('Functional: Session Password Auth', () => {
 
   it('auto-authenticates with saved token', async () => {
     // Connect agent with password
-    const agent = await connectMockAgentEncrypted('TokenAgent', '/token-test', 'tokenpass');
+    const agent = await connectMockAgentEncryptedLocal('TokenAgent', '/token-test', 'tokenpass');
     const page = await browser.newPage();
     try {
       // First: authenticate to get a token
@@ -421,7 +311,7 @@ describe('Functional: Session Password Auth', () => {
 
   it('skips auth for sessions without password', async () => {
     // Connect agent WITHOUT password
-    const agent = await connectMockAgentEncrypted('NoAuthAgent', '/no-auth');
+    const agent = await connectMockAgentEncryptedLocal('NoAuthAgent', '/no-auth');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -441,7 +331,7 @@ describe('Functional: Session Password Auth', () => {
 
 describe('Functional: Chat Message Flow', () => {
   it('sends a chat message and receives streamed response with tool use', async () => {
-    const agent = await connectMockAgentEncrypted('ChatAgent', '/chat-test');
+    const agent = await connectMockAgentEncryptedLocal('ChatAgent', '/chat-test');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -527,7 +417,7 @@ describe('Functional: Chat Message Flow', () => {
   });
 
   it('cancel execution sends cancel and shows system message', async () => {
-    const agent = await connectMockAgentEncrypted('CancelAgent', '/cancel-test');
+    const agent = await connectMockAgentEncryptedLocal('CancelAgent', '/cancel-test');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -580,7 +470,7 @@ describe('Functional: Chat Message Flow', () => {
 
 describe('Functional: Working Directory Change', () => {
   it('folder picker opens and change_workdir updates UI', async () => {
-    const agent = await connectMockAgentEncrypted('WdAgent', '/original-dir');
+    const agent = await connectMockAgentEncryptedLocal('WdAgent', '/original-dir');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -672,7 +562,7 @@ describe('Functional: Working Directory Change', () => {
 
 describe('Functional: Session Resume', () => {
   it('clicking a session in sidebar resumes it with history', async () => {
-    const agent = await connectMockAgentEncrypted('ResumeAgent', '/resume-test');
+    const agent = await connectMockAgentEncryptedLocal('ResumeAgent', '/resume-test');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -756,7 +646,7 @@ describe('Functional: Session Resume', () => {
 
 /** Helper: connect agent, open page, consume list_sessions */
 async function setupFileBrowserTest(agentName: string, workDir: string) {
-  const agent = await connectMockAgentEncrypted(agentName, workDir);
+  const agent = await connectMockAgentEncryptedLocal(agentName, workDir);
   const page = await browser.newPage();
   await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
   await page.waitForSelector('text=Connected', { timeout: 5000 });
@@ -770,7 +660,7 @@ async function setupFileBrowserTest(agentName: string, workDir: string) {
 
 /** Helper: respond to list_directory requests with sample entries */
 function respondWithDirectoryListing(
-  agent: Awaited<ReturnType<typeof connectMockAgentEncrypted>>,
+  agent: MockAgent,
   dirPath: string,
   entries: Array<{ name: string; type: string }>,
 ) {
@@ -1063,7 +953,7 @@ describe('Functional: File Browser Panel', () => {
 
 describe('Functional: Reconnect Processing State', () => {
   it('sends query_active_conversations on initial connect and on agent_reconnected', async () => {
-    const agent = await connectMockAgentEncrypted('QueryActiveAgent', '/query-active');
+    const agent = await connectMockAgentEncryptedLocal('QueryActiveAgent', '/query-active');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -1089,7 +979,7 @@ describe('Functional: Reconnect Processing State', () => {
   });
 
   it('restores processing indicator when active_conversations reports active turn', async () => {
-    const agent = await connectMockAgentEncrypted('RestoreActiveAgent', '/restore-active');
+    const agent = await connectMockAgentEncryptedLocal('RestoreActiveAgent', '/restore-active');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -1122,7 +1012,7 @@ describe('Functional: Reconnect Processing State', () => {
   });
 
   it('clears stale processing state when active_conversations reports none active', async () => {
-    const agent = await connectMockAgentEncrypted('ClearStaleAgent', '/clear-stale');
+    const agent = await connectMockAgentEncryptedLocal('ClearStaleAgent', '/clear-stale');
     const page = await browser.newPage();
     try {
       await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
@@ -1162,7 +1052,7 @@ describe('Functional: Reconnect Processing State', () => {
 
   it('full disconnect-reconnect cycle with active_conversations handshake', async () => {
     // First agent connects
-    const agent = await connectMockAgentEncrypted('DisconnReconnAgent1', '/disconn-reconn');
+    const agent = await connectMockAgentEncryptedLocal('DisconnReconnAgent1', '/disconn-reconn');
     const savedSessionId = agent.sessionId;
     const page = await browser.newPage();
     try {
@@ -1191,7 +1081,7 @@ describe('Functional: Reconnect Processing State', () => {
       }, { timeout: 5000 });
 
       // Reconnect with a new agent (different id) but same sessionId
-      const agent2 = await connectMockAgentEncrypted('DisconnReconnAgent2', '/disconn-reconn', undefined, savedSessionId);
+      const agent2 = await connectMockAgentEncryptedLocal('DisconnReconnAgent2', '/disconn-reconn', undefined, savedSessionId);
 
       // UI should show Connected again via agent_reconnected
       await page.waitForSelector('text=Connected', { timeout: 5000 });

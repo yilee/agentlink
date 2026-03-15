@@ -7,154 +7,47 @@
  * Test cases based on docs/btw-e2e-tests.md (TC-36 through TC-59).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { spawn, type ChildProcess } from 'child_process';
-import { resolve } from 'path';
-import WebSocket from 'ws';
+import { type ChildProcess } from 'child_process';
 import { chromium, type Browser, type Page } from 'playwright';
-import tweetnacl from 'tweetnacl';
-import tweetnaclUtil from 'tweetnacl-util';
+import {
+  type MockAgent,
+  waitForServer, startServer, stopServer,
+  connectMockAgentEncrypted, delay,
+} from './e2e-helpers';
 
-const { encodeBase64, decodeBase64, encodeUTF8, decodeUTF8 } = tweetnaclUtil;
-
-const SERVER_SCRIPT = resolve('server/dist/index.js');
 const PORT = 19877; // Unique port to avoid conflict with main e2e tests
 const BASE_URL = `http://localhost:${PORT}`;
 
 let serverProc: ChildProcess;
 let browser: Browser;
 
-// ── Helpers ──
+// ── Test-specific helpers ──
 
-async function waitForServer(maxMs = 8000): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    try {
-      const res = await fetch(`${BASE_URL}/api/health`);
-      if (res.ok) return;
-    } catch { /* not ready yet */ }
-    await new Promise(r => setTimeout(r, 200));
-  }
-  throw new Error('Server did not start');
-}
-
-function encryptMsg(data: unknown, key: Uint8Array): { n: string; c: string } {
-  const nonce = tweetnacl.randomBytes(24);
-  const jsonStr = JSON.stringify(data);
-  const message = decodeUTF8(jsonStr);
-  const encrypted = tweetnacl.secretbox(message, nonce, key);
-  return { n: encodeBase64(nonce), c: encodeBase64(encrypted) };
-}
-
-function decryptMsg(encrypted: { n: string; c: string }, key: Uint8Array): unknown | null {
-  try {
-    const nonce = decodeBase64(encrypted.n);
-    const ciphertext = decodeBase64(encrypted.c);
-    const decrypted = tweetnacl.secretbox.open(ciphertext, nonce, key);
-    if (!decrypted) return null;
-    return JSON.parse(encodeUTF8(decrypted));
-  } catch {
-    return null;
-  }
-}
-
-type MockAgent = {
-  ws: WebSocket;
-  sessionId: string;
-  sessionKey: Uint8Array;
-  sendEncrypted: (msg: unknown) => void;
-  waitForMessage: (predicate: (msg: Record<string, unknown>) => boolean, timeoutMs?: number) => Promise<Record<string, unknown>>;
-};
-
-function connectMockAgentEncrypted(name = 'TestAgent', workDir = '/test'): Promise<MockAgent> {
-  return new Promise((resolve, reject) => {
-    const params = new URLSearchParams({ type: 'agent', id: name, name, workDir, hostname: 'test-host' });
-    const ws = new WebSocket(`ws://localhost:${PORT}/?${params}`);
-    let sessionKey: Uint8Array;
-
-    const messageQueue: Record<string, unknown>[] = [];
-    const messageListeners: Array<(msg: Record<string, unknown>) => void> = [];
-
-    function dispatchMessage(msg: Record<string, unknown>) {
-      for (let i = messageListeners.length - 1; i >= 0; i--) {
-        messageListeners[i](msg);
-      }
-      messageQueue.push(msg);
-    }
-
-    ws.on('message', (data) => {
-      const parsed = JSON.parse(data.toString());
-      if (parsed.type === 'registered') {
-        sessionKey = decodeBase64(parsed.sessionKey);
-        const sendEncrypted = (msg: unknown) => {
-          ws.send(JSON.stringify(encryptMsg(msg, sessionKey)));
-        };
-        const waitForMessage = (predicate: (msg: Record<string, unknown>) => boolean, timeoutMs = 5000) => {
-          for (const queued of messageQueue) {
-            if (predicate(queued)) return Promise.resolve(queued);
-          }
-          return new Promise<Record<string, unknown>>((res, rej) => {
-            const timer = setTimeout(() => rej(new Error('waitForMessage timeout')), timeoutMs);
-            messageListeners.push((msg) => {
-              if (predicate(msg)) {
-                clearTimeout(timer);
-                res(msg);
-              }
-            });
-          });
-        };
-        resolve({ ws, sessionId: parsed.sessionId, sessionKey, sendEncrypted, waitForMessage });
-      } else if (parsed.n && parsed.c && sessionKey) {
-        const msg = decryptMsg(parsed, sessionKey) as Record<string, unknown>;
-        if (msg) {
-          dispatchMessage(msg);
-        }
-      }
-    });
-    ws.on('error', reject);
-    setTimeout(() => reject(new Error('Mock agent connect timeout')), 5000);
-  });
-}
-
-/** Setup page, connect agent, consume initial list_sessions */
 async function setupBtwTest(agentName: string, workDir = '/btw-test'): Promise<{ agent: MockAgent; page: Page }> {
-  const agent = await connectMockAgentEncrypted(agentName, workDir);
+  const agent = await connectMockAgentEncrypted(PORT, agentName, workDir);
   const page = await browser.newPage();
   await page.goto(`${BASE_URL}/s/${agent.sessionId}`);
   await page.waitForSelector('text=Connected', { timeout: 5000 });
 
-  // Consume the initial list_sessions request
   await agent.waitForMessage((m) => m.type === 'list_sessions');
   agent.sendEncrypted({ type: 'sessions_list', sessions: [], workDir });
 
   return { agent, page };
 }
 
-/** Simulate a btw_answer from the agent (streaming delta + done) */
 function sendBtwAnswer(agent: MockAgent, delta: string, done: boolean) {
   agent.sendEncrypted({ type: 'btw_answer', delta, done });
 }
 
-/** Simulate a complete btw answer (sends text then done) */
 function sendBtwFullAnswer(agent: MockAgent, text: string) {
   agent.sendEncrypted({ type: 'btw_answer', delta: text, done: false });
   agent.sendEncrypted({ type: 'btw_answer', delta: '', done: true });
 }
 
-/** Small delay helper */
-function delay(ms: number): Promise<void> {
-  return new Promise(r => setTimeout(r, ms));
-}
-
-/**
- * Set textarea value and send, bypassing overlay occlusion.
- * Uses page.evaluate() to directly set the value and trigger Vue's v-model update,
- * then clicks the send button. This is needed when the btw overlay covers the input area.
- */
 async function forceTypeAndSend(page: Page, text: string): Promise<void> {
   await page.evaluate((val) => {
     const ta = document.querySelector('textarea') as HTMLTextAreaElement;
     if (!ta) throw new Error('No textarea found');
-    // Set native value setter to trigger Vue's v-model
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
       window.HTMLTextAreaElement.prototype, 'value'
     )!.set!;
@@ -171,26 +64,14 @@ async function forceTypeAndSend(page: Page, text: string): Promise<void> {
 // ── Lifecycle ──
 
 beforeAll(async () => {
-  serverProc = spawn(process.execPath, [SERVER_SCRIPT], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PORT: String(PORT) },
-  });
-
-  await waitForServer();
+  serverProc = startServer(PORT);
+  await waitForServer(PORT);
   browser = await chromium.launch({ headless: true });
 }, 15000);
 
 afterAll(async () => {
   if (browser) await browser.close();
-  if (serverProc) {
-    serverProc.kill();
-    if (process.platform === 'win32') {
-      try {
-        const { execSync } = await import('child_process');
-        execSync(`taskkill /pid ${serverProc.pid} /f /t`, { stdio: 'ignore', windowsHide: true });
-      } catch { /* already dead */ }
-    }
-  }
+  await stopServer(serverProc);
 });
 
 // ── Test Cases ──
