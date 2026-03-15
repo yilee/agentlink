@@ -1,11 +1,31 @@
-// @vitest-environment jsdom
 /**
  * Tests for backgroundRouting.js — background conversation message routing,
  * activeClaudeSessions management, and uncached conversation handling.
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { routeToBackgroundConversation, finalizeLastStreaming, buildHistoryBatch } from '../../server/web/src/modules/backgroundRouting.js';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+
+// markdown.js (imported transitively) uses `window.__copyCodeBlock` at top level,
+// so we mock browser globals before dynamically importing the module.
+let routeToBackgroundConversation: any;
+let finalizeLastStreaming: any;
+let buildHistoryBatch: any;
+
+beforeAll(async () => {
+  // markdown.js uses `window.__copyCodeBlock` at top level — provide window + document
+  (globalThis as any).window = globalThis;
+  (globalThis as any).document = { hidden: false, querySelector: () => null, querySelectorAll: () => [] };
+
+  const mod = await import('../../server/web/src/modules/backgroundRouting.js');
+  routeToBackgroundConversation = mod.routeToBackgroundConversation;
+  finalizeLastStreaming = mod.finalizeLastStreaming;
+  buildHistoryBatch = mod.buildHistoryBatch;
+});
+
+afterAll(() => {
+  delete (globalThis as any).window;
+  delete (globalThis as any).document;
+});
 
 // Helper to create a minimal cache entry
 function makeCache(overrides: Record<string, unknown> = {}) {
