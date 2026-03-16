@@ -1,4 +1,4 @@
-// ── AgentLink Web UI — Store (state management + module wiring) ────────────
+// ── AgenticWorker Web UI — Store (state management + module wiring) ────────────
 import { ref, nextTick, computed, watch, onMounted, onUnmounted } from 'vue';
 
 // Module imports
@@ -583,7 +583,7 @@ export function createStore() {
   watch(messageCount, () => { nextTick(scheduleHighlight); });
 
   watch(hostname, (name) => {
-    document.title = name ? `${name} \u2014 AgentLink` : 'AgentLink';
+    document.title = name ? `${name} \u2014 AgenticWorker` : 'AgenticWorker';
     // Restore sidebar collapsed states from localStorage
     const key = _sidebarCollapseKey();
     if (key) {

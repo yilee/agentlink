@@ -26,7 +26,7 @@ const { toggleSidebar } = sidebar;
           <button class="sidebar-toggle" @click="toggleSidebar" :title="t('header.toggleSidebar')">
             <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
           </button>
-          <h1>AgentLink</h1>
+          <h1>AgenticWorker</h1>
         </div>
         <div class="top-bar-info">
           <span :class="['badge', status.toLowerCase()]">{{ displayStatus }}</span>
