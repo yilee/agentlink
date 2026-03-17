@@ -1150,7 +1150,7 @@ describe('Functional: Workdir Dropdown Menu', () => {
     }
   });
 
-  it('shows four menu items: Browse files, Change directory, Copy path, Memory', async () => {
+  it('shows five menu items: Browse files, Change directory, Copy path, Memory, Git', async () => {
     const { agent, page } = await setupFileBrowserTest('MenuItemsAgent', '/items-test');
     try {
       await page.click('.sidebar-workdir-path-row');
@@ -1158,7 +1158,7 @@ describe('Functional: Workdir Dropdown Menu', () => {
 
       const items = await page.locator('.workdir-menu-item').allTextContents();
       const trimmed = items.map(t => t.trim());
-      expect(trimmed).toEqual(['Browse files', 'Change directory', 'Copy path', 'Memory']);
+      expect(trimmed).toEqual(['Browse files', 'Change directory', 'Copy path', 'Memory', 'Git']);
     } finally {
       await page.close();
       agent.ws.close();

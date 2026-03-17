@@ -20,6 +20,7 @@ import { createFileBrowser } from './modules/fileBrowser.js';
 import { createFilePreview } from './modules/filePreview.js';
 import { createTeam } from './modules/team.js';
 import { createMemory } from './modules/memory.js';
+import { createGit } from './modules/git.js';
 import { createLoop } from './modules/loop.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
@@ -131,6 +132,8 @@ export function createStore() {
   const workdirMenuOpen = ref(false);
   // Memory management state
   const memoryPanelOpen = ref(false);
+  // Git panel state
+  const gitPanelOpen = ref(false);
   const memoryFiles = ref([]);
   const memoryDir = ref(null);
   const memoryLoading = ref(false);
@@ -286,7 +289,7 @@ export function createStore() {
     // i18n
     t,
   });
-  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -357,6 +360,17 @@ export function createStore() {
     isMobile, sidebarView, workdirMenuOpen, filePanelOpen, t,
   });
   setFilePreview(filePreview);
+
+  // Git module
+  const git = createGit({
+    wsSend: (msg) => _wsSend(msg),
+    workDir, gitPanelOpen, filePanelOpen, memoryPanelOpen,
+    previewFile, previewPanelOpen,
+    isMobile, sidebarView, workdirMenuOpen,
+    t,
+  });
+  setGit(git);
+  sidebar.setGit(git);
 
   const isMemoryPreview = computed(() => {
     if (!previewFile.value?.filePath || !memoryDir.value) return false;
@@ -672,6 +686,8 @@ export function createStore() {
     cancelMemoryEdit: memory.cancelMemoryEdit,
     saveMemoryEdit: memory.saveMemoryEdit,
     deleteMemoryFile: memory.deleteMemoryFile,
+    // Git panel
+    gitPanelOpen, git,
   };
 
   return {

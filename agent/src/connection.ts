@@ -4,6 +4,7 @@ import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
 import { loadRuntimeState, saveRuntimeState } from './config.js';
 import { handleListDirectory, handleReadFile, handleChangeWorkDir } from './directory-handlers.js';
+import { handleGitStatus, handleGitDiff } from './git-handlers.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -641,6 +642,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       }
       break;
     }
+    case 'git_status':
+      handleGitStatus(msg, state.workDir, send);
+      break;
+    case 'git_diff':
+      handleGitDiff(msg as unknown as { filePath: string; staged?: boolean; untracked?: boolean; type: string }, state.workDir, send);
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });

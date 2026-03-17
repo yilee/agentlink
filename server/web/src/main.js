@@ -10,6 +10,7 @@ import './css/tools.css';
 import './css/ask-question.css';
 import './css/input.css';
 import './css/file-browser.css';
+import './css/git.css';
 import './css/team.css';
 import './css/responsive.css';
 import './css/loop.css';

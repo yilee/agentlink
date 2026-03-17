@@ -75,9 +75,16 @@ export function createFeatureHandlers(deps) {
       memoryDir.value = null;
       memoryPanelOpen.value = false;
       memoryEditing.value = false;
+      if (deps.git) deps.git.onWorkdirChanged();
       sidebar.requestSessionList();
       if (deps.team) deps.team.requestTeamsList();
       if (deps.loop) deps.loop.requestLoopsList();
+    },
+    git_status_result(msg) {
+      if (deps.git) deps.git.handleGitStatus(msg);
+    },
+    git_diff_result(msg) {
+      if (deps.git) deps.git.handleGitDiff(msg);
     },
   };
 }

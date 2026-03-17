@@ -34,6 +34,9 @@ const {
             <span class="preview-panel-filename" :title="previewFile?.filePath">
               {{ previewFile?.fileName || t('preview.preview') }}
             </span>
+            <span v-if="previewFile?.isDiff" class="diff-status-badge" :class="previewFile.staged ? 'staged' : (previewFile.status === '?' ? 'untracked' : 'modified')">
+              {{ previewFile.staged ? 'Staged' : (previewFile.status === '?' ? 'Untracked' : 'Modified') }}
+            </span>
             <button v-if="previewFile?.content && filePreview.isMarkdownFile(previewFile.fileName)"
                     class="preview-md-toggle" :class="{ active: previewMarkdownRendered }"
                     @click="previewMarkdownRendered = !previewMarkdownRendered"
@@ -59,7 +62,33 @@ const {
             <button class="preview-panel-close" @click="filePreview.closePreview(); memoryEditing = false" :title="t('preview.closePreview')">&times;</button>
           </div>
           <div class="preview-panel-body">
-            <div v-if="memoryEditing" class="memory-edit-container">
+            <!-- Diff view -->
+            <template v-if="previewFile?.isDiff">
+              <div v-if="previewFile.diffLoading" class="file-panel-loading">Loading diff...</div>
+              <div v-else-if="previewFile.error" class="diff-empty-notice">{{ previewFile.error }}</div>
+              <div v-else-if="previewFile.binary" class="diff-binary-notice">Binary file differs</div>
+              <div v-else-if="!previewFile.hunks?.length" class="diff-empty-notice">No changes</div>
+              <div v-else class="diff-container">
+                <template v-for="(hunk, hi) in previewFile.hunks" :key="hi">
+                  <div class="diff-hunk-header" @click="hunk.collapsed = !hunk.collapsed">
+                    {{ hunk.header }}
+                    <template v-if="hunk.collapsed"> ({{ hunk.lines.length }} lines hidden)</template>
+                  </div>
+                  <template v-if="!hunk.collapsed">
+                    <div v-for="(line, li) in hunk.lines" :key="li"
+                         class="diff-line" :class="'diff-line-' + line.type">
+                      <div class="diff-gutter">
+                        <span class="diff-line-number">{{ line.oldLine ?? '' }}</span>
+                        <span class="diff-line-number">{{ line.newLine ?? '' }}</span>
+                      </div>
+                      <span class="diff-line-content">{{ line.content }}</span>
+                    </div>
+                  </template>
+                </template>
+              </div>
+            </template>
+            <!-- Memory editing -->
+            <div v-else-if="memoryEditing" class="memory-edit-container">
               <textarea class="memory-edit-textarea" v-model="memoryEditContent"></textarea>
             </div>
             <div v-else-if="previewLoading" class="preview-loading">{{ t('preview.loading') }}</div>

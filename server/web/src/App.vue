@@ -9,6 +9,7 @@ import AuthDialog from './components/AuthDialog.vue';
 import TopBar from './components/TopBar.vue';
 import Sidebar from './components/Sidebar.vue';
 import FilePanel from './components/FilePanel.vue';
+import GitPanel from './components/GitPanel.vue';
 import TeamView from './components/TeamView.vue';
 import LoopView from './components/LoopView.vue';
 import ChatView from './components/ChatView.vue';
@@ -54,6 +55,8 @@ const {
         <Sidebar />
 
         <FilePanel />
+
+        <GitPanel />
 
         <!-- Chat area -->
         <div class="chat-area">
