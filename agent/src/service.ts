@@ -26,6 +26,7 @@ function buildExtraArgs(config: AgentConfig): string {
   let args = '';
   if (config.password) args += ` --password "${config.password}"`;
   if (config.autoUpdate) args += ' --auto-update';
+  if (config.entra) args += ' --entra';
   return args;
 }
 
@@ -37,6 +38,9 @@ function buildPlistExtraArgs(config: AgentConfig): string {
   }
   if (config.autoUpdate) {
     entries += `        <string>--auto-update</string>\n`;
+  }
+  if (config.entra) {
+    entries += `        <string>--entra</string>\n`;
   }
   return entries;
 }

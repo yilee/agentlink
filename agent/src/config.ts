@@ -70,7 +70,7 @@ export function resolveConfig(cliOptions: Partial<AgentConfig>, ignoreConfigFile
     name: cliOptions.name || fileConfig.name || DEFAULTS.name,
     autoUpdate: cliOptions.autoUpdate ?? fileConfig.autoUpdate ?? false,
     password: cliOptions.password || fileConfig.password || undefined,
-    entra: cliOptions.entra || undefined,
+    entra: cliOptions.entra ?? fileConfig.entra ?? undefined,
   };
 }
 

@@ -53,6 +53,9 @@ program
     if (options.autoUpdate) {
       configUpdates.autoUpdate = true;
     }
+    if (options.entra) {
+      configUpdates.entra = true;
+    }
     if (Object.keys(configUpdates).length > 0 && !options.ephemeral) {
       saveConfig(configUpdates);
     }
@@ -289,7 +292,7 @@ configCmd
   .command('set <key> <value>')
   .description('Set a configuration value (server, dir, name)')
   .action((key: string, value: string) => {
-    const validKeys = ['server', 'dir', 'name', 'autoUpdate', 'password'];
+    const validKeys = ['server', 'dir', 'name', 'autoUpdate', 'password', 'entra'];
     if (!validKeys.includes(key)) {
       console.error(`Invalid key "${key}". Valid keys: ${validKeys.join(', ')}`);
       process.exit(1);
@@ -487,6 +490,7 @@ program
       const restartArgs = ['start', '--daemon'];
       if (savedConfig.password) restartArgs.push('--password', savedConfig.password);
       if (savedConfig.autoUpdate) restartArgs.push('--auto-update');
+      if (savedConfig.entra) restartArgs.push('--entra');
       try {
         execSync(['agentlink-client', ...restartArgs].map(a => `"${a}"`).join(' '), { stdio: 'inherit' });
       } catch {

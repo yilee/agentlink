@@ -143,6 +143,36 @@ describe('Agent Config', () => {
       const config = resolveConfig({});
       expect(config.password).toBeUndefined();
     });
+
+    it('reads entra from config file when not passed via CLI', () => {
+      saveConfig({ entra: true });
+      const config = resolveConfig({});
+      expect(config.entra).toBe(true);
+    });
+
+    it('CLI entra flag takes priority over config file', () => {
+      saveConfig({ entra: false });
+      const config = resolveConfig({ entra: true });
+      expect(config.entra).toBe(true);
+    });
+
+    it('entra is undefined when not set anywhere', () => {
+      const config = resolveConfig({});
+      expect(config.entra).toBeUndefined();
+    });
+
+    it('entra survives config round-trip (persists across restarts)', () => {
+      saveConfig({ entra: true, password: 'pass' });
+      const config = resolveConfig({});
+      expect(config.entra).toBe(true);
+      expect(config.password).toBe('pass');
+    });
+
+    it('entra not inherited from config file when ignoreConfigFile is true', () => {
+      saveConfig({ entra: true });
+      const config = resolveConfig({}, true);
+      expect(config.entra).toBeUndefined();
+    });
   });
 
   describe('RuntimeState', () => {
