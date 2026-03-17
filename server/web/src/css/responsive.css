@@ -45,6 +45,22 @@
   /* Top bar */
   .top-bar {
     padding: env(safe-area-inset-top, 0px) 0.75rem 0;
+    overflow: hidden;
+  }
+
+  .top-bar-left {
+    min-width: 0;
+    flex-shrink: 0;
+  }
+
+  .top-bar h1 {
+    font-size: 0.95rem;
+  }
+
+  .top-bar-info {
+    min-width: 0;
+    flex-shrink: 1;
+    gap: 0.4rem;
   }
 
   .agent-label {
@@ -53,10 +69,6 @@
 
   .latency {
     display: none;
-  }
-
-  .top-bar-info {
-    gap: 0.4rem;
   }
 
   .team-mode-toggle {
@@ -274,6 +286,10 @@
    Extra-small screens — max-width: 480px
    ══════════════════════════════════════════ */
 @media (max-width: 480px) {
+  .top-bar h1 {
+    display: none;
+  }
+
   .message-list {
     padding: 0.5rem 0.5rem 0.5rem;
   }
