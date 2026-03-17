@@ -41,6 +41,9 @@ server/web/node_modules/
 nul
 coverage/
 
+# Certificates (private keys)
+certs/
+
 # E2E test workdir contents (keep the folder, ignore runtime files)
 test/e2e-workdir/*
 !test/e2e-workdir/.gitkeep

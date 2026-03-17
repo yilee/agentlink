@@ -15,4 +15,37 @@ import './css/responsive.css';
 import './css/loop.css';
 import './css/btw.css';
 
-createApp(App).mount('#app');
+function mountApp() {
+  createApp(App).mount('#app');
+}
+
+function showAccessDenied() {
+  document.getElementById('app').innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;color:#c00;font-size:1.2em;">Access denied. A @microsoft.com account is required.</div>';
+}
+
+const isProtectedRoute = window.location.pathname.startsWith('/ms/');
+const isAuthCallback = window.location.pathname === '/auth/callback';
+
+if (isProtectedRoute || isAuthCallback) {
+  import('./auth/msalAuth.js').then(({ initAuth, requireLogin, isAllowedDomain, getUserPhoto }) => {
+    initAuth().then((account) => {
+      if (!account) {
+        requireLogin();
+      } else if (!isAllowedDomain(account)) {
+        showAccessDenied();
+      } else {
+        // Extract first name from account.name (e.g. "Kailun Shi" → "Kailun")
+        window.__entraUser = { firstName: (account.name || '').split(' ')[0] || account.username };
+        getUserPhoto().then((photoUrl) => {
+          if (photoUrl) {
+            window.__entraUser.photoUrl = photoUrl;
+          }
+          mountApp();
+        });
+      }
+    });
+  });
+} else {
+  mountApp();
+}

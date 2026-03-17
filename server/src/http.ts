@@ -1,6 +1,20 @@
 import express from 'express';
 import { join } from 'path';
+import { readFileSync } from 'fs';
 import { sessions } from './session-manager.js';
+
+// Entra ID config — read from environment variables at startup (optional)
+const entraClientId = process.env.ENTRA_CLIENT_ID;
+const entraTenantId = process.env.ENTRA_TENANT_ID;
+const entraConfigured = !!(entraClientId && entraTenantId);
+
+// Base64-encode the config once at startup (empty string if not configured)
+const entraConfigB64 = entraConfigured
+  ? Buffer.from(JSON.stringify({
+      clientId: entraClientId,
+      tenantId: entraTenantId,
+    })).toString('base64')
+  : '';
 
 export function createApp(webDir: string, pkg: { version: string }, startedAt: Date): express.Express {
   const app = express();
@@ -21,6 +35,19 @@ export function createApp(webDir: string, pkg: { version: string }, startedAt: D
     res.sendFile(join(webDir, 'index.html'));
   };
 
+  // Serve index.html with Entra config injected via <meta> tag
+  const sendIndexHtmlWithEntra = (_req: express.Request, res: express.Response) => {
+    try {
+      const html = readFileSync(join(webDir, 'index.html'), 'utf-8');
+      const injected = html.replace('<head>', `<head>\n    <meta name="entra-config" content="${entraConfigB64}">`);
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Type', 'text/html');
+      res.send(injected);
+    } catch {
+      res.status(500).send('Internal server error');
+    }
+  };
+
   // Intercept /index.html before express.static to ensure no-store is applied
   app.get('/index.html', sendIndexHtml);
 
@@ -38,8 +65,26 @@ export function createApp(webDir: string, pkg: { version: string }, startedAt: D
     },
   }));
 
-  // SPA fallback: /s/:sessionId → serve versioned index.html
+  // MSAL SPA callback — serve SPA with Entra config for MSAL.js to handle the auth code
+  app.get('/auth/callback', (req, res) => {
+    if (!entraConfigured) {
+      res.status(500).send('Entra ID not configured.');
+      return;
+    }
+    sendIndexHtmlWithEntra(req, res);
+  });
+
+  // SPA fallback: /s/:sessionId → serve versioned index.html (no login)
   app.get('/s/:sessionId', sendIndexHtml);
+
+  // Protected route: /ms/:sessionId → serve index.html with Entra config (login required)
+  app.get('/ms/:sessionId', (req, res) => {
+    if (!entraConfigured) {
+      res.status(500).send('Entra ID not configured. Set ENTRA_CLIENT_ID and ENTRA_TENANT_ID environment variables.');
+      return;
+    }
+    sendIndexHtmlWithEntra(req, res);
+  });
 
   // Health check
   app.get('/api/health', (_req, res) => {

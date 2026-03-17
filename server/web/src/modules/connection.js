@@ -98,8 +98,8 @@ export function createConnection(deps) {
   }
 
   function getSessionId() {
-    const match = window.location.pathname.match(/^\/s\/([^/]+)/);
-    return match ? match[1] : null;
+    const match = window.location.pathname.match(/^\/(s|ms)\/([^/]+)/);
+    return match ? match[2] : null;
   }
 
   // ── Create handler modules ──
@@ -281,7 +281,7 @@ export function createConnection(deps) {
     if (msg.serverVersion) serverVersion.value = msg.serverVersion;
     if (msg.agent) {
       status.value = 'Connected';
-      agentName.value = msg.agent.name;
+      agentName.value = window.__entraUser?.firstName || msg.agent.name;
       hostname.value = msg.agent.hostname || '';
       workDir.value = msg.agent.workDir;
       agentVersion.value = msg.agent.version || '';
@@ -333,7 +333,7 @@ export function createConnection(deps) {
     status.value = 'Connected';
     error.value = '';
     if (msg.agent) {
-      agentName.value = msg.agent.name;
+      agentName.value = window.__entraUser?.firstName || msg.agent.name;
       hostname.value = msg.agent.hostname || '';
       workDir.value = msg.agent.workDir;
       agentVersion.value = msg.agent.version || '';
