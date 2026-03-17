@@ -75,7 +75,15 @@ export function createApp(webDir: string, pkg: { version: string }, startedAt: D
   });
 
   // SPA fallback: /s/:sessionId → serve versioned index.html (no login)
-  app.get('/s/:sessionId', sendIndexHtml);
+  // Block /s/ access for Entra-protected sessions — must use /ms/ path
+  app.get('/s/:sessionId', (req, res) => {
+    const agent = sessions.getAgentBySession(req.params.sessionId);
+    if (agent?.entra) {
+      res.redirect(302, `/ms/${req.params.sessionId}`);
+      return;
+    }
+    sendIndexHtml(req, res);
+  });
 
   // Protected route: /ms/:sessionId → serve index.html with Entra config (login required)
   app.get('/ms/:sessionId', (req, res) => {

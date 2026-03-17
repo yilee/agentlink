@@ -41,6 +41,7 @@ if (isProtectedRoute || isAuthCallback) {
           if (photoUrl) {
             window.__entraUser.photoUrl = photoUrl;
           }
+        }).catch(() => {}).finally(() => {
           mountApp();
         });
       }
