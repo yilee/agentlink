@@ -45,6 +45,10 @@ export function createSidebar(deps) {
   let _fileBrowser = null;
   function setFileBrowser(fb) { _fileBrowser = fb; }
 
+  // Late-binding: set after git module is created
+  let _git = null;
+  function setGit(g) { _git = g; }
+
   // Late-binding callback: called when user switches to a normal chat session
   let _onSwitchToChat = null;
   function setOnSwitchToChat(fn) { _onSwitchToChat = fn; }
@@ -432,9 +436,14 @@ export function createSidebar(deps) {
     _fileBrowser.copyToClipboard(deps.workDir.value);
   }
 
+  function workdirMenuGit() {
+    workdirMenuOpen.value = false;
+    if (_git) _git.openPanel();
+  }
+
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
-    setOnSwitchToChat, setFileBrowser,
+    setOnSwitchToChat, setFileBrowser, setGit,
     deleteSession, confirmDeleteSession, cancelDeleteSession,
     startRename, confirmRename, cancelRename,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
@@ -442,6 +451,6 @@ export function createSidebar(deps) {
     groupedSessions, isSessionProcessing,
     loadWorkdirHistory, addToWorkdirHistory, removeFromWorkdirHistory,
     switchToWorkdir, filteredWorkdirHistory,
-    toggleWorkdirMenu, workdirMenuBrowse, workdirMenuChangeDir, workdirMenuCopyPath,
+    toggleWorkdirMenu, workdirMenuBrowse, workdirMenuChangeDir, workdirMenuCopyPath, workdirMenuGit,
   };
 }

@@ -44,6 +44,8 @@ export function createConnection(deps) {
   function setTeam(t) { team = t; }
   let loop = null;
   function setLoop(l) { loop = l; }
+  let git = null;
+  function setGit(g) { git = g; }
 
   let ws = null;
   let sessionKey = null;
@@ -120,6 +122,7 @@ export function createConnection(deps) {
     get filePreview() { return filePreview; },     // late-bound
     get team() { return team; },                   // late-bound
     get loop() { return loop; },                   // late-bound
+    get git() { return git; },                     // late-bound
   };
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
@@ -468,5 +471,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }
