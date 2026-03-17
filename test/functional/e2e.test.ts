@@ -128,7 +128,7 @@ describe('Functional: Web UI', () => {
     try {
       await page.goto(BASE_URL);
       const title = await page.title();
-      expect(title.toLowerCase()).toContain('agentlink');
+      expect(title.toLowerCase()).toContain('agenticworker');
     } finally {
       await page.close();
     }
@@ -819,9 +819,9 @@ describe('Functional: File Browser Panel', () => {
         return document.querySelectorAll('.file-tree-item').length === 2;
       }, { timeout: 5000 });
 
-      // Click on a file (not a folder) to open context menu
+      // Right-click on a file (not a folder) to open context menu
       const firstFile = page.locator('.file-tree-item').first();
-      await firstFile.click();
+      await firstFile.click({ button: 'right' });
 
       // Context menu should appear
       await page.waitForSelector('.file-context-menu', { timeout: 3000 });
@@ -856,8 +856,8 @@ describe('Functional: File Browser Panel', () => {
         return document.querySelectorAll('.file-tree-item').length === 1;
       }, { timeout: 5000 });
 
-      // Click on file to open context menu
-      await page.click('.file-tree-item');
+      // Right-click on file to open context menu
+      await page.click('.file-tree-item', { button: 'right' });
       await page.waitForSelector('.file-context-menu', { timeout: 3000 });
 
       // Click "Ask Claude to read"
@@ -1150,7 +1150,7 @@ describe('Functional: Workdir Dropdown Menu', () => {
     }
   });
 
-  it('shows three menu items: Browse files, Change directory, Copy path', async () => {
+  it('shows four menu items: Browse files, Change directory, Copy path, Memory', async () => {
     const { agent, page } = await setupFileBrowserTest('MenuItemsAgent', '/items-test');
     try {
       await page.click('.sidebar-workdir-path-row');
@@ -1158,7 +1158,7 @@ describe('Functional: Workdir Dropdown Menu', () => {
 
       const items = await page.locator('.workdir-menu-item').allTextContents();
       const trimmed = items.map(t => t.trim());
-      expect(trimmed).toEqual(['Browse files', 'Change directory', 'Copy path']);
+      expect(trimmed).toEqual(['Browse files', 'Change directory', 'Copy path', 'Memory']);
     } finally {
       await page.close();
       agent.ws.close();

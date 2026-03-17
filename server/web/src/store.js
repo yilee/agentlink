@@ -353,14 +353,14 @@ export function createStore() {
     wsSend, workDir,
     memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
     memoryEditing, memoryEditContent, memorySaving,
-    previewFile: filePreview.previewFile, filePreview,
+    previewFile, filePreview,
     isMobile, sidebarView, workdirMenuOpen, filePanelOpen, t,
   });
   setFilePreview(filePreview);
 
   const isMemoryPreview = computed(() => {
-    if (!filePreview.previewFile.value?.filePath || !memoryDir.value) return false;
-    const fp = filePreview.previewFile.value.filePath.replace(/\\/g, '/');
+    if (!previewFile.value?.filePath || !memoryDir.value) return false;
+    const fp = previewFile.value.filePath.replace(/\\/g, '/');
     const md = memoryDir.value.replace(/\\/g, '/');
     return fp.startsWith(md);
   });
