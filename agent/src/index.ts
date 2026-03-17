@@ -27,7 +27,7 @@ export async function start(config: AgentConfig, daemon = false, pidFile?: strin
 
   try {
     const sessionId = await connect(config);
-    const sessionUrl = `${httpBase}/s/${sessionId}`;
+    const sessionUrl = `${httpBase}/${config.entra ? 'ms' : 's'}/${sessionId}`;
 
     // Persist runtime state so `agentlink status` can read it
     saveRuntimeState({

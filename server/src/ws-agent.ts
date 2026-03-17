@@ -16,6 +16,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   const hostname = url.searchParams.get('hostname') || '';
   const version = url.searchParams.get('version') || '';
   const password = url.searchParams.get('password') || '';
+  const entra = url.searchParams.get('entra') === '1';
 
   // Hash password if provided (agent sends plaintext over WSS)
   let passwordHash: string | null = null;
@@ -47,6 +48,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     isAlive: true,
     passwordHash,
     passwordSalt,
+    entra,
   };
 
   sessions.registerAgent(agentId, agent);

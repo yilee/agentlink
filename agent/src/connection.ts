@@ -154,7 +154,7 @@ function doConnect(
           saveRuntimeState({
             ...prev,
             sessionId: newSessionId,
-            sessionUrl: `${httpBase}/s/${newSessionId}`,
+            sessionUrl: `${httpBase}/${state.config?.entra ? 'ms' : 's'}/${newSessionId}`,
           });
         }
       }
@@ -226,6 +226,10 @@ function buildWsUrl(config: AgentConfig): string {
   // Send password if configured (server will hash it)
   if (config.password) {
     params.set('password', config.password);
+  }
+  // Send entra flag if enabled
+  if (config.entra) {
+    params.set('entra', '1');
   }
   return `${base}/?${params}`;
 }

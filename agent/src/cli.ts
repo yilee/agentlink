@@ -41,6 +41,7 @@ program
   .option('--auto-update', 'Enable automatic update checks (disabled by default)')
   .option('--ephemeral', 'Skip writing runtime state (for running alongside a daemon)')
   .option('--pid-file <path>', 'Write PID and session URL to a file (for test harness)')
+  .option('--entra', 'Require Microsoft Entra ID login (generates /ms/ URL)')
   .action(async (options) => {
     // Only persist config values the user explicitly passed on the CLI.
     // Don't touch existing config.json values when flags are omitted —

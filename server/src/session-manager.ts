@@ -14,6 +14,7 @@ export interface AgentSession {
   isAlive: boolean;
   passwordHash: string | null;
   passwordSalt: string | null;
+  entra: boolean;
 }
 
 export interface WebClient {

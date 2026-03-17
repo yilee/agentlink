@@ -65,7 +65,12 @@ export async function waitForServer(port: number, maxMs = 8000): Promise<void> {
 export function startServer(port: number): ChildProcess {
   return spawn(process.execPath, [SERVER_SCRIPT], {
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PORT: String(port) },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      ENTRA_CLIENT_ID: process.env.ENTRA_CLIENT_ID || 'test-client-id',
+      ENTRA_TENANT_ID: process.env.ENTRA_TENANT_ID || 'test-tenant-id',
+    },
   });
 }
 

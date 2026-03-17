@@ -1,5 +1,5 @@
 <script setup>
-import { inject } from 'vue';
+import { inject, ref } from 'vue';
 
 const store = inject('store');
 const sidebar = inject('sidebar');
@@ -18,6 +18,8 @@ const {
 } = store;
 
 const { toggleSidebar } = sidebar;
+
+const entraPhotoUrl = ref(window.__entraUser?.photoUrl || null);
 </script>
 
 <template>
@@ -31,7 +33,10 @@ const { toggleSidebar } = sidebar;
         <div class="top-bar-info">
           <span :class="['badge', status.toLowerCase()]">{{ displayStatus }}</span>
           <span v-if="latency !== null && status === 'Connected'" class="latency" :class="{ good: latency < 100, ok: latency >= 100 && latency < 500, bad: latency >= 500 }">{{ latency }}ms</span>
-          <span v-if="agentName" class="agent-label">{{ agentName }}</span>
+          <span v-if="agentName" class="agent-label">
+            <img v-if="entraPhotoUrl" :src="entraPhotoUrl" class="user-avatar" alt="" />
+            {{ agentName }}
+          </span>
           <div class="team-mode-toggle">
             <button :class="['team-mode-btn', { active: viewMode === 'chat' }]" @click="viewMode = 'chat'">{{ t('header.chat') }}</button>
             <button :class="['team-mode-btn', { active: viewMode === 'team' }]" @click="viewMode = 'team'">{{ t('header.team') }}</button>
