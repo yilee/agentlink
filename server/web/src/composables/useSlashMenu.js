@@ -137,7 +137,7 @@ export function useSlashMenu({ inputText, inputRef, brainMode }) {
     if (cmd.category) return; // Can't select category headers
     slashMenuOpen.value = false;
     slashMenuDismissed.value = true;
-    inputText.value = cmd.command + (cmd.isPrefix ? ' ' : '');
+    inputText.value = cmd.command + ' ';
     nextTick(() => inputRef.value?.focus());
   }
 
