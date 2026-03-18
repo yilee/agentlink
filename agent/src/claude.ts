@@ -293,7 +293,7 @@ export function handleChat(
   if (!existing || !existing.inputStream) {
     // If the process exited but we still know the session ID, resume it
     const sessionToResume = options?.resumeSessionId || existing?.claudeSessionId || existing?.lastClaudeSessionId || undefined;
-    startQuery(convId, workDir, sessionToResume);
+    startQuery(convId, workDir, sessionToResume, options?.brainMode);
   }
 
   const state = conversations.get(convId)!;
@@ -419,7 +419,7 @@ export async function handleBtwQuestion(
   ];
 
   const { command, prefixArgs, spawnOpts } = conv?.brainMode
-    ? { command: 'brain', prefixArgs: [] as string[], spawnOpts: {} }
+    ? { command: 'brain', prefixArgs: [] as string[], spawnOpts: { shell: true } }
     : resolveClaudeCommand();
   const env = getCleanEnv();
 
@@ -648,7 +648,7 @@ function processFilesForClaude(files: ChatFile[], workDir: string, prompt: strin
   return content;
 }
 
-function startQuery(conversationId: string, workDir: string, resumeSessionId?: string): void {
+function startQuery(conversationId: string, workDir: string, resumeSessionId?: string, brainMode?: boolean): void {
   // Tear down previous process for THIS conversation only (not others)
   const existing = conversations.get(conversationId);
   console.log(`[Claude:${conversationId.slice(0, 8)}] startQuery: existing=${!!existing}, existing.planMode=${existing?.planMode}`);
@@ -680,7 +680,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     isCompacting: false,
     createdAt: Date.now(),
     planMode: existing?.planMode || false,
-    brainMode: existing?.brainMode || false,
+    brainMode: brainMode || existing?.brainMode || false,
   };
 
   conversations.set(conversationId, state);
@@ -709,7 +709,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
   }
 
   const { command, prefixArgs, spawnOpts } = state.brainMode
-    ? { command: 'brain', prefixArgs: [] as string[], spawnOpts: {} }
+    ? { command: 'brain', prefixArgs: [] as string[], spawnOpts: { shell: true } }
     : resolveClaudeCommand();
   const env = getCleanEnv();
 
