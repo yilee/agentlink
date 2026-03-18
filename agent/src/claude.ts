@@ -272,7 +272,6 @@ export function clearSessionId(conversationId?: string): void {
 /** Options for handleChat() */
 export interface HandleChatOptions {
   resumeSessionId?: string;
-  extraArgs?: string[];
   brainMode?: boolean;
 }
 
@@ -280,7 +279,6 @@ export interface HandleChatOptions {
  * Handle a chat message from the web client.
  * Lazily starts the Claude process on the first message.
  * If resumeSessionId is provided, resumes that Claude session.
- * If extraArgs is provided, they are appended to the Claude CLI args on spawn.
  */
 export function handleChat(
   conversationId: string | undefined,
@@ -295,7 +293,7 @@ export function handleChat(
   if (!existing || !existing.inputStream) {
     // If the process exited but we still know the session ID, resume it
     const sessionToResume = options?.resumeSessionId || existing?.claudeSessionId || existing?.lastClaudeSessionId || undefined;
-    startQuery(convId, workDir, sessionToResume, options?.extraArgs);
+    startQuery(convId, workDir, sessionToResume, options?.brainMode);
   }
 
   const state = conversations.get(convId)!;
@@ -420,7 +418,9 @@ export async function handleBtwQuestion(
     '--verbose',
   ];
 
-  const { command, prefixArgs, spawnOpts } = resolveClaudeCommand();
+  const { command, prefixArgs, spawnOpts } = conv?.brainMode
+    ? { command: 'brain', prefixArgs: [] as string[], spawnOpts: { shell: true } }
+    : resolveClaudeCommand();
   const env = getCleanEnv();
 
   console.log(`[Claude:btw] Spawning side question (session ${sessionId.slice(0, 8)}): ${question.substring(0, 80)}`);
@@ -648,7 +648,7 @@ function processFilesForClaude(files: ChatFile[], workDir: string, prompt: strin
   return content;
 }
 
-function startQuery(conversationId: string, workDir: string, resumeSessionId?: string, extraArgs?: string[]): void {
+function startQuery(conversationId: string, workDir: string, resumeSessionId?: string, brainMode?: boolean): void {
   // Tear down previous process for THIS conversation only (not others)
   const existing = conversations.get(conversationId);
   console.log(`[Claude:${conversationId.slice(0, 8)}] startQuery: existing=${!!existing}, existing.planMode=${existing?.planMode}`);
@@ -680,7 +680,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     isCompacting: false,
     createdAt: Date.now(),
     planMode: existing?.planMode || false,
-    brainMode: existing?.brainMode || false,
+    brainMode: brainMode || existing?.brainMode || false,
   };
 
   conversations.set(conversationId, state);
@@ -708,12 +708,9 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     console.log(`[Claude:${conversationId.slice(0, 8)}] Resuming session: ${resumeSessionId}`);
   }
 
-  if (extraArgs && extraArgs.length > 0) {
-    args.push(...extraArgs);
-    console.log(`[Claude:${conversationId.slice(0, 8)}] Extra args: ${extraArgs.join(' ')}`);
-  }
-
-  const { command, prefixArgs, spawnOpts } = resolveClaudeCommand();
+  const { command, prefixArgs, spawnOpts } = state.brainMode
+    ? { command: 'brain', prefixArgs: [] as string[], spawnOpts: { shell: true } }
+    : resolveClaudeCommand();
   const env = getCleanEnv();
 
   console.log(`[Claude:${conversationId.slice(0, 8)}] Spawning: ${command} ${[...prefixArgs, ...args].join(' ')}`);
