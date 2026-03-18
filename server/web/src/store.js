@@ -121,6 +121,10 @@ export function createStore() {
   const planMode = ref(false);
   const pendingPlanMode = ref(null);
 
+  // Brain mode state (per-conversation, locks after first message)
+  const brainMode = ref(false);
+  const brainModeLocked = ref(false);
+
   // File browser state
   const filePanelOpen = ref(false);
   const filePanelWidth = ref(parseInt(localStorage.getItem('agentlink-file-panel-width'), 10) || 280);
@@ -184,6 +188,8 @@ export function createStore() {
         queuedMessages: queuedMessages.value,
         usageStats: usageStats.value,
         planMode: planMode.value,
+        brainMode: brainMode.value,
+        brainModeLocked: brainModeLocked.value,
       };
     }
 
@@ -203,6 +209,8 @@ export function createStore() {
       queuedMessages.value = cached.queuedMessages || [];
       usageStats.value = cached.usageStats || null;
       planMode.value = cached.planMode || false;
+      brainMode.value = cached.brainMode || false;
+      brainModeLocked.value = cached.brainModeLocked || false;
     } else {
       // New blank conversation
       messages.value = [];
@@ -219,6 +227,8 @@ export function createStore() {
       queuedMessages.value = [];
       usageStats.value = null;
       planMode.value = false;
+      brainMode.value = false;
+      brainModeLocked.value = false;
     }
 
     currentConversationId.value = newConvId;
@@ -254,12 +264,10 @@ export function createStore() {
   const { scheduleHighlight, cleanup: cleanupHighlight } = createHighlightScheduler();
 
   // ── Slash command menu ──
-  // sendMessage defined later, resolve via forwarding
-  let _sendMessage = () => {};
   const {
     slashMenuIndex, slashMenuOpen, slashMenuVisible, filteredSlashCommands,
     selectSlashCommand, openSlashMenu, handleSlashMenuKeydown,
-  } = useSlashMenu({ inputText, inputRef, sendMessage: () => _sendMessage() });
+  } = useSlashMenu({ inputText, inputRef, brainMode });
 
   // ── Create module instances ──
 
@@ -307,6 +315,8 @@ export function createStore() {
     btwState, btwPending,
     // Plan mode
     setPlanMode,
+    // Brain mode
+    setBrainMode,
     // i18n
     t,
   });
@@ -454,6 +464,9 @@ export function createStore() {
     }));
 
     const payload = { type: 'chat', prompt: text || '(see attached files)' };
+    if (brainMode.value) {
+      payload.brainMode = true;
+    }
     if (currentConversationId.value) {
       payload.conversationId = currentConversationId.value;
     }
@@ -488,7 +501,6 @@ export function createStore() {
     scrollToBottom(true);
     attachments.value = [];
   }
-  _sendMessage = sendMessage;
 
   function cancelExecution() {
     if (!isProcessing.value) return;
@@ -547,6 +559,26 @@ export function createStore() {
     planMode.value = enabled;
     pendingPlanMode.value = null;
   }
+
+  // ── Brain mode ──
+  function isSessionBrainMode(claudeSessionId) {
+    if (!claudeSessionId) return false;
+    return !!historySessions.value.find(s => s.sessionId === claudeSessionId)?.brainMode;
+  }
+
+  function setBrainMode(enabled) {
+    brainMode.value = enabled;
+    brainModeLocked.value = enabled;
+  }
+
+  function toggleBrainMode() {
+    if (brainModeLocked.value) return;
+    brainMode.value = true;
+    brainModeLocked.value = true;
+  }
+
+  // Hide brain button for resumed non-brain sessions
+  const showBrainButton = computed(() => brainMode.value || !currentClaudeSessionId.value);
 
   function handleKeydown(e) {
     // Slash menu key handling (must come before btw overlay so Escape closes menu first)
@@ -667,6 +699,7 @@ export function createStore() {
     // Sidebar collapse states
     teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
     formatRelativeTime: (ts) => formatRelativeTime(ts, t),
+    isSessionBrainMode,
   };
   const _files = {
     fileBrowser, filePreview,
@@ -706,6 +739,8 @@ export function createStore() {
     onMessageListScroll, autoResize,
     // Plan mode
     planMode, pendingPlanMode, togglePlanMode,
+    // Brain mode
+    brainMode, brainModeLocked, toggleBrainMode, showBrainButton,
     // Side question (/btw)
     btwState, btwPending, dismissBtw,
     // Message rendering helpers

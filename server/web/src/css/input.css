@@ -8,6 +8,8 @@
 
 .slash-menu {
   max-width: 768px;
+  max-height: 400px;
+  overflow-y: auto;
   margin: 0 auto 4px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -34,7 +36,7 @@
   color: var(--accent);
   font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
   font-size: 0.9rem;
-  min-width: 90px;
+  min-width: 120px;
 }
 
 .slash-menu-desc {
@@ -662,6 +664,78 @@
 /* ── Input card plan mode accent ── */
 .input-card.plan-mode {
   border-top: 2px solid var(--plan-mode);
+}
+
+/* ── Brain Mode toggle button ── */
+.brain-mode-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.brain-mode-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+}
+
+.brain-mode-btn.active {
+  color: var(--brain-mode);
+  background: var(--brain-mode-bg);
+  border-color: var(--brain-mode);
+}
+
+.brain-mode-btn.active:hover:not(:disabled) {
+  background: rgba(155, 109, 215, 0.18);
+}
+
+.brain-mode-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.brain-mode-btn.locked {
+  opacity: 0.5;
+}
+
+.brain-mode-btn svg {
+  flex-shrink: 0;
+}
+
+/* ── Input card brain mode accent ── */
+.input-card.brain-mode {
+  border-top: 2px solid var(--brain-mode);
+}
+
+/* ── Slash menu category headers ── */
+.slash-menu-category {
+  padding: 6px 12px 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  pointer-events: none;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+
+.slash-menu-category:first-child {
+  border-top: none;
+  margin-top: 0;
 }
 
 /* ── Sidebar backdrop (mobile overlay) ── */
