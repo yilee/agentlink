@@ -86,5 +86,17 @@ export function createFeatureHandlers(deps) {
     git_diff_result(msg) {
       if (deps.git) deps.git.handleGitDiff(msg);
     },
+    git_stage_result(msg) {
+      if (deps.git) deps.git.handleGitWriteResult(msg);
+    },
+    git_unstage_result(msg) {
+      if (deps.git) deps.git.handleGitWriteResult(msg);
+    },
+    git_discard_result(msg) {
+      if (deps.git) deps.git.handleGitWriteResult(msg);
+    },
+    git_commit_result(msg) {
+      if (deps.git) deps.git.handleGitCommitResult(msg);
+    },
   };
 }

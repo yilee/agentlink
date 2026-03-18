@@ -73,20 +73,6 @@
   transform: rotate(90deg);
 }
 
-.git-file-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px 3px 24px;
-  font-size: 0.8rem;
-  font-family: var(--font-mono, 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace);
-  cursor: pointer;
-}
-
-.git-file-item:hover {
-  background: var(--bg-tertiary);
-}
-
 .git-status-icon {
   flex-shrink: 0;
   width: 14px;
@@ -238,4 +224,200 @@
   text-align: center;
   color: var(--text-secondary);
   font-size: 0.85rem;
+}
+
+/* ── File item action buttons ── */
+
+.git-file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 24px;
+  font-size: 0.8rem;
+  font-family: var(--font-mono, 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace);
+  cursor: pointer;
+  position: relative;
+}
+
+.git-file-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.git-file-actions {
+  display: none;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.git-file-item:hover .git-file-actions {
+  display: flex;
+}
+
+.git-group-label {
+  flex: 1;
+}
+
+.git-group-actions {
+  display: none;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.git-group-header:hover .git-group-actions {
+  display: flex;
+}
+
+.git-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+}
+
+.git-action-btn:hover {
+  background: var(--bg-secondary);
+}
+
+.git-action-stage:hover {
+  color: #3fb950;
+}
+
+.git-action-unstage:hover {
+  color: #e5a50a;
+}
+
+.git-action-discard:hover {
+  color: #f85149;
+}
+
+/* ── Commit section ── */
+
+.git-commit-section {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.git-commit-input {
+  width: 100%;
+  background: var(--bg-secondary, var(--bg-primary));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono, 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace);
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  resize: vertical;
+  min-height: 2.5em;
+  box-sizing: border-box;
+}
+
+.git-commit-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.git-commit-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.git-commit-btn {
+  margin-top: 6px;
+  width: 100%;
+  padding: 5px 12px;
+  background: var(--accent, #58a6ff);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.git-commit-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.git-commit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Discard confirmation dialog ── */
+
+.git-discard-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.git-discard-dialog {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  max-width: 260px;
+  width: 90%;
+}
+
+.git-discard-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.git-discard-message {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.git-discard-message strong {
+  color: var(--text-primary);
+}
+
+.git-discard-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.git-discard-cancel,
+.git-discard-confirm {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+
+.git-discard-cancel {
+  background: var(--bg-secondary, var(--bg-primary));
+  color: var(--text-primary);
+}
+
+.git-discard-cancel:hover {
+  background: var(--bg-tertiary);
+}
+
+.git-discard-confirm {
+  background: #f85149;
+  color: #fff;
+  border-color: #f85149;
+}
+
+.git-discard-confirm:hover {
+  opacity: 0.9;
 }
