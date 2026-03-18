@@ -11,7 +11,7 @@ export function createMemory(deps) {
     memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
     memoryEditing, memoryEditContent, memorySaving,
     previewFile, filePreview, isMobile, sidebarView,
-    workdirMenuOpen, filePanelOpen, t,
+    workdirMenuOpen, filePanelOpen, gitPanelOpen, t,
   } = deps;
 
   function workdirMenuMemory() {
@@ -20,7 +20,10 @@ export function createMemory(deps) {
       sidebarView.value = 'memory';
     } else {
       memoryPanelOpen.value = !memoryPanelOpen.value;
-      if (memoryPanelOpen.value) filePanelOpen.value = false;
+      if (memoryPanelOpen.value) {
+        filePanelOpen.value = false;
+        gitPanelOpen.value = false;
+      }
     }
     if (!memoryFiles.value.length) {
       memoryLoading.value = true;

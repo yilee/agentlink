@@ -32,7 +32,7 @@ export function createSidebar(deps) {
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
     hostname, workdirHistory, workdirSwitching,
-    workdirMenuOpen, memoryPanelOpen, filePanelOpen,
+    workdirMenuOpen, memoryPanelOpen, filePanelOpen, gitPanelOpen,
     isMobile, sidebarView,
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations, activeClaudeSessions,
@@ -423,7 +423,7 @@ export function createSidebar(deps) {
   function workdirMenuBrowse() {
     workdirMenuOpen.value = false;
     if (isMobile.value) { sidebarView.value = 'files'; _fileBrowser.openPanel(); }
-    else { memoryPanelOpen.value = false; _fileBrowser.togglePanel(); }
+    else { memoryPanelOpen.value = false; gitPanelOpen.value = false; _fileBrowser.togglePanel(); }
   }
 
   function workdirMenuChangeDir() {

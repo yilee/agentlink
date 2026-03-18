@@ -293,7 +293,7 @@ export function createStore() {
     deleteConfirmOpen, deleteConfirmTitle,
     renamingSessionId, renameText,
     hostname, workdirHistory, workdirSwitching,
-    workdirMenuOpen, memoryPanelOpen, filePanelOpen,
+    workdirMenuOpen, memoryPanelOpen, filePanelOpen, gitPanelOpen,
     isMobile, sidebarView,
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations, activeClaudeSessions,
@@ -372,7 +372,7 @@ export function createStore() {
     memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
     memoryEditing, memoryEditContent, memorySaving,
     previewFile, filePreview,
-    isMobile, sidebarView, workdirMenuOpen, filePanelOpen, t,
+    isMobile, sidebarView, workdirMenuOpen, filePanelOpen, gitPanelOpen, t,
   });
   setFilePreview(filePreview);
 
