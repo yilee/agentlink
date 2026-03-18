@@ -19,6 +19,8 @@ const BRAIN_COMMANDS = [
   { command: '/brain-query', desc: 'Query messages with filters' },
   { command: '/search-brain', desc: 'Full-text search across all data' },
   { command: '/brain-status', desc: 'Data coverage status' },
+  { command: '/brain-inbox-v3', desc: 'Retrieve Teams messages, docs, PRs with cross-refs' },
+  { command: '/smartrepo-ask', desc: 'Query SmartRepo with Brain context' },
   // Reports
   { category: 'Reports' },
   { command: '/daily-briefing', desc: 'Generate daily activity summary' },
@@ -32,7 +34,14 @@ const BRAIN_COMMANDS = [
   // Dev Tools
   { category: 'Dev Tools' },
   { command: '/azure-devops', desc: 'ADO PRs, work items, code search' },
+  { command: '/ado-artifacts', desc: 'Download ADO build artifacts & drops' },
   { command: '/sharepoint', desc: 'SharePoint/OneDrive file access' },
+  { command: '/aml-job-graph', desc: 'Analyze Azure ML job graphs' },
+  { command: '/browser-scraper', desc: 'Scrape authenticated internal pages' },
+  // Data Tools
+  { category: 'Data Tools' },
+  { command: '/cosmos-wiki', desc: 'SCOPE language reference & best practices' },
+  { command: '/scope', desc: 'Cosmos data operations & SCOPE jobs' },
   // Output
   { category: 'Output' },
   { command: '/ppt-gen', desc: 'Generate PowerPoint presentations' },
