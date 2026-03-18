@@ -25,6 +25,15 @@
 </head>
 <body>
   <div id="app"></div>
+  <script>
+    // Show loading spinner for Entra-protected routes while auth initializes
+    if (window.location.pathname.startsWith('/ms/') || window.location.pathname === '/auth/callback') {
+      document.getElementById('app').innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100vh">' +
+        '<div style="width:32px;height:32px;border:3px solid rgba(128,128,128,0.2);border-top-color:rgba(128,128,128,0.7);border-radius:50%;animation:spin .8s linear infinite"></div>' +
+        '</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+    }
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

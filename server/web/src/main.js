@@ -38,13 +38,15 @@ if (isProtectedRoute || isAuthCallback) {
       } else {
         // Extract first name from account.name (e.g. "Kailun Shi" → "Kailun")
         window.__entraUser = { firstName: (account.name || '').split(' ')[0] || account.username };
+        // Mount app immediately — don't block on photo fetch
+        mountApp();
+        // Load photo in background
         getUserPhoto().then((photoUrl) => {
           if (photoUrl) {
             window.__entraUser.photoUrl = photoUrl;
+            window.dispatchEvent(new CustomEvent('entra-photo-ready', { detail: photoUrl }));
           }
-        }).catch(() => {}).finally(() => {
-          mountApp();
-        });
+        }).catch(() => {});
       }
     });
   });

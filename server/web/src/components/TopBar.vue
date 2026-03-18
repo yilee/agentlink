@@ -1,5 +1,5 @@
 <script setup>
-import { inject, ref } from 'vue';
+import { inject, ref, onMounted, onUnmounted } from 'vue';
 
 const store = inject('store');
 const sidebar = inject('sidebar');
@@ -20,6 +20,9 @@ const {
 const { toggleSidebar } = sidebar;
 
 const entraPhotoUrl = ref(window.__entraUser?.photoUrl || null);
+const onPhotoReady = (e) => { entraPhotoUrl.value = e.detail; };
+onMounted(() => window.addEventListener('entra-photo-ready', onPhotoReady));
+onUnmounted(() => window.removeEventListener('entra-photo-ready', onPhotoReady));
 </script>
 
 <template>
