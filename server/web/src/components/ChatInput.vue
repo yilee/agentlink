@@ -7,6 +7,10 @@ const {
   viewMode,
   inputText,
   planMode,
+  brainMode,
+  brainModeLocked,
+  toggleBrainMode,
+  showBrainButton,
   slashMenuVisible,
   t,
   sendMessage,
@@ -40,6 +44,15 @@ const {
   fileInputRef,
   inputRef
 } = store;
+
+/** Track which items are selectable (not category headers) for index mapping */
+function selectableIndex(cmd, i) {
+  let si = 0;
+  for (let j = 0; j < i; j++) {
+    if (!filteredSlashCommands.value[j].category) si++;
+  }
+  return si;
+}
 </script>
 
 <template>
@@ -65,16 +78,19 @@ const {
             </div>
             <div v-if="usageStats" class="usage-bar">{{ formatUsage(usageStats) }}</div>
             <div v-if="slashMenuVisible && filteredSlashCommands.length > 0" class="slash-menu">
-              <div v-for="(cmd, i) in filteredSlashCommands" :key="cmd.command"
-                   :class="['slash-menu-item', { active: i === slashMenuIndex }]"
-                   @mouseenter="slashMenuIndex = i"
-                   @click="selectSlashCommand(cmd)">
-                <span class="slash-menu-cmd">{{ cmd.command }}</span>
-                <span class="slash-menu-desc">{{ t(cmd.descKey) }}</span>
-              </div>
+              <template v-for="(cmd, i) in filteredSlashCommands" :key="cmd.command || cmd.category">
+                <div v-if="cmd.category" class="slash-menu-category">{{ cmd.category }}</div>
+                <div v-else
+                     :class="['slash-menu-item', { active: selectableIndex(cmd, i) === slashMenuIndex }]"
+                     @mouseenter="slashMenuIndex = selectableIndex(cmd, i)"
+                     @click="selectSlashCommand(cmd)">
+                  <span class="slash-menu-cmd">{{ cmd.command }}</span>
+                  <span class="slash-menu-desc">{{ cmd.descKey ? t(cmd.descKey) : cmd.desc }}</span>
+                </div>
+              </template>
             </div>
             <div
-              :class="['input-card', { 'drag-over': dragOver, 'plan-mode': planMode }]"
+              :class="['input-card', { 'drag-over': dragOver, 'plan-mode': planMode, 'brain-mode': brainMode }]"
               @dragover="handleDragOver"
               @dragleave="handleDragLeave"
               @drop="handleDrop"
@@ -113,6 +129,10 @@ const {
                   <button :class="['plan-mode-btn', { active: planMode }]" @click="togglePlanMode" :disabled="isProcessing" :title="planMode ? 'Switch to Normal Mode' : 'Switch to Plan Mode'">
                     <svg viewBox="0 0 24 24" width="12" height="12"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
                     Plan
+                  </button>
+                  <button v-if="showBrainButton" :class="['brain-mode-btn', { active: brainMode, locked: brainModeLocked }]" @click="toggleBrainMode" :disabled="brainModeLocked" :title="brainMode ? 'Brain Mode (active)' : 'Enable Brain Mode'">
+                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M12 2C9.24 2 7 4.24 7 7c0 1.38.56 2.63 1.46 3.54.08.08.14.18.14.29v1.67c0 .28.22.5.5.5h5.8c.28 0 .5-.22.5-.5v-1.67c0-.11.06-.21.14-.29A4.98 4.98 0 0 0 17 7c0-2.76-2.24-5-5-5zM9.5 14h5v1h-5v-1zm0 2h5v1h-5v-1zm1.25 3h2.5l-.25 1h-2l-.25-1z"/></svg>
+                    Brain
                   </button>
                 </div>
                 <button v-if="isProcessing && !hasInput" @click="cancelExecution" class="send-btn stop-btn" :title="t('input.stopGeneration')">

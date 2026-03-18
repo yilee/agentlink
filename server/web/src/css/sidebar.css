@@ -314,6 +314,12 @@
   opacity: 0.7;
 }
 
+.session-brain-icon {
+  flex-shrink: 0;
+  color: var(--brain-mode);
+  opacity: 0.8;
+}
+
 /* Processing indicator: pulsing dot before session title */
 .session-item.processing .session-title::before {
   content: '';

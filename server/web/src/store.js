@@ -121,6 +121,10 @@ export function createStore() {
   const planMode = ref(false);
   const pendingPlanMode = ref(null);
 
+  // Brain mode state (per-conversation, locks after first message)
+  const brainMode = ref(false);
+  const brainModeLocked = ref(false);
+
   // File browser state
   const filePanelOpen = ref(false);
   const filePanelWidth = ref(parseInt(localStorage.getItem('agentlink-file-panel-width'), 10) || 280);
@@ -184,6 +188,8 @@ export function createStore() {
         queuedMessages: queuedMessages.value,
         usageStats: usageStats.value,
         planMode: planMode.value,
+        brainMode: brainMode.value,
+        brainModeLocked: brainModeLocked.value,
       };
     }
 
@@ -203,6 +209,8 @@ export function createStore() {
       queuedMessages.value = cached.queuedMessages || [];
       usageStats.value = cached.usageStats || null;
       planMode.value = cached.planMode || false;
+      brainMode.value = cached.brainMode || false;
+      brainModeLocked.value = cached.brainModeLocked || false;
     } else {
       // New blank conversation
       messages.value = [];
@@ -219,6 +227,8 @@ export function createStore() {
       queuedMessages.value = [];
       usageStats.value = null;
       planMode.value = false;
+      brainMode.value = false;
+      brainModeLocked.value = false;
     }
 
     currentConversationId.value = newConvId;
@@ -259,7 +269,7 @@ export function createStore() {
   const {
     slashMenuIndex, slashMenuOpen, slashMenuVisible, filteredSlashCommands,
     selectSlashCommand, openSlashMenu, handleSlashMenuKeydown,
-  } = useSlashMenu({ inputText, inputRef, sendMessage: () => _sendMessage() });
+  } = useSlashMenu({ inputText, inputRef, sendMessage: () => _sendMessage(), brainMode });
 
   // ── Create module instances ──
 
@@ -454,6 +464,9 @@ export function createStore() {
     }));
 
     const payload = { type: 'chat', prompt: text || '(see attached files)' };
+    if (brainMode.value) {
+      payload.brainMode = true;
+    }
     if (currentConversationId.value) {
       payload.conversationId = currentConversationId.value;
     }
@@ -547,6 +560,43 @@ export function createStore() {
     planMode.value = enabled;
     pendingPlanMode.value = null;
   }
+
+  // ── Brain mode ──
+  const BRAIN_SESSIONS_KEY = 'agentlink-brain-sessions';
+
+  function loadBrainSessions() {
+    try { return JSON.parse(localStorage.getItem(BRAIN_SESSIONS_KEY) || '{}'); } catch { return {}; }
+  }
+
+  function markSessionAsBrain(claudeSessionId) {
+    if (!claudeSessionId) return;
+    const map = loadBrainSessions();
+    map[claudeSessionId] = true;
+    localStorage.setItem(BRAIN_SESSIONS_KEY, JSON.stringify(map));
+  }
+
+  function isSessionBrainMode(claudeSessionId) {
+    if (!claudeSessionId) return false;
+    return !!loadBrainSessions()[claudeSessionId];
+  }
+
+  // Persist brain flag when claudeSessionId becomes known, and restore on resume
+  watch(currentClaudeSessionId, (id) => {
+    if (id && brainMode.value) markSessionAsBrain(id);
+    if (id && !brainMode.value && isSessionBrainMode(id)) {
+      brainMode.value = true;
+      brainModeLocked.value = true;
+    }
+  });
+
+  function toggleBrainMode() {
+    if (brainModeLocked.value) return;
+    brainMode.value = true;
+    brainModeLocked.value = true;
+  }
+
+  // Hide brain button for resumed non-brain sessions
+  const showBrainButton = computed(() => brainMode.value || !currentClaudeSessionId.value);
 
   function handleKeydown(e) {
     // Slash menu key handling (must come before btw overlay so Escape closes menu first)
@@ -667,6 +717,7 @@ export function createStore() {
     // Sidebar collapse states
     teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
     formatRelativeTime: (ts) => formatRelativeTime(ts, t),
+    isSessionBrainMode,
   };
   const _files = {
     fileBrowser, filePreview,
@@ -706,6 +757,8 @@ export function createStore() {
     onMessageListScroll, autoResize,
     // Plan mode
     planMode, pendingPlanMode, togglePlanMode,
+    // Brain mode
+    brainMode, brainModeLocked, toggleBrainMode, showBrainButton,
     // Side question (/btw)
     btwState, btwPending, dismissBtw,
     // Message rendering helpers

@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import os from 'os';
+import path from 'path';
 import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
 import { loadRuntimeState, saveRuntimeState } from './config.js';
@@ -261,12 +262,23 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'chat': {
       const chatConvId = (msg as unknown as { conversationId?: string }).conversationId;
       const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
-      console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}`);
+      const isBrainMode = (msg as unknown as { brainMode?: boolean }).brainMode;
+      console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${isBrainMode}`);
+      const chatOptions: { resumeSessionId?: string; extraArgs?: string[] } = {
+        resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
+      };
+      if (isBrainMode) {
+        const brainDir = path.join(os.homedir(), '.brain');
+        chatOptions.extraArgs = [
+          '--add-dir', path.join(brainDir, 'BrainCore'),
+          '--add-dir', path.join(brainDir, 'CoreSkill'),
+        ];
+      }
       claudeHandleChat(
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
         existingConv?.workDir || state.workDir,
-        { resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId },
+        chatOptions,
         (msg as unknown as { files?: ChatFile[] }).files,
       );
       break;
