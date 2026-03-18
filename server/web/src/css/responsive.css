@@ -280,6 +280,12 @@
   .loop-exec-messages {
     max-height: calc(100vh - 160px);
   }
+
+  /* Git panel — always show action buttons (no hover on touch) */
+  .git-file-actions-mobile,
+  .git-group-actions-mobile {
+    display: flex;
+  }
 }
 
 /* ══════════════════════════════════════════

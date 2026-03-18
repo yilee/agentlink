@@ -112,11 +112,20 @@ const {
           <!-- Mobile: file preview view -->
           <div v-else-if="isMobile && sidebarView === 'preview'" class="file-preview-mobile">
             <div class="file-preview-mobile-header">
-              <button class="file-panel-mobile-back" @click="filePreview.closePreview(); memoryEditing = false; fileEditing = false">
+              <button v-if="previewFile?.isDiff" class="file-panel-mobile-back" @click="previewFile = null; sidebarView = 'git'">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                Git
+              </button>
+              <button v-else class="file-panel-mobile-back" @click="filePreview.closePreview(); memoryEditing = false; fileEditing = false">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
                 {{ t('sidebar.files') }}
               </button>
               <div class="preview-header-actions">
+                <template v-if="previewFile?.isDiff">
+                  <span v-if="previewFile.staged" class="diff-status-badge staged">Staged</span>
+                  <span v-else class="diff-status-badge modified">Modified</span>
+                </template>
+                <template v-else>
                 <button v-if="isMemoryPreview && previewFile && !memoryEditing && !fileEditing"
                         class="preview-edit-btn" @click="startMemoryEdit()" :title="t('memory.edit')">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
@@ -149,13 +158,40 @@ const {
                 <button v-if="previewFile && !memoryEditing && !fileEditing" class="preview-refresh-btn" @click="filePreview.refreshPreview()" :title="t('sidebar.refresh')">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </button>
+                </template>
               </div>
             </div>
             <div class="file-preview-mobile-filename" :title="previewFile?.filePath">
               {{ previewFile?.fileName || t('preview.preview') }}
             </div>
             <div class="preview-panel-body">
-              <div v-if="fileEditing" class="memory-edit-container">
+              <!-- Diff view -->
+              <template v-if="previewFile?.isDiff">
+                <div v-if="previewFile.diffLoading" class="file-panel-loading">Loading diff...</div>
+                <div v-else-if="previewFile.error" class="diff-empty-notice">{{ previewFile.error }}</div>
+                <div v-else-if="previewFile.binary" class="diff-binary-notice">Binary file differs</div>
+                <div v-else-if="!previewFile.hunks?.length" class="diff-empty-notice">No changes</div>
+                <div v-else class="diff-container">
+                  <template v-for="(hunk, hi) in previewFile.hunks" :key="hi">
+                    <div class="diff-hunk-header" @click="hunk.collapsed = !hunk.collapsed">
+                      {{ hunk.header }}
+                      <template v-if="hunk.collapsed"> ({{ hunk.lines.length }} lines hidden)</template>
+                    </div>
+                    <template v-if="!hunk.collapsed">
+                      <div v-for="(line, li) in hunk.lines" :key="li"
+                           class="diff-line" :class="'diff-line-' + line.type">
+                        <div class="diff-gutter">
+                          <span class="diff-line-number">{{ line.oldLine ?? '' }}</span>
+                          <span class="diff-line-number">{{ line.newLine ?? '' }}</span>
+                        </div>
+                        <span class="diff-line-content">{{ line.content }}</span>
+                      </div>
+                    </template>
+                  </template>
+                </div>
+              </template>
+              <!-- File editing -->
+              <div v-else-if="fileEditing" class="memory-edit-container">
                 <textarea class="memory-edit-textarea" v-model="fileEditContent"></textarea>
               </div>
               <div v-else-if="memoryEditing" class="memory-edit-container">
@@ -262,7 +298,12 @@ const {
                 <template v-if="git.gitInfo.value.staged?.length">
                   <div class="git-group-header" @click="git.toggleGroup('staged')">
                     <span class="git-group-arrow" :class="{ expanded: git.expandedGroups.value.staged }">&#9654;</span>
-                    <span>Staged ({{ git.gitInfo.value.staged.length }})</span>
+                    <span class="git-group-label">Staged ({{ git.gitInfo.value.staged.length }})</span>
+                    <div class="git-group-actions git-group-actions-mobile" @click.stop>
+                      <button class="git-action-btn git-action-unstage" @click="git.unstageAll(git.gitInfo.value.staged)" title="Unstage All">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13H5v-2h14v2z"/></svg>
+                      </button>
+                    </div>
                   </div>
                   <template v-if="git.expandedGroups.value.staged">
                     <div v-for="entry in git.gitInfo.value.staged" :key="'s-' + entry.path"
@@ -270,6 +311,11 @@ const {
                       <span class="git-status-icon" :class="'git-status-' + entry.status">{{ entry.status }}</span>
                       <span class="git-file-name">{{ entry.path.split('/').pop() }}</span>
                       <span v-if="entry.path.includes('/')" class="git-file-dir">{{ entry.path.split('/').slice(0, -1).join('/') }}</span>
+                      <div class="git-file-actions git-file-actions-mobile" @click.stop>
+                        <button class="git-action-btn git-action-unstage" @click="git.unstageFile(entry.path)" title="Unstage">
+                          <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13H5v-2h14v2z"/></svg>
+                        </button>
+                      </div>
                     </div>
                   </template>
                 </template>
@@ -278,7 +324,12 @@ const {
                 <template v-if="git.gitInfo.value.modified?.length">
                   <div class="git-group-header" @click="git.toggleGroup('modified')">
                     <span class="git-group-arrow" :class="{ expanded: git.expandedGroups.value.modified }">&#9654;</span>
-                    <span>Modified ({{ git.gitInfo.value.modified.length }})</span>
+                    <span class="git-group-label">Modified ({{ git.gitInfo.value.modified.length }})</span>
+                    <div class="git-group-actions git-group-actions-mobile" @click.stop>
+                      <button class="git-action-btn git-action-stage" @click="git.stageAll(git.gitInfo.value.modified)" title="Stage All">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      </button>
+                    </div>
                   </div>
                   <template v-if="git.expandedGroups.value.modified">
                     <div v-for="entry in git.gitInfo.value.modified" :key="'m-' + entry.path"
@@ -286,6 +337,14 @@ const {
                       <span class="git-status-icon" :class="'git-status-' + entry.status">{{ entry.status }}</span>
                       <span class="git-file-name">{{ entry.path.split('/').pop() }}</span>
                       <span v-if="entry.path.includes('/')" class="git-file-dir">{{ entry.path.split('/').slice(0, -1).join('/') }}</span>
+                      <div class="git-file-actions git-file-actions-mobile" @click.stop>
+                        <button class="git-action-btn git-action-stage" @click="git.stageFile(entry.path)" title="Stage">
+                          <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                        </button>
+                        <button class="git-action-btn git-action-discard" @click="git.requestDiscard(entry.path)" title="Discard Changes">
+                          <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+                        </button>
+                      </div>
                     </div>
                   </template>
                 </template>
@@ -294,7 +353,12 @@ const {
                 <template v-if="git.gitInfo.value.untracked?.length">
                   <div class="git-group-header" @click="git.toggleGroup('untracked')">
                     <span class="git-group-arrow" :class="{ expanded: git.expandedGroups.value.untracked }">&#9654;</span>
-                    <span>Untracked ({{ git.gitInfo.value.untracked.length }})</span>
+                    <span class="git-group-label">Untracked ({{ git.gitInfo.value.untracked.length }})</span>
+                    <div class="git-group-actions git-group-actions-mobile" @click.stop>
+                      <button class="git-action-btn git-action-stage" @click="git.stageAll(git.gitInfo.value.untracked)" title="Stage All">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      </button>
+                    </div>
                   </div>
                   <template v-if="git.expandedGroups.value.untracked">
                     <div v-for="entry in git.gitInfo.value.untracked" :key="'u-' + entry.path"
@@ -302,10 +366,49 @@ const {
                       <span class="git-status-icon git-status-U">?</span>
                       <span class="git-file-name">{{ entry.path.split('/').pop() }}</span>
                       <span v-if="entry.path.includes('/')" class="git-file-dir">{{ entry.path.split('/').slice(0, -1).join('/') }}</span>
+                      <div class="git-file-actions git-file-actions-mobile" @click.stop>
+                        <button class="git-action-btn git-action-stage" @click="git.stageFile(entry.path)" title="Stage">
+                          <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                        </button>
+                      </div>
                     </div>
                   </template>
                 </template>
+
+                <!-- Commit section (mobile) -->
+                <div v-if="git.gitInfo.value.staged?.length" class="git-commit-section">
+                  <textarea
+                    class="git-commit-input"
+                    v-model="git.commitMessage.value"
+                    placeholder="Commit message..."
+                    rows="3"
+                    @keydown.ctrl.enter="git.commit()"
+                    @keydown.meta.enter="git.commit()"
+                  ></textarea>
+                  <button
+                    class="git-commit-btn"
+                    :disabled="!git.commitMessage.value.trim() || git.commitInProgress.value"
+                    @click="git.commit()"
+                  >
+                    {{ git.commitInProgress.value ? 'Committing...' : 'Commit' }}
+                  </button>
+                </div>
               </template>
+
+              <!-- Discard confirmation overlay (mobile) -->
+              <div v-if="git.discardConfirmFile.value" class="git-discard-overlay" @click="git.cancelDiscard()">
+                <div class="git-discard-dialog" @click.stop>
+                  <div class="git-discard-title">Discard Changes</div>
+                  <div class="git-discard-message">
+                    Discard changes to <strong>{{ git.discardConfirmFile.value.split('/').pop() }}</strong>?
+                    This cannot be undone.
+                  </div>
+                  <div class="git-discard-actions">
+                    <button class="git-discard-cancel" @click="git.cancelDiscard()">Cancel</button>
+                    <button class="git-discard-confirm" @click="git.confirmDiscard()">Discard</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

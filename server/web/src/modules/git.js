@@ -59,7 +59,11 @@ export function createGit(deps) {
       binary: false,
       error: null,
     };
-    previewPanelOpen.value = true;
+    if (isMobile.value) {
+      sidebarView.value = 'preview';
+    } else {
+      previewPanelOpen.value = true;
+    }
     gitDiffLoading.value = true;
     wsSend({ type: 'git_diff', filePath: entry.path, staged: isStaged });
   }
