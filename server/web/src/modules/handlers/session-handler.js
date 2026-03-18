@@ -5,7 +5,7 @@ export function createSessionHandlers(deps) {
   const {
     messages, isProcessing, isCompacting, streaming, scrollToBottom,
     historySessions, currentClaudeSessionId, loadingHistory,
-    loadingSessions, setPlanMode, t, toolMsgMap,
+    loadingSessions, setPlanMode, setBrainMode, t, toolMsgMap,
   } = deps;
 
   return {
@@ -29,6 +29,10 @@ export function createSessionHandlers(deps) {
       // Detect plan mode from agent-provided flag
       if (msg.planMode != null) {
         if (setPlanMode) setPlanMode(!!msg.planMode);
+      }
+      // Detect brain mode from agent-provided flag
+      if (msg.brainMode != null) {
+        if (setBrainMode) setBrainMode(!!msg.brainMode);
       }
       loadingHistory.value = false;
       // Restore live status from agent (compacting / processing)

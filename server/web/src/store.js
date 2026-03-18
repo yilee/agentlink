@@ -264,12 +264,10 @@ export function createStore() {
   const { scheduleHighlight, cleanup: cleanupHighlight } = createHighlightScheduler();
 
   // ── Slash command menu ──
-  // sendMessage defined later, resolve via forwarding
-  let _sendMessage = () => {};
   const {
     slashMenuIndex, slashMenuOpen, slashMenuVisible, filteredSlashCommands,
     selectSlashCommand, openSlashMenu, handleSlashMenuKeydown,
-  } = useSlashMenu({ inputText, inputRef, sendMessage: () => _sendMessage(), brainMode });
+  } = useSlashMenu({ inputText, inputRef, brainMode });
 
   // ── Create module instances ──
 
@@ -317,6 +315,8 @@ export function createStore() {
     btwState, btwPending,
     // Plan mode
     setPlanMode,
+    // Brain mode
+    setBrainMode,
     // i18n
     t,
   });
@@ -501,7 +501,6 @@ export function createStore() {
     scrollToBottom(true);
     attachments.value = [];
   }
-  _sendMessage = sendMessage;
 
   function cancelExecution() {
     if (!isProcessing.value) return;
@@ -562,32 +561,15 @@ export function createStore() {
   }
 
   // ── Brain mode ──
-  const BRAIN_SESSIONS_KEY = 'agentlink-brain-sessions';
-
-  function loadBrainSessions() {
-    try { return JSON.parse(localStorage.getItem(BRAIN_SESSIONS_KEY) || '{}'); } catch { return {}; }
-  }
-
-  function markSessionAsBrain(claudeSessionId) {
-    if (!claudeSessionId) return;
-    const map = loadBrainSessions();
-    map[claudeSessionId] = true;
-    localStorage.setItem(BRAIN_SESSIONS_KEY, JSON.stringify(map));
-  }
-
   function isSessionBrainMode(claudeSessionId) {
     if (!claudeSessionId) return false;
-    return !!loadBrainSessions()[claudeSessionId];
+    return !!historySessions.value.find(s => s.sessionId === claudeSessionId)?.brainMode;
   }
 
-  // Persist brain flag when claudeSessionId becomes known, and restore on resume
-  watch(currentClaudeSessionId, (id) => {
-    if (id && brainMode.value) markSessionAsBrain(id);
-    if (id && !brainMode.value && isSessionBrainMode(id)) {
-      brainMode.value = true;
-      brainModeLocked.value = true;
-    }
-  });
+  function setBrainMode(enabled) {
+    brainMode.value = enabled;
+    brainModeLocked.value = enabled;
+  }
 
   function toggleBrainMode() {
     if (brainModeLocked.value) return;

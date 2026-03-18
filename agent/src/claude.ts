@@ -27,6 +27,7 @@ import {
   streamToStdin,
 } from './sdk.js';
 import { CONFIG_DIR } from './config.js';
+import { saveSessionMetadata } from './session-metadata.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,8 @@ export interface ConversationState {
   createdAt: number;
   // Plan mode: when true, agent uses --permission-mode plan (Claude natively enforces read-only)
   planMode: boolean;
+  // Brain mode: when true, session metadata is persisted with brainMode flag
+  brainMode: boolean;
 }
 
 type SendFn = (msg: Record<string, unknown>) => void;
@@ -270,6 +273,7 @@ export function clearSessionId(conversationId?: string): void {
 export interface HandleChatOptions {
   resumeSessionId?: string;
   extraArgs?: string[];
+  brainMode?: boolean;
 }
 
 /**
@@ -297,6 +301,7 @@ export function handleChat(
   const state = conversations.get(convId)!;
   state.turnActive = true;
   state.turnResultReceived = false;
+  if (options?.brainMode) state.brainMode = true;
 
   console.log(`[Claude:${convId.slice(0, 8)}] Sending: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
 
@@ -571,6 +576,7 @@ export function setPermissionMode(
       isCompacting: false,
       createdAt: Date.now(),
       planMode: enteringPlan,
+      brainMode: false,
     };
     conversations.set(convId, newState);
     return 'immediate';
@@ -590,6 +596,7 @@ export function setPermissionMode(
       isCompacting: false,
       createdAt: Date.now(),
       planMode: enteringPlan,
+      brainMode: false,
     };
     conversations.set(convId, placeholder);
     return 'immediate';
@@ -673,6 +680,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     isCompacting: false,
     createdAt: Date.now(),
     planMode: existing?.planMode || false,
+    brainMode: existing?.brainMode || false,
   };
 
   conversations.set(conversationId, state);
@@ -951,6 +959,10 @@ async function processOutput(
             console.log(`[Claude:${state.conversationId.slice(0, 8)}] Session ID: ${state.claudeSessionId}`);
             // Notify web client so sidebar can refresh session list
             sendWithConvId({ type: 'session_started', claudeSessionId: state.claudeSessionId });
+            // Persist brain mode metadata to disk
+            if (state.brainMode) {
+              saveSessionMetadata(state.claudeSessionId, { brainMode: true });
+            }
           }
 
           // Handle control_request (tool permission checks)

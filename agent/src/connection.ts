@@ -6,6 +6,7 @@ import type { AgentConfig } from './config.js';
 import { loadRuntimeState, saveRuntimeState } from './config.js';
 import { handleListDirectory, handleReadFile, handleChangeWorkDir } from './directory-handlers.js';
 import { handleGitStatus, handleGitDiff } from './git-handlers.js';
+import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -264,7 +265,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
       const isBrainMode = (msg as unknown as { brainMode?: boolean }).brainMode;
       console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${isBrainMode}`);
-      const chatOptions: { resumeSessionId?: string; extraArgs?: string[] } = {
+      const chatOptions: { resumeSessionId?: string; extraArgs?: string[]; brainMode?: boolean } = {
         resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       };
       if (isBrainMode) {
@@ -273,6 +274,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
           '--add-dir', path.join(brainDir, 'BrainCore'),
           '--add-dir', path.join(brainDir, 'CoreSkill'),
         ];
+        chatOptions.brainMode = true;
       }
       claudeHandleChat(
         chatConvId,
@@ -344,6 +346,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         }
       }
 
+      // Determine brain mode from persisted metadata
+      const sessionMeta = loadSessionMetadata(m.claudeSessionId);
+
       send({
         type: 'conversation_resumed',
         conversationId: convId,
@@ -352,6 +357,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         isCompacting: isSameSession && (convId ? getIsCompacting(convId) : getIsCompacting()),
         isProcessing: isSameSession && currentConv?.turnActive === true,
         planMode,
+        brainMode: sessionMeta.brainMode || false,
       });
       break;
     }
@@ -669,8 +675,10 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
 function handleListSessions(): void {
   try {
     const sessions = listSessions(state.workDir);
+    const metaMap = loadAllSessionMetadata();
+    const enriched = sessions.map(s => ({ ...s, ...metaMap.get(s.sessionId) }));
     console.log(`[AgentLink] → sessions_list (${sessions.length} sessions for ${state.workDir})`);
-    send({ type: 'sessions_list', sessions, workDir: state.workDir });
+    send({ type: 'sessions_list', sessions: enriched, workDir: state.workDir });
   } catch (err) {
     console.error(`[AgentLink] listSessions failed:`, err);
     send({ type: 'sessions_list', sessions: [], workDir: state.workDir });
@@ -685,6 +693,7 @@ function handleDeleteSession(sessionId: string): void {
   }
   const deleted = deleteSession(state.workDir, sessionId);
   if (deleted) {
+    deleteSessionMetadata(sessionId);
     send({ type: 'session_deleted', sessionId });
   } else {
     send({ type: 'error', message: 'Session not found or could not be deleted.' });
