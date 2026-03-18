@@ -54,8 +54,13 @@ const BRAIN_COMMANDS = [
 export function useSlashMenu({ inputText, inputRef, brainMode }) {
   const slashMenuIndex = ref(0);
   const slashMenuOpen = ref(false);
+  const slashMenuDismissed = ref(false);
+
+  // Reset dismissed state when user changes input
+  watch(inputText, () => { slashMenuDismissed.value = false; });
 
   const slashMenuVisible = computed(() => {
+    if (slashMenuDismissed.value) return false;
     if (slashMenuOpen.value) return true;
     const txt = inputText.value;
     return txt.startsWith('/') && !/\s/.test(txt.slice(1));
@@ -122,11 +127,13 @@ export function useSlashMenu({ inputText, inputRef, brainMode }) {
   function selectSlashCommand(cmd) {
     if (cmd.category) return; // Can't select category headers
     slashMenuOpen.value = false;
+    slashMenuDismissed.value = true;
     inputText.value = cmd.command + (cmd.isPrefix ? ' ' : '');
     nextTick(() => inputRef.value?.focus());
   }
 
   function openSlashMenu() {
+    slashMenuDismissed.value = false;
     slashMenuOpen.value = !slashMenuOpen.value;
     slashMenuIndex.value = 0;
   }
@@ -135,6 +142,7 @@ export function useSlashMenu({ inputText, inputRef, brainMode }) {
   function _slashMenuClickOutside(e) {
     if (slashMenuOpen.value && !e.target.closest('.slash-btn') && !e.target.closest('.slash-menu')) {
       slashMenuOpen.value = false;
+      slashMenuDismissed.value = true;
     }
   }
   document.addEventListener('click', _slashMenuClickOutside);
