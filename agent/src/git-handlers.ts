@@ -13,7 +13,7 @@ interface GitFileEntry {
 // Helper: execute a git command and return stdout
 function gitExec(args: string[], cwd: string, timeoutMs = 10000): Promise<string> {
   return new Promise((res, rej) => {
-    execFile('git', args, { cwd, timeout: timeoutMs, maxBuffer: 5 * 1024 * 1024 }, (err, stdout) => {
+    execFile('git', args, { cwd, timeout: timeoutMs, maxBuffer: 5 * 1024 * 1024, windowsHide: true }, (err, stdout) => {
       if (err) rej(err);
       else res(stdout.trim());
     });
