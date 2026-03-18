@@ -49,10 +49,9 @@ const BRAIN_COMMANDS = [
  * @param {Object} deps
  * @param {import('vue').Ref<string>} deps.inputText
  * @param {import('vue').Ref} deps.inputRef
- * @param {Function} deps.sendMessage
  * @param {import('vue').Ref<boolean>} [deps.brainMode]
  */
-export function useSlashMenu({ inputText, inputRef, sendMessage, brainMode }) {
+export function useSlashMenu({ inputText, inputRef, brainMode }) {
   const slashMenuIndex = ref(0);
   const slashMenuOpen = ref(false);
 
@@ -123,13 +122,8 @@ export function useSlashMenu({ inputText, inputRef, sendMessage, brainMode }) {
   function selectSlashCommand(cmd) {
     if (cmd.category) return; // Can't select category headers
     slashMenuOpen.value = false;
-    if (cmd.isPrefix) {
-      inputText.value = cmd.command + ' ';
-      nextTick(() => inputRef.value?.focus());
-    } else {
-      inputText.value = cmd.command;
-      sendMessage();
-    }
+    inputText.value = cmd.command + (cmd.isPrefix ? ' ' : '');
+    nextTick(() => inputRef.value?.focus());
   }
 
   function openSlashMenu() {
