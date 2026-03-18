@@ -1,4 +1,4 @@
-// ── Git handlers for repository status and diff viewing ──
+// ── Git handlers for repository status, diff viewing, and write operations ──
 import { execFile } from 'child_process';
 import { resolve, isAbsolute, normalize, sep } from 'path';
 
@@ -242,5 +242,104 @@ export async function handleGitDiff(
       binary: false,
       error: (err as Error).message,
     });
+  }
+}
+
+// ── Write operations ──
+
+export async function handleGitStage(
+  msg: { files: string[]; type: string; [key: string]: unknown },
+  workDir: string,
+  send: SendFn,
+): Promise<void> {
+  const files = msg.files;
+  if (!Array.isArray(files) || files.length === 0) {
+    send({ type: 'git_stage_result', success: false, error: 'No files specified.' });
+    return;
+  }
+
+  for (const f of files) {
+    if (!validatePath(f, workDir)) {
+      send({ type: 'git_stage_result', success: false, error: `Invalid file path: ${f}` });
+      return;
+    }
+  }
+
+  try {
+    await gitExec(['add', '--', ...files], workDir);
+    send({ type: 'git_stage_result', success: true });
+  } catch (err) {
+    send({ type: 'git_stage_result', success: false, error: (err as Error).message });
+  }
+}
+
+export async function handleGitUnstage(
+  msg: { files: string[]; type: string; [key: string]: unknown },
+  workDir: string,
+  send: SendFn,
+): Promise<void> {
+  const files = msg.files;
+  if (!Array.isArray(files) || files.length === 0) {
+    send({ type: 'git_unstage_result', success: false, error: 'No files specified.' });
+    return;
+  }
+
+  for (const f of files) {
+    if (!validatePath(f, workDir)) {
+      send({ type: 'git_unstage_result', success: false, error: `Invalid file path: ${f}` });
+      return;
+    }
+  }
+
+  try {
+    await gitExec(['restore', '--staged', '--', ...files], workDir);
+    send({ type: 'git_unstage_result', success: true });
+  } catch (err) {
+    send({ type: 'git_unstage_result', success: false, error: (err as Error).message });
+  }
+}
+
+export async function handleGitDiscard(
+  msg: { files: string[]; type: string; [key: string]: unknown },
+  workDir: string,
+  send: SendFn,
+): Promise<void> {
+  const files = msg.files;
+  if (!Array.isArray(files) || files.length === 0) {
+    send({ type: 'git_discard_result', success: false, error: 'No files specified.' });
+    return;
+  }
+
+  for (const f of files) {
+    if (!validatePath(f, workDir)) {
+      send({ type: 'git_discard_result', success: false, error: `Invalid file path: ${f}` });
+      return;
+    }
+  }
+
+  try {
+    await gitExec(['checkout', '--', ...files], workDir);
+    send({ type: 'git_discard_result', success: true });
+  } catch (err) {
+    send({ type: 'git_discard_result', success: false, error: (err as Error).message });
+  }
+}
+
+export async function handleGitCommit(
+  msg: { message: string; type: string; [key: string]: unknown },
+  workDir: string,
+  send: SendFn,
+): Promise<void> {
+  const commitMessage = msg.message;
+  if (!commitMessage || typeof commitMessage !== 'string' || !commitMessage.trim()) {
+    send({ type: 'git_commit_result', success: false, error: 'Commit message is required.' });
+    return;
+  }
+
+  try {
+    const stdout = await gitExec(['commit', '-m', commitMessage.trim()], workDir, 30000);
+    send({ type: 'git_commit_result', success: true, output: stdout });
+  } catch (err) {
+    send({ type: 'git_commit_result', success: false, error: (err as Error).message });
   }
 }

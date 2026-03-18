@@ -5,7 +5,7 @@ import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
 import { loadRuntimeState, saveRuntimeState } from './config.js';
 import { handleListDirectory, handleReadFile, handleChangeWorkDir, handleUpdateFile } from './directory-handlers.js';
-import { handleGitStatus, handleGitDiff } from './git-handlers.js';
+import { handleGitStatus, handleGitDiff, handleGitStage, handleGitUnstage, handleGitDiscard, handleGitCommit } from './git-handlers.js';
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
 
 const require = createRequire(import.meta.url);
@@ -663,6 +663,18 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       break;
     case 'git_diff':
       handleGitDiff(msg as unknown as { filePath: string; staged?: boolean; untracked?: boolean; type: string }, state.workDir, send);
+      break;
+    case 'git_stage':
+      handleGitStage(msg as unknown as { files: string[]; type: string }, state.workDir, send);
+      break;
+    case 'git_unstage':
+      handleGitUnstage(msg as unknown as { files: string[]; type: string }, state.workDir, send);
+      break;
+    case 'git_discard':
+      handleGitDiscard(msg as unknown as { files: string[]; type: string }, state.workDir, send);
+      break;
+    case 'git_commit':
+      handleGitCommit(msg as unknown as { message: string; type: string }, state.workDir, send);
       break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);

@@ -15,6 +15,9 @@ export function createGit(deps) {
   const gitLoading = ref(false);
   const gitDiffLoading = ref(false);
   const expandedGroups = ref({ staged: true, modified: true, untracked: false });
+  const commitMessage = ref('');
+  const commitInProgress = ref(false);
+  const discardConfirmFile = ref(null); // file path awaiting discard confirmation
 
   function openPanel() {
     workdirMenuOpen.value = false;
@@ -61,6 +64,49 @@ export function createGit(deps) {
     wsSend({ type: 'git_diff', filePath: entry.path, staged: isStaged });
   }
 
+  // ── Write operations ──
+
+  function stageFile(filePath) {
+    wsSend({ type: 'git_stage', files: [filePath] });
+  }
+
+  function stageAll(files) {
+    if (files.length === 0) return;
+    wsSend({ type: 'git_stage', files: files.map(f => f.path) });
+  }
+
+  function unstageFile(filePath) {
+    wsSend({ type: 'git_unstage', files: [filePath] });
+  }
+
+  function unstageAll(files) {
+    if (files.length === 0) return;
+    wsSend({ type: 'git_unstage', files: files.map(f => f.path) });
+  }
+
+  function requestDiscard(filePath) {
+    discardConfirmFile.value = filePath;
+  }
+
+  function cancelDiscard() {
+    discardConfirmFile.value = null;
+  }
+
+  function confirmDiscard() {
+    if (!discardConfirmFile.value) return;
+    wsSend({ type: 'git_discard', files: [discardConfirmFile.value] });
+    discardConfirmFile.value = null;
+  }
+
+  function commit() {
+    const msg = commitMessage.value.trim();
+    if (!msg) return;
+    commitInProgress.value = true;
+    wsSend({ type: 'git_commit', message: msg });
+  }
+
+  // ── Message handlers ──
+
   function handleGitStatus(msg) {
     gitLoading.value = false;
     gitInfo.value = msg;
@@ -77,6 +123,19 @@ export function createGit(deps) {
       binary: msg.binary || false,
       error: msg.error || null,
     };
+  }
+
+  function handleGitWriteResult(_msg) {
+    // After any write operation, refresh status
+    refresh();
+  }
+
+  function handleGitCommitResult(msg) {
+    commitInProgress.value = false;
+    if (msg.success) {
+      commitMessage.value = '';
+    }
+    refresh();
   }
 
   function parseDiff(rawDiff) {
@@ -135,13 +194,26 @@ export function createGit(deps) {
     gitLoading,
     gitDiffLoading,
     expandedGroups,
+    commitMessage,
+    commitInProgress,
+    discardConfirmFile,
     openPanel,
     closePanel,
     refresh,
     toggleGroup,
     openFileDiff,
+    stageFile,
+    stageAll,
+    unstageFile,
+    unstageAll,
+    requestDiscard,
+    cancelDiscard,
+    confirmDiscard,
+    commit,
     handleGitStatus,
     handleGitDiff,
+    handleGitWriteResult,
+    handleGitCommitResult,
     parseDiff,
     onWorkdirChanged,
   };

@@ -1,5 +1,5 @@
 <script setup>
-import { inject } from 'vue';
+import { inject, ref } from 'vue';
 
 const store = inject('store');
 const filesStore = inject('files');
@@ -69,7 +69,12 @@ const {
               <template v-if="git.gitInfo.value.staged?.length">
                 <div class="git-group-header" @click="git.toggleGroup('staged')">
                   <span class="git-group-arrow" :class="{ expanded: git.expandedGroups.value.staged }">&#9654;</span>
-                  <span>Staged ({{ git.gitInfo.value.staged.length }})</span>
+                  <span class="git-group-label">Staged ({{ git.gitInfo.value.staged.length }})</span>
+                  <div class="git-group-actions" @click.stop>
+                    <button class="git-action-btn git-action-unstage" @click="git.unstageAll(git.gitInfo.value.staged)" title="Unstage All">
+                      <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13H5v-2h14v2z"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <template v-if="git.expandedGroups.value.staged">
                   <div v-for="entry in git.gitInfo.value.staged" :key="'s-' + entry.path"
@@ -77,6 +82,11 @@ const {
                     <span class="git-status-icon" :class="'git-status-' + entry.status">{{ entry.status }}</span>
                     <span class="git-file-name">{{ entry.path.split('/').pop() }}</span>
                     <span v-if="entry.path.includes('/')" class="git-file-dir">{{ entry.path.split('/').slice(0, -1).join('/') }}</span>
+                    <div class="git-file-actions" @click.stop>
+                      <button class="git-action-btn git-action-unstage" @click="git.unstageFile(entry.path)" title="Unstage">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13H5v-2h14v2z"/></svg>
+                      </button>
+                    </div>
                   </div>
                 </template>
               </template>
@@ -85,7 +95,12 @@ const {
               <template v-if="git.gitInfo.value.modified?.length">
                 <div class="git-group-header" @click="git.toggleGroup('modified')">
                   <span class="git-group-arrow" :class="{ expanded: git.expandedGroups.value.modified }">&#9654;</span>
-                  <span>Modified ({{ git.gitInfo.value.modified.length }})</span>
+                  <span class="git-group-label">Modified ({{ git.gitInfo.value.modified.length }})</span>
+                  <div class="git-group-actions" @click.stop>
+                    <button class="git-action-btn git-action-stage" @click="git.stageAll(git.gitInfo.value.modified)" title="Stage All">
+                      <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <template v-if="git.expandedGroups.value.modified">
                   <div v-for="entry in git.gitInfo.value.modified" :key="'m-' + entry.path"
@@ -93,6 +108,14 @@ const {
                     <span class="git-status-icon" :class="'git-status-' + entry.status">{{ entry.status }}</span>
                     <span class="git-file-name">{{ entry.path.split('/').pop() }}</span>
                     <span v-if="entry.path.includes('/')" class="git-file-dir">{{ entry.path.split('/').slice(0, -1).join('/') }}</span>
+                    <div class="git-file-actions" @click.stop>
+                      <button class="git-action-btn git-action-stage" @click="git.stageFile(entry.path)" title="Stage">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      </button>
+                      <button class="git-action-btn git-action-discard" @click="git.requestDiscard(entry.path)" title="Discard Changes">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+                      </button>
+                    </div>
                   </div>
                 </template>
               </template>
@@ -101,7 +124,12 @@ const {
               <template v-if="git.gitInfo.value.untracked?.length">
                 <div class="git-group-header" @click="git.toggleGroup('untracked')">
                   <span class="git-group-arrow" :class="{ expanded: git.expandedGroups.value.untracked }">&#9654;</span>
-                  <span>Untracked ({{ git.gitInfo.value.untracked.length }})</span>
+                  <span class="git-group-label">Untracked ({{ git.gitInfo.value.untracked.length }})</span>
+                  <div class="git-group-actions" @click.stop>
+                    <button class="git-action-btn git-action-stage" @click="git.stageAll(git.gitInfo.value.untracked)" title="Stage All">
+                      <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    </button>
+                  </div>
                 </div>
                 <template v-if="git.expandedGroups.value.untracked">
                   <div v-for="entry in git.gitInfo.value.untracked" :key="'u-' + entry.path"
@@ -109,10 +137,49 @@ const {
                     <span class="git-status-icon git-status-U">?</span>
                     <span class="git-file-name">{{ entry.path.split('/').pop() }}</span>
                     <span v-if="entry.path.includes('/')" class="git-file-dir">{{ entry.path.split('/').slice(0, -1).join('/') }}</span>
+                    <div class="git-file-actions" @click.stop>
+                      <button class="git-action-btn git-action-stage" @click="git.stageFile(entry.path)" title="Stage">
+                        <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                      </button>
+                    </div>
                   </div>
                 </template>
               </template>
+
+              <!-- Commit section -->
+              <div v-if="git.gitInfo.value.staged?.length" class="git-commit-section">
+                <textarea
+                  class="git-commit-input"
+                  v-model="git.commitMessage.value"
+                  placeholder="Commit message..."
+                  rows="3"
+                  @keydown.ctrl.enter="git.commit()"
+                  @keydown.meta.enter="git.commit()"
+                ></textarea>
+                <button
+                  class="git-commit-btn"
+                  :disabled="!git.commitMessage.value.trim() || git.commitInProgress.value"
+                  @click="git.commit()"
+                >
+                  {{ git.commitInProgress.value ? 'Committing...' : 'Commit' }}
+                </button>
+              </div>
             </template>
+          </div>
+
+          <!-- Discard confirmation overlay -->
+          <div v-if="git.discardConfirmFile.value" class="git-discard-overlay" @click="git.cancelDiscard()">
+            <div class="git-discard-dialog" @click.stop>
+              <div class="git-discard-title">Discard Changes</div>
+              <div class="git-discard-message">
+                Discard changes to <strong>{{ git.discardConfirmFile.value.split('/').pop() }}</strong>?
+                This cannot be undone.
+              </div>
+              <div class="git-discard-actions">
+                <button class="git-discard-cancel" @click="git.cancelDiscard()">Cancel</button>
+                <button class="git-discard-confirm" @click="git.confirmDiscard()">Discard</button>
+              </div>
+            </div>
           </div>
         </div>
         </Transition>
