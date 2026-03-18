@@ -56,6 +56,13 @@ const {
   startMemoryEdit,
   workdirMenuMemory,
   git,
+  fileEditing,
+  fileEditContent,
+  fileSaving,
+  canEditFile,
+  startFileEdit,
+  cancelFileEdit,
+  saveFileEdit,
 } = filesStore;
 </script>
 
@@ -105,15 +112,25 @@ const {
           <!-- Mobile: file preview view -->
           <div v-else-if="isMobile && sidebarView === 'preview'" class="file-preview-mobile">
             <div class="file-preview-mobile-header">
-              <button class="file-panel-mobile-back" @click="filePreview.closePreview(); memoryEditing = false">
+              <button class="file-panel-mobile-back" @click="filePreview.closePreview(); memoryEditing = false; fileEditing = false">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
                 {{ t('sidebar.files') }}
               </button>
               <div class="preview-header-actions">
-                <button v-if="isMemoryPreview && previewFile && !memoryEditing"
+                <button v-if="isMemoryPreview && previewFile && !memoryEditing && !fileEditing"
                         class="preview-edit-btn" @click="startMemoryEdit()" :title="t('memory.edit')">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
                   {{ t('memory.edit') }}
+                </button>
+                <button v-if="!isMemoryPreview && canEditFile() && !fileEditing && !memoryEditing"
+                        class="preview-edit-btn" @click="startFileEdit()" :title="t('file.edit')">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/></svg>
+                  {{ t('file.edit') }}
+                </button>
+                <span v-if="fileEditing" class="preview-edit-label">{{ t('file.editing') }}</span>
+                <button v-if="fileEditing" class="memory-header-cancel" @click="cancelFileEdit()">{{ t('loop.cancel') }}</button>
+                <button v-if="fileEditing" class="memory-header-save" @click="saveFileEdit()" :disabled="fileSaving">
+                  {{ fileSaving ? t('memory.saving') : t('memory.save') }}
                 </button>
                 <span v-if="memoryEditing" class="preview-edit-label">{{ t('memory.editing') }}</span>
                 <button v-if="memoryEditing" class="memory-header-cancel" @click="cancelMemoryEdit()">{{ t('loop.cancel') }}</button>
@@ -126,10 +143,10 @@ const {
                         :title="previewMarkdownRendered ? t('preview.showSource') : t('preview.renderMarkdown')">
                   <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3zM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5z"/></svg>
                 </button>
-                <span v-if="previewFile && !memoryEditing" class="file-preview-mobile-size">
+                <span v-if="previewFile && !memoryEditing && !fileEditing" class="file-preview-mobile-size">
                   {{ filePreview.formatFileSize(previewFile.totalSize) }}
                 </span>
-                <button v-if="previewFile && !memoryEditing" class="preview-refresh-btn" @click="filePreview.refreshPreview()" :title="t('sidebar.refresh')">
+                <button v-if="previewFile && !memoryEditing && !fileEditing" class="preview-refresh-btn" @click="filePreview.refreshPreview()" :title="t('sidebar.refresh')">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
                 </button>
               </div>
@@ -138,7 +155,10 @@ const {
               {{ previewFile?.fileName || t('preview.preview') }}
             </div>
             <div class="preview-panel-body">
-              <div v-if="memoryEditing" class="memory-edit-container">
+              <div v-if="fileEditing" class="memory-edit-container">
+                <textarea class="memory-edit-textarea" v-model="fileEditContent"></textarea>
+              </div>
+              <div v-else-if="memoryEditing" class="memory-edit-container">
                 <textarea class="memory-edit-textarea" v-model="memoryEditContent"></textarea>
               </div>
               <div v-else-if="previewLoading" class="preview-loading">{{ t('preview.loading') }}</div>

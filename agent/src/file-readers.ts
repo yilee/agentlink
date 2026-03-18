@@ -39,7 +39,7 @@ function resolveReader(ext: string, totalSize: number): FileReader {
 
 // ── Text reader ────────────────────────────────────────────────
 
-const TEXT_EXTENSIONS = new Set([
+export const TEXT_EXTENSIONS = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.json', '.json5',
   '.yaml', '.yml', '.toml', '.xml', '.html', '.htm', '.css', '.scss', '.less',
   '.md', '.txt', '.log', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.bat', '.cmd',
@@ -49,13 +49,13 @@ const TEXT_EXTENSIONS = new Set([
   '.gitignore', '.dockerignore', '.editorconfig',
 ]);
 
-const TEXT_FILENAMES = new Set([
+export const TEXT_FILENAMES = new Set([
   'Makefile', 'Dockerfile', 'Vagrantfile', 'Gemfile', 'Rakefile',
   'LICENSE', 'CHANGELOG', 'AUTHORS',
 ]);
 
 const textReader: FileReader = {
-  maxSize: 100 * 1024, // 100 KB
+  maxSize: 500 * 1024, // 500 KB
   async read(filePath, totalSize) {
     const bytesToRead = Math.min(totalSize, this.maxSize);
     const buf = Buffer.alloc(bytesToRead);

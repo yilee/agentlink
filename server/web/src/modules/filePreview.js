@@ -17,11 +17,19 @@ export function createFilePreview(deps) {
     sidebarOpen,
     isMobile,
     renderMarkdown,
+    fileEditing,
+    fileEditContent,
+    fileSaving,
+    memoryDir,
   } = deps;
 
   // ── Open / Close ──
 
   function openPreview(filePath) {
+    // Reset any active file edit
+    fileEditing.value = false;
+    fileEditContent.value = '';
+
     // Skip re-fetch if same file already loaded
     if (previewFile.value && previewFile.value.filePath === filePath && !previewFile.value.error) {
       if (isMobile.value) {
@@ -44,6 +52,8 @@ export function createFilePreview(deps) {
   }
 
   function closePreview() {
+    fileEditing.value = false;
+    fileEditContent.value = '';
     if (isMobile.value) {
       sidebarView.value = 'files';
     } else {
@@ -197,6 +207,59 @@ export function createFilePreview(deps) {
     wsSend({ type: 'read_file', filePath });
   }
 
+  // ── General file editing ──
+
+  function _isMemoryFile() {
+    if (!previewFile.value?.filePath || !memoryDir.value) return false;
+    const fp = previewFile.value.filePath.replace(/\\/g, '/');
+    const md = memoryDir.value.replace(/\\/g, '/');
+    return fp.startsWith(md);
+  }
+
+  function canEditFile() {
+    const f = previewFile.value;
+    if (!f || !f.content) return false;
+    if (f.encoding !== 'utf8') return false;
+    if (f.truncated) return false;
+    if (f.error) return false;
+    if (_isMemoryFile()) return false;
+    return true;
+  }
+
+  function startFileEdit() {
+    fileEditing.value = true;
+    fileEditContent.value = previewFile.value?.content || '';
+  }
+
+  function cancelFileEdit() {
+    if (fileEditContent.value !== (previewFile.value?.content || '')) {
+      if (!confirm('Discard unsaved changes?')) return;
+    }
+    fileEditing.value = false;
+    fileEditContent.value = '';
+  }
+
+  function saveFileEdit() {
+    if (!previewFile.value) return;
+    fileSaving.value = true;
+    wsSend({
+      type: 'update_file',
+      filePath: previewFile.value.filePath,
+      content: fileEditContent.value,
+    });
+  }
+
+  function handleFileUpdated(msg) {
+    fileSaving.value = false;
+    if (msg.success) {
+      fileEditing.value = false;
+      fileEditContent.value = '';
+      refreshPreview();
+    } else {
+      alert('Save failed: ' + (msg.error || 'Unknown error'));
+    }
+  }
+
   return {
     openPreview,
     closePreview,
@@ -209,5 +272,10 @@ export function createFilePreview(deps) {
     onResizeStart,
     isMarkdownFile,
     renderedMarkdownHtml,
+    canEditFile,
+    startFileEdit,
+    cancelFileEdit,
+    saveFileEdit,
+    handleFileUpdated,
   };
 }

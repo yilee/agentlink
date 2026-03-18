@@ -266,6 +266,11 @@
   "memory.deleteConfirm": "Delete {name}?",
   "memory.discardChanges": "Discard changes?",
 
+  "file.edit": "Edit",
+  "file.editing": "Editing",
+  "file.discardChanges": "You have unsaved changes. Discard?",
+  "file.saveFailed": "Save failed: {error}",
+
   "slash.cost": "Show token usage and cost",
   "slash.context": "Show context usage",
   "slash.compact": "Compact context",

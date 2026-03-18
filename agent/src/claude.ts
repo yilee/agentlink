@@ -423,8 +423,6 @@ export async function handleBtwQuestion(
     : resolveClaudeCommand();
   const env = getCleanEnv();
 
-  console.log(`[Claude:btw] Spawning side question (session ${sessionId.slice(0, 8)}): ${question.substring(0, 80)}`);
-
   let child: ChildProcess;
   try {
     child = spawn(command, [...prefixArgs, ...args], {

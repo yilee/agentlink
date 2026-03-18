@@ -51,15 +51,15 @@ describe('file-readers', () => {
       expect(result.mimeType).toBe('text/x-python');
     });
 
-    it('truncates text files exceeding 100 KB', async () => {
+    it('truncates text files exceeding 500 KB', async () => {
       const filePath = join(TEST_DIR, 'large.txt');
-      const content = 'x'.repeat(200 * 1024); // 200 KB
+      const content = 'x'.repeat(600 * 1024); // 600 KB
       writeFileSync(filePath, content);
 
       const result = await readFileForPreview(filePath, Buffer.byteLength(content));
 
       expect(result.truncated).toBe(true);
-      expect(result.content!.length).toBe(100 * 1024);
+      expect(result.content!.length).toBe(500 * 1024);
       expect(result.encoding).toBe('utf8');
     });
 
@@ -125,7 +125,7 @@ describe('file-readers', () => {
   describe('binary reader (fallback)', () => {
     it('returns metadata only for unknown binary extensions', async () => {
       const filePath = join(TEST_DIR, 'data.bin');
-      const content = Buffer.alloc(200 * 1024); // 200 KB — too large for text fallback
+      const content = Buffer.alloc(600 * 1024); // 600 KB — too large for text fallback
       writeFileSync(filePath, content);
 
       const result = await readFileForPreview(filePath, content.length);

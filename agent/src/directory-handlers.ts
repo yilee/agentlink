@@ -1,9 +1,9 @@
 // ── Filesystem handlers for directory listing, file reading, workdir changes ──
 import os from 'os';
 import { existsSync } from 'fs';
-import { readdir, stat } from 'fs/promises';
-import { resolve, isAbsolute, basename } from 'path';
-import { readFileForPreview } from './file-readers.js';
+import { readdir, stat, writeFile } from 'fs/promises';
+import { resolve, isAbsolute, basename, extname, sep } from 'path';
+import { readFileForPreview, TEXT_EXTENSIONS, TEXT_FILENAMES } from './file-readers.js';
 
 type SendFn = (msg: Record<string, unknown>) => void;
 
@@ -123,4 +123,52 @@ export function handleChangeWorkDir(
 
   // Auto-refresh session list for new directory
   onListSessions();
+}
+
+const MAX_FILE_EDIT_SIZE = 500 * 1024; // 500 KB
+
+export async function handleUpdateFile(
+  msg: { filePath: string; content: string },
+  workDir: string,
+  send: SendFn,
+): Promise<void> {
+  const { filePath, content } = msg;
+
+  try {
+    const resolved = isAbsolute(filePath) ? resolve(filePath) : resolve(workDir, filePath);
+
+    // Security: must be under workDir
+    const normalizedWorkDir = resolve(workDir);
+    if (!resolved.startsWith(normalizedWorkDir + sep) && resolved !== normalizedWorkDir) {
+      send({ type: 'file_updated', filePath, success: false,
+             error: 'Cannot edit files outside the working directory' });
+      return;
+    }
+
+    // File must already exist (no creating new files)
+    await stat(resolved);
+
+    // Must be a known text file type
+    const ext = extname(resolved).toLowerCase();
+    const fileName = basename(resolved);
+    if (!TEXT_EXTENSIONS.has(ext) && !TEXT_FILENAMES.has(fileName) && ext !== '') {
+      send({ type: 'file_updated', filePath, success: false,
+             error: 'Only text files can be edited' });
+      return;
+    }
+
+    // Content size limit
+    const contentBytes = Buffer.byteLength(content, 'utf8');
+    if (contentBytes > MAX_FILE_EDIT_SIZE) {
+      send({ type: 'file_updated', filePath, success: false,
+             error: 'Content exceeds 500 KB limit' });
+      return;
+    }
+
+    await writeFile(resolved, content, 'utf8');
+    send({ type: 'file_updated', filePath: resolved, success: true });
+  } catch (err) {
+    send({ type: 'file_updated', filePath, success: false,
+           error: (err as Error).message });
+  }
 }
