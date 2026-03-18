@@ -43,5 +43,8 @@ export function createFileHandlers(deps) {
         if (deps.filePreview) deps.filePreview.closePreview();
       }
     },
+    file_updated(msg) {
+      if (deps.filePreview) deps.filePreview.handleFileUpdated(msg);
+    },
   };
 }

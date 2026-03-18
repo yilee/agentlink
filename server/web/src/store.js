@@ -144,6 +144,10 @@ export function createStore() {
   const memoryEditing = ref(false);
   const memoryEditContent = ref('');
   const memorySaving = ref(false);
+  // General file editing state
+  const fileEditing = ref(false);
+  const fileEditContent = ref('');
+  const fileSaving = ref(false);
   const teamsCollapsed = ref(false);
   const chatsCollapsed = ref(false);
   const loopsCollapsed = ref(false);
@@ -359,6 +363,7 @@ export function createStore() {
   const filePreview = createFilePreview({
     wsSend, previewPanelOpen, previewPanelWidth, previewFile, previewLoading,
     previewMarkdownRendered, sidebarView, sidebarOpen, isMobile, renderMarkdown,
+    fileEditing, fileEditContent, fileSaving, memoryDir,
   });
 
   // Memory module
@@ -712,6 +717,12 @@ export function createStore() {
     // Memory management
     memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
     memoryEditing, memoryEditContent, memorySaving,
+    // General file editing
+    fileEditing, fileEditContent, fileSaving,
+    canEditFile: filePreview.canEditFile,
+    startFileEdit: filePreview.startFileEdit,
+    cancelFileEdit: filePreview.cancelFileEdit,
+    saveFileEdit: filePreview.saveFileEdit,
     workdirMenuMemory: memory.workdirMenuMemory,
     refreshMemory: memory.refreshMemory,
     openMemoryFile: memory.openMemoryFile,
