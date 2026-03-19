@@ -107,7 +107,12 @@ export function handleChangeWorkDir(
   send: SendFn,
   onListSessions: () => void,
 ): void {
-  const newDir = msg.workDir;
+  let newDir = msg.workDir;
+
+  // Expand ~ to user home directory
+  if (newDir === '~' || newDir.startsWith('~/') || newDir.startsWith('~\\')) {
+    newDir = resolve(os.homedir(), newDir.slice(2));
+  }
 
   if (!existsSync(newDir)) {
     send({ type: 'error', message: `Directory does not exist: ${newDir}` });

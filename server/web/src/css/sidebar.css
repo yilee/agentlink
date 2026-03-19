@@ -53,6 +53,28 @@
   line-height: 1.3;
 }
 
+/* ── Brain Home Button ── */
+.brain-home-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.brain-home-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.brain-home-btn .brain-home-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
 /* ── Working Directory History ── */
 .workdir-history {
   margin-top: 10px;
