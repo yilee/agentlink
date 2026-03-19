@@ -274,6 +274,9 @@
   "file.newFolder": "New Folder",
   "file.enterFileName": "File name...",
   "file.enterFolderName": "Folder name...",
+  "file.delete": "Delete",
+  "file.confirmDelete": "Are you sure you want to delete \"{name}\"?",
+  "file.confirmDeleteFolder": "Are you sure you want to delete folder \"{name}\" and all its contents?",
 
   "slash.cost": "Show token usage and cost",
   "slash.context": "Show context usage",

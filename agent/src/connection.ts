@@ -4,7 +4,7 @@ import path from 'path';
 import { createRequire } from 'module';
 import type { AgentConfig } from './config.js';
 import { loadRuntimeState, saveRuntimeState } from './config.js';
-import { handleListDirectory, handleReadFile, handleChangeWorkDir, handleUpdateFile, handleCreateFile, handleCreateDirectory } from './directory-handlers.js';
+import { handleListDirectory, handleReadFile, handleChangeWorkDir, handleUpdateFile, handleCreateFile, handleCreateDirectory, handleDeleteFile } from './directory-handlers.js';
 import { handleGitStatus, handleGitDiff, handleGitStage, handleGitUnstage, handleGitDiscard, handleGitCommit } from './git-handlers.js';
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
 
@@ -308,6 +308,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       break;
     case 'create_directory':
       handleCreateDirectory(msg as unknown as { dirPath: string; dirName: string }, state.workDir, send);
+      break;
+    case 'delete_file':
+      handleDeleteFile(msg as unknown as { filePath: string }, state.workDir, send);
       break;
     case 'change_workdir':
       handleChangeWorkDir(msg as unknown as { workDir: string }, state, send, handleListSessions);

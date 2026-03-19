@@ -218,7 +218,8 @@ export function createFilePreview(deps) {
 
   function canEditFile() {
     const f = previewFile.value;
-    if (!f || !f.content) return false;
+    if (!f) return false;
+    if (f.content == null) return false;
     if (f.encoding !== 'utf8') return false;
     if (f.truncated) return false;
     if (f.error) return false;

@@ -274,6 +274,9 @@
   "file.newFolder": "新建文件夹",
   "file.enterFileName": "文件名...",
   "file.enterFolderName": "文件夹名...",
+  "file.delete": "删除",
+  "file.confirmDelete": "确定要删除 \"{name}\" 吗？",
+  "file.confirmDeleteFolder": "确定要删除文件夹 \"{name}\" 及其所有内容吗？",
 
   "slash.cost": "显示 Token 用量和费用",
   "slash.context": "显示上下文用量",

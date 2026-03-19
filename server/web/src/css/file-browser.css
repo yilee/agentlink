@@ -204,6 +204,20 @@
   background: var(--bg-tertiary);
 }
 
+.file-context-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
+
+.file-context-danger {
+  color: var(--error, #ef4444);
+}
+
+.file-context-danger svg {
+  color: var(--error, #ef4444);
+}
+
 .file-context-item svg {
   flex-shrink: 0;
   color: var(--text-secondary);

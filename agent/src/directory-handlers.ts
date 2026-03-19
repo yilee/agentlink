@@ -1,7 +1,7 @@
 // ── Filesystem handlers for directory listing, file reading, workdir changes ──
 import os from 'os';
 import { existsSync } from 'fs';
-import { readdir, stat, writeFile, mkdir } from 'fs/promises';
+import { readdir, stat, writeFile, mkdir, rm } from 'fs/promises';
 import { resolve, isAbsolute, basename, extname, sep } from 'path';
 import { readFileForPreview, TEXT_EXTENSIONS, TEXT_FILENAMES } from './file-readers.js';
 
@@ -282,5 +282,38 @@ export async function handleCreateDirectory(
     send({ type: 'directory_created', success: true, dirPath: targetPath });
   } catch (err) {
     send({ type: 'directory_created', success: false, error: (err as Error).message });
+  }
+}
+
+export async function handleDeleteFile(
+  msg: { filePath: string },
+  workDir: string,
+  send: SendFn,
+): Promise<void> {
+  const { filePath } = msg;
+
+  try {
+    const resolved = isAbsolute(filePath) ? resolve(filePath) : resolve(workDir, filePath);
+    const normalizedWorkDir = resolve(workDir);
+
+    // Security: must be under workDir (cannot delete workDir itself)
+    if (!resolved.startsWith(normalizedWorkDir + sep) || resolved === normalizedWorkDir) {
+      send({ type: 'file_deleted', filePath, success: false,
+             error: 'Cannot delete files outside the working directory' });
+      return;
+    }
+
+    // Must exist
+    try {
+      await stat(resolved);
+    } catch {
+      send({ type: 'file_deleted', filePath, success: false, error: 'File or folder does not exist' });
+      return;
+    }
+
+    await rm(resolved, { recursive: true });
+    send({ type: 'file_deleted', filePath: resolved, success: true });
+  } catch (err) {
+    send({ type: 'file_deleted', filePath, success: false, error: (err as Error).message });
   }
 }

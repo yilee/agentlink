@@ -372,7 +372,8 @@ export function createStore() {
   const fileBrowser = createFileBrowser({
     wsSend, workDir, inputText, inputRef, sendMessage,
     filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
-    sidebarOpen, sidebarView, newItemInput, requireVersion,
+    sidebarOpen, sidebarView, newItemInput, requireVersion, t,
+    previewFile, closePreview: () => filePreview.closePreview(),
   });
   setFileBrowser(fileBrowser);
   sidebar.setFileBrowser(fileBrowser);

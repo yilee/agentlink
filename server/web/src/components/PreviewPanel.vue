@@ -155,7 +155,7 @@ watch(fileEditing, async (editing) => {
             <div v-else-if="previewFile?.content && previewMarkdownRendered && filePreview.isMarkdownFile(previewFile.fileName)"
                  class="preview-markdown-rendered markdown-body" v-html="filePreview.renderedMarkdownHtml(previewFile.content)">
             </div>
-            <div v-else-if="previewFile?.content" class="preview-text-container">
+            <div v-else-if="previewFile?.content || (previewFile?.encoding === 'utf8' && previewFile?.content === '')" class="preview-text-container">
               <pre class="preview-code"><code v-html="filePreview.highlightCode(previewFile.content, previewFile.fileName)"></code></pre>
               <div v-if="previewFile.truncated" class="preview-truncated-notice">
                 {{ t('preview.fileTruncated', { size: filePreview.formatFileSize(previewFile.totalSize) }) }}

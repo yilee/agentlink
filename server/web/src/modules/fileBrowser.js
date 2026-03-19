@@ -10,7 +10,7 @@ export function createFileBrowser(deps) {
     wsSend, workDir, inputText, inputRef,
     filePanelOpen, fileTreeRoot, fileTreeLoading, fileContextMenu,
     sidebarOpen, sidebarView, filePanelWidth,
-    newItemInput, requireVersion,
+    newItemInput, requireVersion, t, previewFile, closePreview,
   } = deps;
 
   // Map of dirPath → TreeNode awaiting directory_listing response
@@ -404,6 +404,32 @@ export function createFileBrowser(deps) {
     newItemInput.value = null;
   }
 
+  // ── Delete file / folder ──
+
+  function deleteItem(path, name, isDirectory) {
+    if (requireVersion && !requireVersion('0.1.114', 'Delete File')) return;
+    closeContextMenu();
+    const msg = isDirectory
+      ? (t ? t('file.confirmDeleteFolder', { name }) : `Delete folder "${name}" and all its contents?`)
+      : (t ? t('file.confirmDelete', { name }) : `Delete "${name}"?`);
+    if (!window.confirm(msg)) return;
+    wsSend({ type: 'delete_file', filePath: path });
+  }
+
+  function handleFileDeleted(msg) {
+    if (msg.success) {
+      refreshTree();
+      // Close preview if the deleted file/folder was being previewed
+      if (previewFile && previewFile.value && closePreview) {
+        const previewPath = previewFile.value.filePath;
+        const deletedPath = msg.filePath;
+        if (previewPath === deletedPath || previewPath.startsWith(deletedPath + '/') || previewPath.startsWith(deletedPath + '\\')) {
+          closePreview();
+        }
+      }
+    }
+  }
+
   // Set up listeners immediately
   setupGlobalListeners();
 
@@ -427,5 +453,7 @@ export function createFileBrowser(deps) {
     startNewFolder,
     confirmNewItem,
     cancelNewItem,
+    deleteItem,
+    handleFileDeleted,
   };
 }

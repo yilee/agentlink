@@ -68,5 +68,12 @@ export function createFileHandlers(deps) {
         if (deps.showToast) deps.showToast(msg.error || 'Create failed', { type: 'error' });
       }
     },
+    file_deleted(msg) {
+      if (msg.success) {
+        if (deps.fileBrowser) deps.fileBrowser.handleFileDeleted(msg);
+      } else {
+        if (deps.showToast) deps.showToast(msg.error || 'Delete failed', { type: 'error' });
+      }
+    },
   };
 }
