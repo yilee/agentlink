@@ -46,5 +46,34 @@ export function createFileHandlers(deps) {
     file_updated(msg) {
       if (deps.filePreview) deps.filePreview.handleFileUpdated(msg);
     },
+    file_created(msg) {
+      if (deps.newItemInput) deps.newItemInput.value = null;
+      if (msg.success) {
+        // Refresh the file tree
+        if (deps.fileBrowser) deps.fileBrowser.refreshTree();
+        // Open the new file in preview and enter edit mode
+        if (deps.filePreview && msg.filePath) {
+          deps.filePreview.openPreview(msg.filePath);
+        }
+      } else {
+        if (deps.showToast) deps.showToast(msg.error || 'Create failed', { type: 'error' });
+      }
+    },
+    directory_created(msg) {
+      if (deps.newItemInput) deps.newItemInput.value = null;
+      if (msg.success) {
+        // Refresh the file tree
+        if (deps.fileBrowser) deps.fileBrowser.refreshTree();
+      } else {
+        if (deps.showToast) deps.showToast(msg.error || 'Create failed', { type: 'error' });
+      }
+    },
+    file_deleted(msg) {
+      if (msg.success) {
+        if (deps.fileBrowser) deps.fileBrowser.handleFileDeleted(msg);
+      } else {
+        if (deps.showToast) deps.showToast(msg.error || 'Delete failed', { type: 'error' });
+      }
+    },
   };
 }

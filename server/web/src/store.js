@@ -85,10 +85,6 @@ export function createStore() {
   const folderPickerLoading = ref(false);
   const folderPickerSelected = ref('');
 
-  // Delete confirmation dialog state
-  const deleteConfirmOpen = ref(false);
-  const deleteConfirmTitle = ref('');
-
   // Rename session state
   const renamingSessionId = ref(null);
   const renameText = ref('');
@@ -133,6 +129,9 @@ export function createStore() {
   const fileTreeRoot = ref(null);
   const fileTreeLoading = ref(false);
   const fileContextMenu = ref(null);
+  // Inline input state for creating new files/folders in file browser
+  // { type: 'file'|'folder', dirPath: string, parentNode: object } or null
+  const newItemInput = ref(null);
   const sidebarView = ref('sessions');
   const isMobile = ref(window.innerWidth <= 768);
   const workdirMenuOpen = ref(false);
@@ -301,7 +300,6 @@ export function createStore() {
     loadingSessions, loadingHistory, workDir, visibleLimit,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
-    deleteConfirmOpen, deleteConfirmTitle,
     renamingSessionId, renameText,
     hostname, workdirHistory, workdirSwitching,
     workdirMenuOpen, memoryPanelOpen, filePanelOpen, gitPanelOpen,
@@ -328,6 +326,8 @@ export function createStore() {
     switchConversation,
     // Memory management
     memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
+    // File creation inline input
+    newItemInput, showToast,
     // Side question (/btw)
     btwState, btwPending,
     // Plan mode
@@ -348,7 +348,7 @@ export function createStore() {
 
   // Team module
   const team = createTeam({
-    wsSend, scrollToBottom, loadingTeams,
+    wsSend, scrollToBottom, loadingTeams, t,
   });
   setTeam(team);
   // Loop module
@@ -367,7 +367,8 @@ export function createStore() {
   const fileBrowser = createFileBrowser({
     wsSend, workDir, inputText, inputRef, sendMessage,
     filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
-    sidebarOpen, sidebarView,
+    sidebarOpen, sidebarView, newItemInput, requireVersion, t,
+    previewFile, closePreview: () => filePreview.closePreview(),
   });
   setFileBrowser(fileBrowser);
   sidebar.setFileBrowser(fileBrowser);
@@ -709,8 +710,7 @@ export function createStore() {
     // Folder picker state
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected,
-    // Delete/rename session state
-    deleteConfirmOpen, deleteConfirmTitle,
+    // Rename session state
     renamingSessionId, renameText,
     // Working directory
     workdirHistory, workdirSwitching, workdirMenuOpen,
@@ -723,7 +723,7 @@ export function createStore() {
     fileBrowser, filePreview,
     flattenedTree: fileBrowser.flattenedTree,
     // File browser state
-    filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
+    filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu, newItemInput,
     // File preview state
     previewPanelOpen, previewPanelWidth, previewFile, previewLoading, previewMarkdownRendered,
     isMemoryPreview,

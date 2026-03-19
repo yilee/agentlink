@@ -1,5 +1,6 @@
 // ── File Browser: tree state, lazy loading, context menu, file actions ────────
 import { computed, nextTick } from 'vue';
+import { useConfirmDialog } from '../composables/useConfirmDialog.js';
 
 /**
  * Creates the file browser controller.
@@ -10,6 +11,7 @@ export function createFileBrowser(deps) {
     wsSend, workDir, inputText, inputRef,
     filePanelOpen, fileTreeRoot, fileTreeLoading, fileContextMenu,
     sidebarOpen, sidebarView, filePanelWidth,
+    newItemInput, requireVersion, t, previewFile, closePreview,
   } = deps;
 
   // Map of dirPath → TreeNode awaiting directory_listing response
@@ -209,14 +211,13 @@ export function createFileBrowser(deps) {
   // ── Context menu ──
 
   function onFileClick(event, node) {
-    if (node.type === 'directory') return;
     event.stopPropagation();
 
     // Position the menu near the click, adjusting for viewport edges
     let x = event.clientX;
     let y = event.clientY;
     const menuWidth = 220;
-    const menuHeight = 120; // approx 3 items
+    const menuHeight = node.type === 'directory' ? 80 : 120; // fewer items for folders
     if (x + menuWidth > window.innerWidth) {
       x = window.innerWidth - menuWidth - 8;
     }
@@ -231,6 +232,7 @@ export function createFileBrowser(deps) {
       y,
       path: node.path,
       name: node.name,
+      isDirectory: node.type === 'directory',
     };
   }
 
@@ -375,6 +377,73 @@ export function createFileBrowser(deps) {
     localStorage.setItem('agentlink-file-panel-width', String(filePanelWidth.value));
   }
 
+  // ── Create new file / folder ──
+
+  function startNewFile(dirPath) {
+    if (requireVersion && !requireVersion('0.1.114', 'Create File')) return;
+    closeContextMenu();
+    newItemInput.value = { type: 'file', dirPath, name: '' };
+  }
+
+  function startNewFolder(dirPath) {
+    if (requireVersion && !requireVersion('0.1.114', 'Create Folder')) return;
+    closeContextMenu();
+    newItemInput.value = { type: 'folder', dirPath, name: '' };
+  }
+
+  function confirmNewItem(name) {
+    if (!newItemInput.value || !name.trim()) return;
+    const { type, dirPath } = newItemInput.value;
+    if (type === 'file') {
+      wsSend({ type: 'create_file', dirPath, fileName: name.trim() });
+    } else {
+      wsSend({ type: 'create_directory', dirPath, dirName: name.trim() });
+    }
+  }
+
+  function cancelNewItem() {
+    newItemInput.value = null;
+  }
+
+  // ── Delete file / folder ──
+
+  const { showConfirm } = useConfirmDialog();
+
+  function deleteItem(path, name, isDirectory) {
+    if (requireVersion && !requireVersion('0.1.114', 'Delete File')) return;
+    closeContextMenu();
+    const title = isDirectory
+      ? (t ? t('file.deleteFolder') : 'Delete Folder')
+      : (t ? t('file.deleteFile') : 'Delete File');
+    const message = isDirectory
+      ? (t ? t('file.confirmDeleteFolder', { name }) : `Delete folder "${name}" and all its contents?`)
+      : (t ? t('file.confirmDelete', { name }) : `Delete "${name}"?`);
+    showConfirm({
+      title,
+      message,
+      itemName: name,
+      warning: t ? t('dialog.cannotUndo') : 'This action cannot be undone.',
+      confirmText: t ? t('dialog.delete') : 'Delete',
+      onConfirm: () => {
+        wsSend({ type: 'delete_file', filePath: path });
+      },
+    });
+  }
+
+  function handleFileDeleted(msg) {
+    if (msg.success) {
+      refreshTree();
+      // Close preview if the deleted file/folder was being previewed
+      if (previewFile && previewFile.value && closePreview) {
+        const previewPath = previewFile.value.filePath;
+        const deletedPath = msg.filePath;
+        if (previewPath === deletedPath || previewPath.startsWith(deletedPath + '/') || previewPath.startsWith(deletedPath + '\\')) {
+          closePreview();
+        }
+      }
+    }
+  }
+
   // Set up listeners immediately
   setupGlobalListeners();
 
@@ -394,5 +463,11 @@ export function createFileBrowser(deps) {
     onWorkdirChanged,
     flattenedTree,
     onResizeStart,
+    startNewFile,
+    startNewFolder,
+    confirmNewItem,
+    cancelNewItem,
+    deleteItem,
+    handleFileDeleted,
   };
 }

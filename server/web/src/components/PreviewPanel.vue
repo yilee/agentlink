@@ -1,10 +1,11 @@
 <script setup>
-import { inject } from 'vue';
+import { inject, ref, watch, nextTick } from 'vue';
+import { useMonacoEditor } from '../composables/useMonacoEditor.js';
 
 const store = inject('store');
 const filesStore = inject('files');
 
-const { t, isMobile } = store;
+const { t, isMobile, theme } = store;
 
 const {
   previewPanelOpen,
@@ -28,6 +29,38 @@ const {
   cancelFileEdit,
   saveFileEdit,
 } = filesStore;
+
+// Monaco editor (desktop only)
+const monacoContainer = ref(null);
+
+function doSaveFile() {
+  if (monacoEditor.editorReady.value) {
+    fileEditContent.value = monacoEditor.getContent();
+  }
+  saveFileEdit();
+}
+
+function doCancelFile() {
+  monacoEditor.dispose();
+  cancelFileEdit();
+}
+
+const monacoEditor = useMonacoEditor(theme, {
+  onSave: doSaveFile,
+  onCancel: doCancelFile,
+});
+
+// Initialize Monaco when file editing starts
+watch(fileEditing, async (editing) => {
+  if (editing && !isMobile.value) {
+    await nextTick();
+    if (monacoContainer.value) {
+      monacoEditor.init(monacoContainer.value, fileEditContent.value, previewFile.value?.fileName);
+    }
+  } else {
+    monacoEditor.dispose();
+  }
+});
 </script>
 
 <template>
@@ -67,8 +100,8 @@ const {
               {{ t('file.edit') }}
             </button>
             <span v-if="fileEditing" class="preview-edit-label">{{ t('file.editing') }}</span>
-            <button v-if="fileEditing" class="memory-header-cancel" @click="cancelFileEdit()">{{ t('loop.cancel') }}</button>
-            <button v-if="fileEditing" class="memory-header-save" @click="saveFileEdit()" :disabled="fileSaving">
+            <button v-if="fileEditing" class="memory-header-cancel" @click="doCancelFile()">{{ t('loop.cancel') }}</button>
+            <button v-if="fileEditing" class="memory-header-save" @click="doSaveFile()" :disabled="fileSaving">
               {{ fileSaving ? t('memory.saving') : t('memory.save') }}
             </button>
             <span v-if="memoryEditing" class="preview-edit-label">{{ t('memory.editing') }}</span>
@@ -76,7 +109,7 @@ const {
             <button v-if="memoryEditing" class="memory-header-save" @click="saveMemoryEdit()" :disabled="memorySaving">
               {{ memorySaving ? t('memory.saving') : t('memory.save') }}
             </button>
-            <button class="preview-panel-close" @click="filePreview.closePreview(); memoryEditing = false; fileEditing = false" :title="t('preview.closePreview')">&times;</button>
+            <button class="preview-panel-close" @click="monacoEditor.dispose(); filePreview.closePreview(); memoryEditing = false; fileEditing = false" :title="t('preview.closePreview')">&times;</button>
           </div>
           <div class="preview-panel-body">
             <!-- Diff view -->
@@ -104,10 +137,8 @@ const {
                 </template>
               </div>
             </template>
-            <!-- General file editing -->
-            <div v-else-if="fileEditing" class="memory-edit-container">
-              <textarea class="memory-edit-textarea" v-model="fileEditContent"></textarea>
-            </div>
+            <!-- General file editing (Monaco on desktop, textarea on mobile fallback) -->
+            <div v-else-if="fileEditing" class="monaco-edit-container" ref="monacoContainer"></div>
             <!-- Memory editing -->
             <div v-else-if="memoryEditing" class="memory-edit-container">
               <textarea class="memory-edit-textarea" v-model="memoryEditContent"></textarea>
@@ -124,7 +155,7 @@ const {
             <div v-else-if="previewFile?.content && previewMarkdownRendered && filePreview.isMarkdownFile(previewFile.fileName)"
                  class="preview-markdown-rendered markdown-body" v-html="filePreview.renderedMarkdownHtml(previewFile.content)">
             </div>
-            <div v-else-if="previewFile?.content" class="preview-text-container">
+            <div v-else-if="previewFile?.content || (previewFile?.encoding === 'utf8' && previewFile?.content === '')" class="preview-text-container">
               <pre class="preview-code"><code v-html="filePreview.highlightCode(previewFile.content, previewFile.fileName)"></code></pre>
               <div v-if="previewFile.truncated" class="preview-truncated-notice">
                 {{ t('preview.fileTruncated', { size: filePreview.formatFileSize(previewFile.totalSize) }) }}

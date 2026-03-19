@@ -1,6 +1,8 @@
 <script setup>
 import { inject } from 'vue';
 
+const vFocus = { mounted: (el) => el.focus() };
+
 const store = inject('store');
 const filesStore = inject('files');
 
@@ -20,6 +22,7 @@ const {
   fileTreeRoot,
   fileTreeLoading,
   memoryFiles,
+  newItemInput,
 } = filesStore;
 </script>
 
@@ -31,6 +34,12 @@ const {
           <div class="file-panel-header">
             <span class="file-panel-title">{{ t('filePanel.files') }}</span>
             <div class="file-panel-actions">
+              <button class="file-panel-btn" @click="fileBrowser.startNewFile(workDir)" :title="t('file.newFile')">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 14h-3v3h-2v-3H8v-2h3v-3h2v3h3v2zm-3-7V3.5L18.5 9H13z"/></svg>
+              </button>
+              <button class="file-panel-btn" @click="fileBrowser.startNewFolder(workDir)" :title="t('file.newFolder')">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3H11v-2h3V9h2v3h3v2z"/></svg>
+              </button>
               <button class="file-panel-btn" @click="fileBrowser.refreshTree()" :title="t('sidebar.refresh')">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
               </button>
@@ -41,17 +50,31 @@ const {
           </div>
           <div class="file-panel-breadcrumb" :title="workDir">{{ workDir }}</div>
           <div v-if="fileTreeLoading" class="file-panel-loading">{{ t('filePanel.loading') }}</div>
-          <div v-else-if="!fileTreeRoot || !fileTreeRoot.children || fileTreeRoot.children.length === 0" class="file-panel-empty">
+          <div v-else-if="(!fileTreeRoot || !fileTreeRoot.children || fileTreeRoot.children.length === 0) && !(newItemInput && fileTreeRoot && newItemInput.dirPath === fileTreeRoot.path)" class="file-panel-empty">
             {{ t('filePanel.noFiles') }}
           </div>
           <div v-else class="file-tree">
+            <div v-if="newItemInput && fileTreeRoot && newItemInput.dirPath === fileTreeRoot.path" class="file-tree-new-item" style="padding-left: 8px;">
+              <span class="file-tree-file-icon">
+                <svg v-if="newItemInput.type === 'folder'" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z"/></svg>
+                <svg v-else viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+              </span>
+              <input
+                class="file-tree-new-input"
+                :placeholder="newItemInput.type === 'file' ? t('file.enterFileName') : t('file.enterFolderName')"
+                @keydown.enter="fileBrowser.confirmNewItem($event.target.value)"
+                @keydown.escape="fileBrowser.cancelNewItem()"
+                @blur="fileBrowser.cancelNewItem()"
+                v-focus
+              />
+            </div>
             <template v-for="item in flattenedTree" :key="item.node.path">
               <div
                 class="file-tree-item"
                 :class="{ folder: item.node.type === 'directory' }"
                 :style="{ paddingLeft: (item.depth * 16 + 8) + 'px' }"
                 @click="item.node.type === 'directory' ? fileBrowser.toggleFolder(item.node) : filePreview.openPreview(item.node.path)"
-                @contextmenu.prevent="item.node.type !== 'directory' ? fileBrowser.onFileClick($event, item.node) : null"
+                @contextmenu.prevent="fileBrowser.onFileClick($event, item.node)"
               >
                 <span v-if="item.node.type === 'directory'" class="file-tree-arrow" :class="{ expanded: item.node.expanded }">&#9654;</span>
                 <span v-else class="file-tree-file-icon">
@@ -60,7 +83,21 @@ const {
                 <span class="file-tree-name" :title="item.node.path">{{ item.node.name }}</span>
                 <span v-if="item.node.loading" class="file-tree-spinner"></span>
               </div>
-              <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ t('filePanel.empty') }}</div>
+              <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading && !(newItemInput && newItemInput.dirPath === item.node.path)" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ t('filePanel.empty') }}</div>
+              <div v-if="newItemInput && newItemInput.dirPath === item.node.path && item.node.expanded" class="file-tree-new-item" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">
+                <span class="file-tree-file-icon">
+                  <svg v-if="newItemInput.type === 'folder'" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z"/></svg>
+                  <svg v-else viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+                </span>
+                <input
+                  class="file-tree-new-input"
+                  :placeholder="newItemInput.type === 'file' ? t('file.enterFileName') : t('file.enterFolderName')"
+                  @keydown.enter="fileBrowser.confirmNewItem($event.target.value)"
+                  @keydown.escape="fileBrowser.cancelNewItem()"
+                  @blur="fileBrowser.cancelNewItem()"
+                  v-focus
+                />
+              </div>
               <div v-if="item.node.error" class="file-tree-error" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ item.node.error }}</div>
             </template>
           </div>

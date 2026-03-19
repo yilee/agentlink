@@ -1,6 +1,7 @@
 // ── Team mode: state management and message routing ───────────────────────
 import { ref, computed } from 'vue';
 import { TEMPLATES, TEMPLATE_KEYS, buildFullLeadPrompt } from './teamTemplates.js';
+import { useConfirmDialog } from '../composables/useConfirmDialog.js';
 
 const MAX_FEED_ENTRIES = 200;
 
@@ -17,7 +18,7 @@ const AGENT_COLORS = [
  * @param {Function} deps.scrollToBottom
  */
 export function createTeam(deps) {
-  const { wsSend, scrollToBottom, loadingTeams } = deps;
+  const { wsSend, scrollToBottom, loadingTeams, t } = deps;
 
   // ── Reactive state ──
 
@@ -42,9 +43,6 @@ export function createTeam(deps) {
   // --- Team panel refs (moved from store.js) ---
   const renamingTeamId = ref(null);
   const renameTeamText = ref('');
-  const deleteTeamConfirmOpen = ref(false);
-  const deleteTeamConfirmTitle = ref('');
-  const pendingDeleteTeamId = ref(null);
   const teamInstruction = ref('');
   const selectedTemplate = ref('custom');
   const editedLeadPrompt = ref(TEMPLATES.custom.leadPrompt);
@@ -441,22 +439,20 @@ export function createTeam(deps) {
     renameTeamText.value = '';
   }
 
+  const { showConfirm } = useConfirmDialog();
+
   function requestDeleteTeam(tm) {
-    pendingDeleteTeamId.value = tm.teamId;
-    deleteTeamConfirmTitle.value = tm.title || tm.teamId.slice(0, 8);
-    deleteTeamConfirmOpen.value = true;
-  }
-
-  function confirmDeleteTeam() {
-    if (!pendingDeleteTeamId.value) return;
-    deleteTeamById(pendingDeleteTeamId.value);
-    deleteTeamConfirmOpen.value = false;
-    pendingDeleteTeamId.value = null;
-  }
-
-  function cancelDeleteTeam() {
-    deleteTeamConfirmOpen.value = false;
-    pendingDeleteTeamId.value = null;
+    const title = tm.title || tm.teamId.slice(0, 8);
+    showConfirm({
+      title: t('dialog.deleteTeam'),
+      message: t('dialog.deleteTeamConfirm'),
+      itemName: title,
+      warning: t('dialog.cannotUndo'),
+      confirmText: t('dialog.delete'),
+      onConfirm: () => {
+        deleteTeamById(tm.teamId);
+      },
+    });
   }
 
   function onTemplateChange(key) {
@@ -535,7 +531,6 @@ export function createTeam(deps) {
     leadPromptExpanded, kanbanExpanded, instructionExpanded,
     // Rename/delete state
     renamingTeamId, renameTeamText,
-    deleteTeamConfirmOpen, deleteTeamConfirmTitle, pendingDeleteTeamId,
     // Computed
     isTeamActive, isTeamRunning, displayTeam,
     pendingTasks, activeTasks, doneTasks, failedTasks,
@@ -548,7 +543,7 @@ export function createTeam(deps) {
     getAgentColor, findAgent, getAgentMessages, backToChat, newTeam,
     // Rename/delete methods
     startTeamRename, confirmTeamRename, cancelTeamRename,
-    requestDeleteTeam, confirmDeleteTeam, cancelDeleteTeam,
+    requestDeleteTeam,
     // Template methods
     onTemplateChange, resetLeadPrompt, leadPromptPreview, launchTeamFromPanel,
     // Utility methods
