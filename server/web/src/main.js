@@ -15,6 +15,7 @@ import './css/team.css';
 import './css/responsive.css';
 import './css/loop.css';
 import './css/btw.css';
+import './css/toast.css';
 
 function mountApp() {
   createApp(App).mount('#app');

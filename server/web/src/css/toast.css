@@ -1,0 +1,146 @@
+/* ── Toast Notifications ── */
+.toast-container {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+  max-width: 420px;
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.toast-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-message code {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.78rem;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+/* Warning (amber) */
+.toast-warning {
+  color: #7a4f01;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+}
+
+.toast-warning .toast-close {
+  color: #7a4f01;
+}
+
+/* Error (red) */
+.toast-error {
+  color: #b71c1c;
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+}
+
+.toast-error .toast-close {
+  color: #b71c1c;
+}
+
+/* Info (blue) */
+.toast-info {
+  color: #0d47a1;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+}
+
+.toast-info .toast-close {
+  color: #0d47a1;
+}
+
+/* Dark mode */
+[data-theme="dark"] .toast-warning {
+  color: #ffcc02;
+  background: rgba(255, 193, 7, 0.12);
+  border-color: rgba(255, 193, 7, 0.25);
+}
+
+[data-theme="dark"] .toast-warning .toast-close {
+  color: #ffcc02;
+}
+
+[data-theme="dark"] .toast-error {
+  color: #ef9a9a;
+  background: rgba(244, 67, 54, 0.12);
+  border-color: rgba(244, 67, 54, 0.25);
+}
+
+[data-theme="dark"] .toast-error .toast-close {
+  color: #ef9a9a;
+}
+
+[data-theme="dark"] .toast-info {
+  color: #90caf9;
+  background: rgba(33, 150, 243, 0.12);
+  border-color: rgba(33, 150, 243, 0.25);
+}
+
+[data-theme="dark"] .toast-info .toast-close {
+  color: #90caf9;
+}
+
+[data-theme="dark"] .toast-message code {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Transitions */
+.toast-enter-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}

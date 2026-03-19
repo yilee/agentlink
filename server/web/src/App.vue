@@ -15,6 +15,7 @@ import LoopView from './components/LoopView.vue';
 import ChatView from './components/ChatView.vue';
 import ChatInput from './components/ChatInput.vue';
 import PreviewPanel from './components/PreviewPanel.vue';
+import ToastContainer from './components/ToastContainer.vue';
 
 // Create store inside component setup() so onMounted/onUnmounted hooks fire correctly
 const store = createStore();
@@ -115,4 +116,6 @@ const {
         </div>
       </div>
     </div>
+
+    <ToastContainer />
 </template>

@@ -26,6 +26,8 @@ import { createScrollManager, createHighlightScheduler, formatUsage } from './mo
 import { createI18n } from './modules/i18n.js';
 import { useTheme } from './composables/useTheme.js';
 import { useSlashMenu } from './composables/useSlashMenu.js';
+import { useToast } from './composables/useToast.js';
+import { meetsMinVersion } from './modules/version.js';
 
 /**
  * Creates the application store.
@@ -241,6 +243,15 @@ export function createStore() {
 
   // Theme
   const { theme, toggleTheme } = useTheme();
+
+  // ── Toast notifications ──
+  const { showToast, dismissToast } = useToast();
+
+  function requireVersion(minVer, featureName) {
+    if (meetsMinVersion(agentVersion.value, minVer)) return true;
+    showToast(`${featureName} requires agent ${minVer}+. Run <code>agentlink-client upgrade</code>`);
+    return false;
+  }
 
   // ── i18n ──
   const { t, locale, setLocale, toggleLocale, localeLabel } = createI18n();
@@ -770,6 +781,8 @@ export function createStore() {
     hasQuestionAnswer, getQuestionResponseSummary,
     // Theme
     theme, toggleTheme,
+    // Toast & version gating
+    showToast, dismissToast, requireVersion,
     // i18n
     t, locale, toggleLocale, localeLabel, displayStatus,
     // Auth

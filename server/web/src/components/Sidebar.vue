@@ -1,5 +1,5 @@
 <script setup>
-import { inject, ref } from 'vue';
+import { inject } from 'vue';
 
 import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
@@ -35,19 +35,9 @@ const {
 } = sidebarStore;
 
 const isMsRoute = window.location.pathname.startsWith('/ms/');
-const brainHomeWarning = ref(false);
 
 function goToBrainHome() {
-  const v = agentVersion.value;
-  if (v) {
-    const parts = v.split('.').map(Number);
-    const num = (parts[0] || 0) * 1e8 + (parts[1] || 0) * 1e4 + (parts[2] || 0);
-    if (num < 0 * 1e8 + 1 * 1e4 + 112) {
-      brainHomeWarning.value = true;
-      setTimeout(() => { brainHomeWarning.value = false; }, 5000);
-      return;
-    }
-  }
+  if (!store.requireVersion('0.1.112', 'Brain Home')) return;
   switchToWorkdir('~/.brain/BrainCore');
 }
 
@@ -448,11 +438,6 @@ const {
                 <span class="brain-home-icon">🧠</span>
                 <span>Brain Home</span>
               </div>
-              <transition name="brain-warn">
-                <div v-if="brainHomeWarning" class="brain-home-warning">
-                  Agent 0.1.112+ required. Run <code>agentlink-client upgrade</code>
-                </div>
-              </transition>
               <div v-if="workdirMenuOpen" class="workdir-menu">
                 <div class="workdir-menu-item" @click.stop="workdirMenuBrowse()">
                   <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13h8v2H8v-2z"/></svg>
