@@ -497,3 +497,38 @@
   }
 }
 
+/* ══════════════════════════════════════════
+   Monaco Editor Container
+   ══════════════════════════════════════════ */
+.monaco-edit-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ══════════════════════════════════════════
+   Inline New File / Folder Input
+   ══════════════════════════════════════════ */
+.file-tree-new-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.file-tree-new-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--accent);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  outline: none;
+}
+
+.file-tree-new-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}

@@ -270,6 +270,10 @@
   "file.editing": "Editing",
   "file.discardChanges": "You have unsaved changes. Discard?",
   "file.saveFailed": "Save failed: {error}",
+  "file.newFile": "New File",
+  "file.newFolder": "New Folder",
+  "file.enterFileName": "File name...",
+  "file.enterFolderName": "Folder name...",
 
   "slash.cost": "Show token usage and cost",
   "slash.context": "Show context usage",

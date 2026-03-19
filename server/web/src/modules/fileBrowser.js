@@ -10,6 +10,7 @@ export function createFileBrowser(deps) {
     wsSend, workDir, inputText, inputRef,
     filePanelOpen, fileTreeRoot, fileTreeLoading, fileContextMenu,
     sidebarOpen, sidebarView, filePanelWidth,
+    newItemInput, requireVersion,
   } = deps;
 
   // Map of dirPath → TreeNode awaiting directory_listing response
@@ -209,14 +210,13 @@ export function createFileBrowser(deps) {
   // ── Context menu ──
 
   function onFileClick(event, node) {
-    if (node.type === 'directory') return;
     event.stopPropagation();
 
     // Position the menu near the click, adjusting for viewport edges
     let x = event.clientX;
     let y = event.clientY;
     const menuWidth = 220;
-    const menuHeight = 120; // approx 3 items
+    const menuHeight = node.type === 'directory' ? 80 : 120; // fewer items for folders
     if (x + menuWidth > window.innerWidth) {
       x = window.innerWidth - menuWidth - 8;
     }
@@ -231,6 +231,7 @@ export function createFileBrowser(deps) {
       y,
       path: node.path,
       name: node.name,
+      isDirectory: node.type === 'directory',
     };
   }
 
@@ -375,6 +376,34 @@ export function createFileBrowser(deps) {
     localStorage.setItem('agentlink-file-panel-width', String(filePanelWidth.value));
   }
 
+  // ── Create new file / folder ──
+
+  function startNewFile(dirPath) {
+    if (requireVersion && !requireVersion('0.1.114', 'Create File')) return;
+    closeContextMenu();
+    newItemInput.value = { type: 'file', dirPath, name: '' };
+  }
+
+  function startNewFolder(dirPath) {
+    if (requireVersion && !requireVersion('0.1.114', 'Create Folder')) return;
+    closeContextMenu();
+    newItemInput.value = { type: 'folder', dirPath, name: '' };
+  }
+
+  function confirmNewItem(name) {
+    if (!newItemInput.value || !name.trim()) return;
+    const { type, dirPath } = newItemInput.value;
+    if (type === 'file') {
+      wsSend({ type: 'create_file', dirPath, fileName: name.trim() });
+    } else {
+      wsSend({ type: 'create_directory', dirPath, dirName: name.trim() });
+    }
+  }
+
+  function cancelNewItem() {
+    newItemInput.value = null;
+  }
+
   // Set up listeners immediately
   setupGlobalListeners();
 
@@ -394,5 +423,9 @@ export function createFileBrowser(deps) {
     onWorkdirChanged,
     flattenedTree,
     onResizeStart,
+    startNewFile,
+    startNewFolder,
+    confirmNewItem,
+    cancelNewItem,
   };
 }

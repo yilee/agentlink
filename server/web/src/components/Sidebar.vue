@@ -5,6 +5,8 @@ import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
 
+const vFocus = { mounted: (el) => el.focus() };
+
 const store = inject('store');
 const sidebarStore = inject('sidebar');
 const filesStore = inject('files');
@@ -70,6 +72,7 @@ const {
   startFileEdit,
   cancelFileEdit,
   saveFileEdit,
+  newItemInput,
 } = filesStore;
 </script>
 
@@ -101,7 +104,7 @@ const {
                   :class="{ folder: item.node.type === 'directory' }"
                   :style="{ paddingLeft: (item.depth * 16 + 8) + 'px' }"
                   @click="item.node.type === 'directory' ? fileBrowser.toggleFolder(item.node) : filePreview.openPreview(item.node.path)"
-                  @contextmenu.prevent="item.node.type !== 'directory' ? fileBrowser.onFileClick($event, item.node) : null"
+                  @contextmenu.prevent="fileBrowser.onFileClick($event, item.node)"
                 >
                   <span v-if="item.node.type === 'directory'" class="file-tree-arrow" :class="{ expanded: item.node.expanded }">&#9654;</span>
                   <span v-else class="file-tree-file-icon">
@@ -110,7 +113,21 @@ const {
                   <span class="file-tree-name" :title="item.node.path">{{ item.node.name }}</span>
                   <span v-if="item.node.loading" class="file-tree-spinner"></span>
                 </div>
-                <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ t('filePanel.empty') }}</div>
+                <div v-if="item.node.type === 'directory' && item.node.expanded && item.node.children && item.node.children.length === 0 && !item.node.loading && !(newItemInput && newItemInput.dirPath === item.node.path)" class="file-tree-empty" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ t('filePanel.empty') }}</div>
+                <div v-if="newItemInput && newItemInput.dirPath === item.node.path && item.node.expanded" class="file-tree-new-item" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">
+                  <span class="file-tree-file-icon">
+                    <svg v-if="newItemInput.type === 'folder'" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2z"/></svg>
+                    <svg v-else viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+                  </span>
+                  <input
+                    class="file-tree-new-input"
+                    :placeholder="newItemInput.type === 'file' ? t('file.enterFileName') : t('file.enterFolderName')"
+                    @keydown.enter="fileBrowser.confirmNewItem($event.target.value)"
+                    @keydown.escape="fileBrowser.cancelNewItem()"
+                    @blur="fileBrowser.cancelNewItem()"
+                    v-focus
+                  />
+                </div>
                 <div v-if="item.node.error" class="file-tree-error" :style="{ paddingLeft: ((item.depth + 1) * 16 + 8) + 'px' }">{{ item.node.error }}</div>
               </template>
             </div>

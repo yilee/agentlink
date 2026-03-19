@@ -1,7 +1,7 @@
 // ── Filesystem handlers for directory listing, file reading, workdir changes ──
 import os from 'os';
 import { existsSync } from 'fs';
-import { readdir, stat, writeFile } from 'fs/promises';
+import { readdir, stat, writeFile, mkdir } from 'fs/promises';
 import { resolve, isAbsolute, basename, extname, sep } from 'path';
 import { readFileForPreview, TEXT_EXTENSIONS, TEXT_FILENAMES } from './file-readers.js';
 
@@ -175,5 +175,112 @@ export async function handleUpdateFile(
   } catch (err) {
     send({ type: 'file_updated', filePath, success: false,
            error: (err as Error).message });
+  }
+}
+
+function isValidName(name: string): boolean {
+  if (!name || name.includes('/') || name.includes('\\') || name.includes('..') || name.includes('\0')) {
+    return false;
+  }
+  return true;
+}
+
+export async function handleCreateFile(
+  msg: { dirPath: string; fileName: string },
+  workDir: string,
+  send: SendFn,
+): Promise<void> {
+  const { dirPath, fileName } = msg;
+
+  try {
+    if (!isValidName(fileName)) {
+      send({ type: 'file_created', success: false, error: 'Invalid file name' });
+      return;
+    }
+
+    const resolvedDir = isAbsolute(dirPath) ? resolve(dirPath) : resolve(workDir, dirPath);
+    const normalizedWorkDir = resolve(workDir);
+
+    // Security: parent must be under workDir
+    if (!resolvedDir.startsWith(normalizedWorkDir + sep) && resolvedDir !== normalizedWorkDir) {
+      send({ type: 'file_created', success: false,
+             error: 'Cannot create files outside the working directory' });
+      return;
+    }
+
+    // Parent directory must exist
+    try {
+      const dirStat = await stat(resolvedDir);
+      if (!dirStat.isDirectory()) {
+        send({ type: 'file_created', success: false, error: 'Parent path is not a directory' });
+        return;
+      }
+    } catch {
+      send({ type: 'file_created', success: false, error: 'Parent directory does not exist' });
+      return;
+    }
+
+    const targetPath = resolve(resolvedDir, fileName);
+
+    // Must not already exist
+    if (existsSync(targetPath)) {
+      send({ type: 'file_created', success: false, error: 'File already exists' });
+      return;
+    }
+
+    await writeFile(targetPath, '', 'utf8');
+    send({ type: 'file_created', success: true, filePath: targetPath });
+  } catch (err) {
+    send({ type: 'file_created', success: false, error: (err as Error).message });
+  }
+}
+
+export async function handleCreateDirectory(
+  msg: { dirPath: string; dirName: string },
+  workDir: string,
+  send: SendFn,
+): Promise<void> {
+  const { dirPath, dirName } = msg;
+
+  try {
+    if (!isValidName(dirName)) {
+      send({ type: 'directory_created', success: false, error: 'Invalid folder name' });
+      return;
+    }
+
+    const resolvedDir = isAbsolute(dirPath) ? resolve(dirPath) : resolve(workDir, dirPath);
+    const normalizedWorkDir = resolve(workDir);
+
+    // Security: parent must be under workDir
+    if (!resolvedDir.startsWith(normalizedWorkDir + sep) && resolvedDir !== normalizedWorkDir) {
+      send({ type: 'directory_created', success: false,
+             error: 'Cannot create folders outside the working directory' });
+      return;
+    }
+
+    // Parent directory must exist
+    try {
+      const dirStat = await stat(resolvedDir);
+      if (!dirStat.isDirectory()) {
+        send({ type: 'directory_created', success: false, error: 'Parent path is not a directory' });
+        return;
+      }
+    } catch {
+      send({ type: 'directory_created', success: false, error: 'Parent directory does not exist' });
+      return;
+    }
+
+    const targetPath = resolve(resolvedDir, dirName);
+
+    // Must not already exist
+    if (existsSync(targetPath)) {
+      send({ type: 'directory_created', success: false, error: 'Folder already exists' });
+      return;
+    }
+
+    await mkdir(targetPath);
+    send({ type: 'directory_created', success: true, dirPath: targetPath });
+  } catch (err) {
+    send({ type: 'directory_created', success: false, error: (err as Error).message });
   }
 }

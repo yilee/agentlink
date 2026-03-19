@@ -133,6 +133,9 @@ export function createStore() {
   const fileTreeRoot = ref(null);
   const fileTreeLoading = ref(false);
   const fileContextMenu = ref(null);
+  // Inline input state for creating new files/folders in file browser
+  // { type: 'file'|'folder', dirPath: string, parentNode: object } or null
+  const newItemInput = ref(null);
   const sidebarView = ref('sessions');
   const isMobile = ref(window.innerWidth <= 768);
   const workdirMenuOpen = ref(false);
@@ -328,6 +331,8 @@ export function createStore() {
     switchConversation,
     // Memory management
     memoryFiles, memoryDir, memoryLoading, memoryEditing, memoryEditContent, memorySaving, memoryPanelOpen,
+    // File creation inline input
+    newItemInput, showToast,
     // Side question (/btw)
     btwState, btwPending,
     // Plan mode
@@ -367,7 +372,7 @@ export function createStore() {
   const fileBrowser = createFileBrowser({
     wsSend, workDir, inputText, inputRef, sendMessage,
     filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
-    sidebarOpen, sidebarView,
+    sidebarOpen, sidebarView, newItemInput, requireVersion,
   });
   setFileBrowser(fileBrowser);
   sidebar.setFileBrowser(fileBrowser);
@@ -723,7 +728,7 @@ export function createStore() {
     fileBrowser, filePreview,
     flattenedTree: fileBrowser.flattenedTree,
     // File browser state
-    filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu,
+    filePanelOpen, filePanelWidth, fileTreeRoot, fileTreeLoading, fileContextMenu, newItemInput,
     // File preview state
     previewPanelOpen, previewPanelWidth, previewFile, previewLoading, previewMarkdownRendered,
     isMemoryPreview,

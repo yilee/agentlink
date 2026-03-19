@@ -270,6 +270,10 @@
   "file.editing": "编辑中",
   "file.discardChanges": "您有未保存的更改。放弃？",
   "file.saveFailed": "保存失败：{error}",
+  "file.newFile": "新建文件",
+  "file.newFolder": "新建文件夹",
+  "file.enterFileName": "文件名...",
+  "file.enterFolderName": "文件夹名...",
 
   "slash.cost": "显示 Token 用量和费用",
   "slash.context": "显示上下文用量",
