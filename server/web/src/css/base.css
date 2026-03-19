@@ -17,6 +17,7 @@
 }
 
 :root {
+  color-scheme: dark;
   --bg-primary: #1e1e1e;
   --bg-secondary: #252525;
   --bg-tertiary: #2f2f2f;
@@ -39,6 +40,7 @@
 
 /* ── Light theme ── */
 [data-theme="light"] {
+  color-scheme: light;
   --bg-primary: #fefcf8;
   --bg-secondary: #f5f3ef;
   --bg-tertiary: #e8e6e1;
