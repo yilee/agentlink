@@ -309,6 +309,8 @@ export function createStore() {
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations, activeClaudeSessions,
     switchConversation,
+    // Brain mode
+    setBrainMode,
     // i18n
     t,
   });

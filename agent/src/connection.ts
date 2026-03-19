@@ -257,6 +257,12 @@ function scheduleReconnect(config: AgentConfig): void {
   }, delay);
 }
 
+const BRAIN_HOME_DIR = path.resolve(os.homedir(), '.brain', 'BrainCore');
+
+function isBrainHomeDir(dir: string): boolean {
+  return path.resolve(dir) === BRAIN_HOME_DIR;
+}
+
 function handleServerMessage(msg: { type: string; [key: string]: unknown }): void {
   console.log(`[AgentLink] ← ${msg.type}`);
   switch (msg.type) {
@@ -264,11 +270,13 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const chatConvId = (msg as unknown as { conversationId?: string }).conversationId;
       const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
       const isBrainMode = (msg as unknown as { brainMode?: boolean }).brainMode;
-      console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${isBrainMode}`);
+      const chatWorkDir = existingConv?.workDir || state.workDir;
+      const effectiveBrainMode = isBrainMode || isBrainHomeDir(chatWorkDir);
+      console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${effectiveBrainMode} (explicit=${isBrainMode}, workDir=${isBrainHomeDir(chatWorkDir)})`);
       const chatOptions: { resumeSessionId?: string; brainMode?: boolean } = {
         resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       };
-      if (isBrainMode) {
+      if (effectiveBrainMode) {
         chatOptions.brainMode = true;
       }
       claudeHandleChat(
@@ -344,8 +352,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         }
       }
 
-      // Determine brain mode from persisted metadata
+      // Determine brain mode from persisted metadata or workDir
       const sessionMeta = loadSessionMetadata(m.claudeSessionId);
+      const resumeBrainMode = sessionMeta.brainMode || isBrainHomeDir(state.workDir);
 
       send({
         type: 'conversation_resumed',
@@ -355,7 +364,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         isCompacting: isSameSession && (convId ? getIsCompacting(convId) : getIsCompacting()),
         isProcessing: isSameSession && currentConv?.turnActive === true,
         planMode,
-        brainMode: sessionMeta.brainMode || false,
+        brainMode: resumeBrainMode,
       });
       break;
     }
@@ -686,8 +695,14 @@ function handleListSessions(): void {
   try {
     const sessions = listSessions(state.workDir);
     const metaMap = loadAllSessionMetadata();
-    const enriched = sessions.map(s => ({ ...s, ...metaMap.get(s.sessionId) }));
-    console.log(`[AgentLink] → sessions_list (${sessions.length} sessions for ${state.workDir})`);
+    const isBrainHome = isBrainHomeDir(state.workDir);
+    const enriched = sessions.map(s => ({
+      ...s,
+      ...metaMap.get(s.sessionId),
+      // All sessions under Brain Home are brain sessions
+      ...(isBrainHome ? { brainMode: true } : {}),
+    }));
+    console.log(`[AgentLink] → sessions_list (${sessions.length} sessions for ${state.workDir}, brainHome=${isBrainHome})`);
     send({ type: 'sessions_list', sessions: enriched, workDir: state.workDir });
   } catch (err) {
     console.error(`[AgentLink] listSessions failed:`, err);

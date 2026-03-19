@@ -37,6 +37,8 @@ export function createSidebar(deps) {
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations, activeClaudeSessions,
     switchConversation,
+    // Brain mode
+    setBrainMode,
     // i18n
     t,
   } = deps;
@@ -140,6 +142,12 @@ export function createSidebar(deps) {
     if (switchConversation) {
       const newConvId = crypto.randomUUID();
       switchConversation(newConvId);
+      // Re-enable brain mode if currently in Brain Home directory
+      // (switchConversation resets brainMode to false)
+      if (setBrainMode) {
+        const dir = (workDir.value || '').replace(/\\/g, '/');
+        if (dir.endsWith('/.brain/BrainCore')) setBrainMode(true);
+      }
       messages.value.push({
         id: streaming.nextId(), role: 'system',
         content: t('system.newConversation'),

@@ -3,7 +3,7 @@
 export function createFeatureHandlers(deps) {
   const {
     messages, isProcessing, streaming, scrollToBottom,
-    btwState, btwPending, setPlanMode,
+    btwState, btwPending, setPlanMode, setBrainMode,
     workDir, workdirSwitching, sessionId,
     currentConversationId, processingConversations,
     queuedMessages, visibleLimit, currentClaudeSessionId,
@@ -55,6 +55,11 @@ export function createFeatureHandlers(deps) {
         currentClaudeSessionId.value = null;
         isProcessing.value = false;
       }
+
+      // Auto-enable brain mode when switching to Brain Home directory
+      // Must run AFTER switchConversation which resets brainMode to false
+      const normalizedDir = msg.workDir.replace(/\\/g, '/');
+      if (setBrainMode) setBrainMode(normalizedDir.endsWith('/.brain/BrainCore'));
       messages.value.push({
         id: streaming.nextId(), role: 'system',
         content: t('system.workdirChanged', { dir: msg.workDir }),
