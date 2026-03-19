@@ -275,6 +275,8 @@
   "file.enterFileName": "文件名...",
   "file.enterFolderName": "文件夹名...",
   "file.delete": "删除",
+  "file.deleteFile": "删除文件",
+  "file.deleteFolder": "删除文件夹",
   "file.confirmDelete": "确定要删除 \"{name}\" 吗？",
   "file.confirmDeleteFolder": "确定要删除文件夹 \"{name}\" 及其所有内容吗？",
 

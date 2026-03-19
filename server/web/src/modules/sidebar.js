@@ -1,5 +1,6 @@
 // ── Sidebar: session management, folder picker, grouped sessions ─────────────
 import { computed } from 'vue';
+import { useConfirmDialog } from '../composables/useConfirmDialog.js';
 
 /**
  * Creates sidebar functionality bound to reactive state.
@@ -183,10 +184,7 @@ export function createSidebar(deps) {
 
   // ── Delete session ──
 
-  /** Session pending delete confirmation (null = dialog closed) */
-  let pendingDeleteSession = null;
-  const deleteConfirmOpen = deps.deleteConfirmOpen;
-  const deleteConfirmTitle = deps.deleteConfirmTitle;
+  const { showConfirm } = useConfirmDialog();
 
   function deleteSession(session) {
     if (currentClaudeSessionId.value === session.sessionId) return; // guard: foreground
@@ -196,21 +194,17 @@ export function createSidebar(deps) {
         if (cached.claudeSessionId === session.sessionId && cached.isProcessing) return;
       }
     }
-    pendingDeleteSession = session;
-    deleteConfirmTitle.value = session.title || session.sessionId.slice(0, 8);
-    deleteConfirmOpen.value = true;
-  }
-
-  function confirmDeleteSession() {
-    if (!pendingDeleteSession) return;
-    wsSend({ type: 'delete_session', sessionId: pendingDeleteSession.sessionId });
-    deleteConfirmOpen.value = false;
-    pendingDeleteSession = null;
-  }
-
-  function cancelDeleteSession() {
-    deleteConfirmOpen.value = false;
-    pendingDeleteSession = null;
+    const title = session.title || session.sessionId.slice(0, 8);
+    showConfirm({
+      title: t('dialog.deleteSession'),
+      message: t('dialog.deleteSessionConfirm'),
+      itemName: title,
+      warning: t('dialog.cannotUndo'),
+      confirmText: t('dialog.delete'),
+      onConfirm: () => {
+        wsSend({ type: 'delete_session', sessionId: session.sessionId });
+      },
+    });
   }
 
   // ── Rename session ──
@@ -452,7 +446,7 @@ export function createSidebar(deps) {
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
     setOnSwitchToChat, setFileBrowser, setGit,
-    deleteSession, confirmDeleteSession, cancelDeleteSession,
+    deleteSession,
     startRename, confirmRename, cancelRename,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,

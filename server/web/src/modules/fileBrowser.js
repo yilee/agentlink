@@ -1,5 +1,6 @@
 // ── File Browser: tree state, lazy loading, context menu, file actions ────────
 import { computed, nextTick } from 'vue';
+import { useConfirmDialog } from '../composables/useConfirmDialog.js';
 
 /**
  * Creates the file browser controller.
@@ -406,14 +407,27 @@ export function createFileBrowser(deps) {
 
   // ── Delete file / folder ──
 
+  const { showConfirm } = useConfirmDialog();
+
   function deleteItem(path, name, isDirectory) {
     if (requireVersion && !requireVersion('0.1.114', 'Delete File')) return;
     closeContextMenu();
-    const msg = isDirectory
+    const title = isDirectory
+      ? (t ? t('file.deleteFolder') : 'Delete Folder')
+      : (t ? t('file.deleteFile') : 'Delete File');
+    const message = isDirectory
       ? (t ? t('file.confirmDeleteFolder', { name }) : `Delete folder "${name}" and all its contents?`)
       : (t ? t('file.confirmDelete', { name }) : `Delete "${name}"?`);
-    if (!window.confirm(msg)) return;
-    wsSend({ type: 'delete_file', filePath: path });
+    showConfirm({
+      title,
+      message,
+      itemName: name,
+      warning: t ? t('dialog.cannotUndo') : 'This action cannot be undone.',
+      confirmText: t ? t('dialog.delete') : 'Delete',
+      onConfirm: () => {
+        wsSend({ type: 'delete_file', filePath: path });
+      },
+    });
   }
 
   function handleFileDeleted(msg) {
