@@ -64,20 +64,6 @@ describe('Functional: Agent Registration', () => {
     ws.close();
   });
 
-  it('GET /api/session/:id returns agent info', async () => {
-    const { ws, sessionId } = await connectMockAgent('InfoAgent', '/info');
-    const res = await fetch(`${BASE_URL}/api/session/${sessionId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json() as { agent: { name: string; workDir: string } };
-    expect(body.agent.name).toBe('InfoAgent');
-    expect(body.agent.workDir).toBe('/info');
-    ws.close();
-  });
-
-  it('GET /api/session/invalid returns 404', async () => {
-    const res = await fetch(`${BASE_URL}/api/session/nonexistent`);
-    expect(res.status).toBe(404);
-  });
 });
 
 describe('Functional: Web UI', () => {

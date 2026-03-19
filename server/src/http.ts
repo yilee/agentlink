@@ -123,23 +123,5 @@ export function createApp(webDir: string, pkg: { version: string }, startedAt: D
     });
   });
 
-  // Session info API (web client fetches this to know agent details)
-  app.get('/api/session/:sessionId', (req, res) => {
-    const { sessionId } = req.params;
-    const agent = sessions.getAgentBySession(sessionId);
-    if (agent) {
-      res.json({
-        sessionId,
-        agent: {
-          name: agent.name,
-          workDir: agent.workDir,
-          connectedAt: agent.connectedAt,
-        },
-      });
-    } else {
-      res.status(404).json({ error: 'Session not found' });
-    }
-  });
-
   return app;
 }
