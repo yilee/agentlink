@@ -30,7 +30,18 @@ export function createScrollManager(selector) {
     if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
   }
 
-  return { onScroll, scrollToBottom, cleanup };
+  function getScrollTop() {
+    const el = document.querySelector(selector);
+    return el ? el.scrollTop : 0;
+  }
+
+  function setScrollTop(val) {
+    _userScrolledUp = true;
+    const el = document.querySelector(selector);
+    if (el) el.scrollTop = val;
+  }
+
+  return { onScroll, scrollToBottom, cleanup, getScrollTop, setScrollTop };
 }
 
 /**

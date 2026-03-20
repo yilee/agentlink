@@ -195,6 +195,7 @@ export function createStore() {
         planMode: planMode.value,
         brainMode: brainMode.value,
         brainModeLocked: brainModeLocked.value,
+        scrollTop: getScrollTop(),
       };
     }
 
@@ -237,7 +238,11 @@ export function createStore() {
     }
 
     currentConversationId.value = newConvId;
-    scrollToBottom(true);
+    if (cached && cached.scrollTop != null) {
+      nextTick(() => setScrollTop(cached.scrollTop));
+    } else {
+      scrollToBottom(true);
+    }
   }
 
   // Theme
@@ -272,7 +277,7 @@ export function createStore() {
   });
 
   // ── Scroll management ──
-  const { onScroll: onMessageListScroll, scrollToBottom, cleanup: cleanupScroll } = createScrollManager('.message-list');
+  const { onScroll: onMessageListScroll, scrollToBottom, cleanup: cleanupScroll, getScrollTop, setScrollTop } = createScrollManager('.message-list');
 
   // ── Highlight.js scheduling ──
   const { scheduleHighlight, cleanup: cleanupHighlight } = createHighlightScheduler();
@@ -682,7 +687,7 @@ export function createStore() {
   // ── Lifecycle ──
   function _onVisibilityChange() {
     if (!document.hidden) {
-      nextTick(() => scrollToBottom(true));
+      nextTick(() => scrollToBottom());
     }
   }
 
