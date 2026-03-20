@@ -233,9 +233,12 @@ export function deleteLoop(loopId: string): boolean {
 
 export function listLoops(workDir?: string): Loop[] {
   const filtered = workDir ? loops.filter(l => l.workDir === workDir) : loops;
-  const result = filtered.map(l => ({ ...l }));
-  result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return result;
+  const result = filtered.map((l, i) => ({ ...l, _idx: i }));
+  result.sort((a, b) => {
+    const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return diff !== 0 ? diff : b._idx - a._idx; // stable tiebreaker: later insertion first
+  });
+  return result.map(({ _idx, ...rest }) => rest) as Loop[];
 }
 
 export function getLoop(loopId: string): Loop | null {
