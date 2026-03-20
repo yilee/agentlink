@@ -11,7 +11,7 @@ import { buildHistoryBatch } from './backgroundRouting.js';
  * @param {Function} deps.scrollToBottom
  */
 export function createLoop(deps) {
-  const { wsSend, scrollToBottom, loadingLoops, setViewMode, formatRelativeTime, requireVersion } = deps;
+  const { wsSend, scrollToBottom, loadingLoops, setViewMode, formatRelativeTime, requireVersion, showToast, t } = deps;
 
   // ── Reactive state ──────────────────────────────────
 
@@ -237,8 +237,9 @@ export function createLoop(deps) {
         return true;
 
       case 'loop_created':
-        loopsList.value.push(msg.loop);
+        loopsList.value.unshift(msg.loop);
         loopError.value = '';
+        if (showToast && t) showToast(t('loop.createSuccess'), { type: 'info', duration: 3000 });
         return true;
 
       case 'loop_updated': {

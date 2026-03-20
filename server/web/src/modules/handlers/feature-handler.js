@@ -65,6 +65,11 @@ export function createFeatureHandlers(deps) {
         content: t('system.workdirChanged', { dir: msg.workDir }),
         timestamp: new Date(),
       });
+      // Request new lists FIRST (sets loading = true) before clearing old data,
+      // so the watch callbacks triggered by clearing don't reset loading to false.
+      sidebar.requestSessionList();
+      if (deps.team) deps.team.requestTeamsList();
+      if (deps.loop) deps.loop.requestLoopsList();
       // Clear old history so UI doesn't show stale data
       historySessions.value = [];
       if (deps.team) {
@@ -81,9 +86,6 @@ export function createFeatureHandlers(deps) {
       memoryPanelOpen.value = false;
       memoryEditing.value = false;
       if (deps.git) deps.git.onWorkdirChanged();
-      sidebar.requestSessionList();
-      if (deps.team) deps.team.requestTeamsList();
-      if (deps.loop) deps.loop.requestLoopsList();
     },
     git_status_result(msg) {
       if (deps.git) deps.git.handleGitStatus(msg);

@@ -157,6 +157,7 @@
   "loop.delete": "删除",
   "loop.isRunning": "运行中...",
   "loop.manualBadge": "手动",
+  "loop.createSuccess": "循环创建成功",
 
   "chat.you": "你",
   "chat.claude": "Claude",

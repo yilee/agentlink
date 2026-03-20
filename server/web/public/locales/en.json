@@ -157,6 +157,7 @@
   "loop.delete": "Delete",
   "loop.isRunning": "is running...",
   "loop.manualBadge": "manual",
+  "loop.createSuccess": "Loop created successfully",
 
   "chat.you": "You",
   "chat.claude": "Claude",

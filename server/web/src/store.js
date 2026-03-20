@@ -358,7 +358,7 @@ export function createStore() {
   setTeam(team);
   // Loop module
   const loop = createLoop({
-    wsSend, scrollToBottom, loadingLoops,
+    wsSend, scrollToBottom, loadingLoops, showToast, t,
     setViewMode: (mode) => { team.viewMode.value = mode; },
     formatRelativeTime: (ts) => formatRelativeTime(ts, t),
     requireVersion,
