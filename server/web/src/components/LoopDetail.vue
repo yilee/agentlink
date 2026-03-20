@@ -40,6 +40,7 @@ const {
         <div class="loop-detail-meta">
           <span class="loop-detail-schedule">{{ loopScheduleDisplay(selectedLoop) }}</span>
           <span :class="['loop-status-badge', selectedLoop.enabled ? 'loop-status-enabled' : 'loop-status-disabled']">{{ selectedLoop.enabled ? t('loop.enabled') : t('loop.disabled') }}</span>
+          <span v-if="selectedLoop.brainMode" class="loop-status-badge loop-status-brain">🧠 Brain</span>
         </div>
         <div class="loop-detail-actions">
           <button class="loop-action-btn" @click="startEditingLoop(selectedLoop); selectedLoop = null">{{ t('loop.edit') }}</button>

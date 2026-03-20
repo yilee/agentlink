@@ -337,8 +337,8 @@
 
 .session-brain-icon {
   flex-shrink: 0;
-  color: var(--brain-mode);
-  opacity: 0.8;
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* Processing indicator: pulsing dot before session title */

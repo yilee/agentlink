@@ -74,6 +74,7 @@ const {
           <div v-else class="team-history-title">{{ l.name || t('sidebar.untitledLoop') }}</div>
           <div v-if="renamingLoopId !== l.id" class="team-history-meta">
             <span :class="['team-status-badge', 'team-status-badge-sm', l.enabled ? 'team-status-running' : 'team-status-completed']">{{ l.enabled ? t('sidebar.active') : t('sidebar.paused') }}</span>
+            <span v-if="l.brainMode" class="team-status-badge team-status-badge-sm loop-status-brain">🧠 Brain</span>
             <span v-if="l.scheduleType" class="team-history-tasks">{{ formatSchedule(l.scheduleType, l.scheduleConfig || {}, l.schedule) }}</span>
             <span class="session-actions">
               <button class="session-rename-btn" @click.stop="startLoopRename(l)" :title="t('sidebar.renameLoop')">

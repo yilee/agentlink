@@ -53,7 +53,7 @@ import {
 
 describe('scheduler.ts', () => {
   let sentMessages: Record<string, unknown>[];
-  let handleChatCalls: Array<{ conversationId: string | undefined; prompt: string; workDir: string }>;
+  let handleChatCalls: Array<{ conversationId: string | undefined; prompt: string; workDir: string; options?: any }>;
   let cancelCalls: Array<string | undefined>;
   let outputObservers: Array<(conversationId: string, msg: any) => boolean | void>;
   let closeObservers: Array<(conversationId: string, exitCode: number | null, resultReceived: boolean) => void>;
@@ -67,8 +67,8 @@ describe('scheduler.ts', () => {
 
     return {
       send: (msg: Record<string, unknown>) => sentMessages.push(msg),
-      handleChat: (conversationId: string | undefined, prompt: string, workDir: string) => {
-        handleChatCalls.push({ conversationId, prompt, workDir });
+      handleChat: (conversationId: string | undefined, prompt: string, workDir: string, options?: any) => {
+        handleChatCalls.push({ conversationId, prompt, workDir, options });
       },
       cancelExecution: (conversationId?: string) => cancelCalls.push(conversationId),
       addOutputObserver: (fn: any) => outputObservers.push(fn),
@@ -337,8 +337,9 @@ describe('scheduler.ts', () => {
 
       const all = listLoops();
       expect(all).toHaveLength(2);
-      expect(all[0].name).toBe('Loop A');
-      expect(all[1].name).toBe('Loop B');
+      // sorted by createdAt descending (newest first)
+      expect(all[0].name).toBe('Loop B');
+      expect(all[1].name).toBe('Loop A');
     });
   });
 
@@ -573,6 +574,104 @@ describe('scheduler.ts', () => {
       expect(orphaned).toBeTruthy();
       expect(orphaned!.status).toBe('error');
       expect(orphaned!.error).toBe('Agent restarted during execution');
+    });
+  });
+
+  describe('brainMode', () => {
+    it('creates a loop with brainMode: true', () => {
+      const loop = createLoop({
+        name: 'Brain Loop',
+        prompt: 'brain task',
+        schedule: '0 9 * * *',
+        scheduleType: 'daily',
+        scheduleConfig: { hour: 9, minute: 0 },
+        workDir: '/test',
+        brainMode: true,
+      });
+
+      expect(loop.brainMode).toBe(true);
+    });
+
+    it('defaults brainMode to false when not provided', () => {
+      const loop = createLoop({
+        name: 'Default Loop',
+        prompt: 'prompt',
+        schedule: '0 9 * * *',
+        scheduleType: 'daily',
+        scheduleConfig: { hour: 9, minute: 0 },
+        workDir: '/test',
+      });
+
+      expect(loop.brainMode).toBe(false);
+    });
+
+    it('persists brainMode to disk', () => {
+      createLoop({
+        name: 'Brain Persist',
+        prompt: 'prompt',
+        schedule: '0 9 * * *',
+        scheduleType: 'daily',
+        scheduleConfig: { hour: 9, minute: 0 },
+        workDir: '/test',
+        brainMode: true,
+      });
+
+      const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
+      const parsed = JSON.parse(readFileSync(loopsFile, 'utf-8'));
+      expect(parsed[0].brainMode).toBe(true);
+    });
+
+    it('passes brainMode to handleChat when executing', () => {
+      const loop = createLoop({
+        name: 'Brain Exec',
+        prompt: 'brain prompt',
+        schedule: '0 9 * * *',
+        scheduleType: 'daily',
+        scheduleConfig: { hour: 9, minute: 0 },
+        workDir: '/brain-dir',
+        brainMode: true,
+      });
+
+      runLoopNow(loop.id);
+
+      expect(handleChatCalls).toHaveLength(1);
+      expect(handleChatCalls[0].options).toEqual({ brainMode: true });
+    });
+
+    it('passes brainMode: false for non-brain loops', () => {
+      const loop = createLoop({
+        name: 'Normal Exec',
+        prompt: 'normal prompt',
+        schedule: '0 9 * * *',
+        scheduleType: 'daily',
+        scheduleConfig: { hour: 9, minute: 0 },
+        workDir: '/normal-dir',
+      });
+
+      runLoopNow(loop.id);
+
+      expect(handleChatCalls).toHaveLength(1);
+      expect(handleChatCalls[0].options).toEqual({ brainMode: false });
+    });
+
+    it('updates brainMode via updateLoop', () => {
+      const loop = createLoop({
+        name: 'Update Brain',
+        prompt: 'prompt',
+        schedule: '0 9 * * *',
+        scheduleType: 'daily',
+        scheduleConfig: { hour: 9, minute: 0 },
+        workDir: '/test',
+        brainMode: false,
+      });
+
+      const updated = updateLoop(loop.id, { brainMode: true });
+      expect(updated!.brainMode).toBe(true);
+
+      // Verify persistence
+      const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
+      const parsed = JSON.parse(readFileSync(loopsFile, 'utf-8'));
+      expect(parsed[0].brainMode).toBe(true);
     });
   });
 });

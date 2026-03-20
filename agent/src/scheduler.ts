@@ -36,6 +36,7 @@ export interface Loop {
   };
   workDir: string;
   enabled: boolean;
+  brainMode?: boolean;
   createdAt: string;
   updatedAt: string;
   lastExecution?: LoopExecutionSummary;
@@ -158,6 +159,7 @@ export function createLoop(config: {
   scheduleType: Loop['scheduleType'];
   scheduleConfig: Loop['scheduleConfig'];
   workDir: string;
+  brainMode?: boolean;
 }): Loop {
   // Validate cron expression (skip for manual loops)
   if (config.scheduleType !== 'manual' && !cron.validate(config.schedule)) {
@@ -173,6 +175,7 @@ export function createLoop(config: {
     scheduleConfig: config.scheduleConfig,
     workDir: config.workDir,
     enabled: true,
+    brainMode: config.brainMode || false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -187,7 +190,7 @@ export function createLoop(config: {
 
 export function updateLoop(
   loopId: string,
-  updates: Partial<Pick<Loop, 'name' | 'prompt' | 'schedule' | 'scheduleType' | 'scheduleConfig' | 'enabled'>>,
+  updates: Partial<Pick<Loop, 'name' | 'prompt' | 'schedule' | 'scheduleType' | 'scheduleConfig' | 'enabled' | 'brainMode'>>,
 ): Loop | null {
   const loop = loops.find(l => l.id === loopId);
   if (!loop) return null;
@@ -230,7 +233,9 @@ export function deleteLoop(loopId: string): boolean {
 
 export function listLoops(workDir?: string): Loop[] {
   const filtered = workDir ? loops.filter(l => l.workDir === workDir) : loops;
-  return filtered.map(l => ({ ...l }));
+  const result = filtered.map(l => ({ ...l }));
+  result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return result;
 }
 
 export function getLoop(loopId: string): Loop | null {
@@ -355,7 +360,7 @@ function executeLoop(loopId: string, trigger: 'scheduled' | 'manual'): void {
 
   // Execute via existing claude.ts handleChat
   try {
-    handleChatFn(conversationId, loop.prompt, loop.workDir, {});
+    handleChatFn(conversationId, loop.prompt, loop.workDir, { brainMode: loop.brainMode || false });
   } catch (err) {
     console.error(`[Scheduler] Failed to start execution: ${(err as Error).message}`);
     completeExecution(executionId, 'error', (err as Error).message);

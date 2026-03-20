@@ -8,6 +8,8 @@ const teamStore = inject('team');
 const { t } = store;
 const { backToChat } = teamStore;
 
+const isMsRoute = window.location.pathname.startsWith('/ms/');
+
 const {
   LOOP_TEMPLATES,
   LOOP_TEMPLATE_KEYS,
@@ -22,6 +24,7 @@ const {
   loopScheduleMinute,
   loopScheduleHour,
   loopCronExpr,
+  loopBrainMode,
   createLoopFromPanel,
   saveLoopEdits,
   cancelEditingLoop,
@@ -124,6 +127,16 @@ const {
         </div>
       </div>
 
+      <!-- Brain Mode toggle (only on /ms/ routes) -->
+      <div v-if="isMsRoute" class="loop-brain-toggle">
+        <label class="loop-brain-label">
+          <input type="checkbox" v-model="loopBrainMode" />
+          <span class="brain-emoji">🧠</span>
+          {{ t('loop.brainMode') }}
+        </label>
+        <div class="loop-brain-desc">{{ t('loop.brainModeDesc') }}</div>
+      </div>
+
       <!-- Action buttons -->
       <div class="team-create-actions">
         <button v-if="editingLoopId" class="team-create-launch" :disabled="!loopName.trim() || !loopPrompt.trim()" @click="saveLoopEdits()">
@@ -152,6 +165,7 @@ const {
             <div class="loop-active-item-info" @click="viewLoop(l.id)">
               <div class="loop-active-item-top">
                 <span class="loop-active-item-name">{{ l.name }}</span>
+                <span v-if="l.brainMode" class="brain-emoji" :title="t('loop.brainMode')">🧠</span>
                 <span :class="['loop-status-dot', l.enabled ? 'loop-status-dot-on' : 'loop-status-dot-off']"></span>
               </div>
               <div class="loop-active-item-meta">

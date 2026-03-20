@@ -132,7 +132,7 @@ function selectableIndex(cmd, i) {
                     Plan
                   </button>
                   <button v-if="showBrainButton" :class="['brain-mode-btn', { active: brainMode, locked: brainModeLocked }]" @click="toggleBrainMode" :disabled="brainModeLocked || isProcessing || !!currentClaudeSessionId" :title="brainMode ? 'Brain Mode (active)' : 'Enable Brain Mode'">
-                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M12 2C9.24 2 7 4.24 7 7c0 1.38.56 2.63 1.46 3.54.08.08.14.18.14.29v1.67c0 .28.22.5.5.5h5.8c.28 0 .5-.22.5-.5v-1.67c0-.11.06-.21.14-.29A4.98 4.98 0 0 0 17 7c0-2.76-2.24-5-5-5zM9.5 14h5v1h-5v-1zm0 2h5v1h-5v-1zm1.25 3h2.5l-.25 1h-2l-.25-1z"/></svg>
+                    <span class="brain-emoji">🧠</span>
                     Brain
                   </button>
                 </div>

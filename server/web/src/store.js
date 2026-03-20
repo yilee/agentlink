@@ -601,8 +601,9 @@ export function createStore() {
     brainModeLocked.value = true;
   }
 
-  // Hide brain button for resumed non-brain sessions
-  const showBrainButton = computed(() => brainMode.value || !currentClaudeSessionId.value);
+  // Hide brain button for resumed non-brain sessions, and only show on /ms/ routes
+  const isMsRoute = window.location.pathname.startsWith('/ms/');
+  const showBrainButton = computed(() => isMsRoute && (brainMode.value || !currentClaudeSessionId.value));
 
   function handleKeydown(e) {
     // Slash menu key handling (must come before btw overlay so Escape closes menu first)

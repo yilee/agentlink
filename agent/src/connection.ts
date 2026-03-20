@@ -524,6 +524,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         schedule: string;
         scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron';
         scheduleConfig: { hour?: number; minute?: number; dayOfWeek?: number };
+        brainMode?: boolean;
       };
       try {
         const loop = createLoop({
@@ -533,6 +534,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
           scheduleType: m.scheduleType,
           scheduleConfig: m.scheduleConfig,
           workDir: state.workDir,
+          brainMode: m.brainMode,
         });
         send({ type: 'loop_created', loop });
       } catch (err) {
@@ -550,6 +552,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
           scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron';
           scheduleConfig: { hour?: number; minute?: number; dayOfWeek?: number };
           enabled: boolean;
+          brainMode: boolean;
         }>;
       };
       try {

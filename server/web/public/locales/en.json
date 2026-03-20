@@ -128,6 +128,8 @@
   "loop.createLoopBtn": "Create Loop",
   "loop.cancel": "Cancel",
   "loop.backToChat": "Back to Chat",
+  "loop.brainMode": "Enable Brain Mode",
+  "loop.brainModeDesc": "Run scheduled tasks using Brain instead of Claude",
   "loop.backToLoops": "Back to Loops",
   "loop.enabled": "Enabled",
   "loop.disabled": "Disabled",

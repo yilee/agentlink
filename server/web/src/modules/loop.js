@@ -68,7 +68,7 @@ export function createLoop(deps) {
   const loopDeleteConfirmName = ref('');
   const renamingLoopId = ref(null);
   const renameLoopText = ref('');
-
+  const loopBrainMode = ref(false);
 
   // ── Computed ──────────────────────────────────────
 
@@ -359,6 +359,7 @@ export function createLoop(deps) {
     loopSelectedTemplate.value = null;
     loopName.value = '';
     loopPrompt.value = '';
+    loopBrainMode.value = false;
     loopScheduleType.value = 'daily';
     loopScheduleHour.value = 9;
     loopScheduleMinute.value = 0;
@@ -409,12 +410,12 @@ export function createLoop(deps) {
     const schedule = loopScheduleType.value === 'manual' ? ''
       : loopScheduleType.value === 'cron' ? loopCronExpr.value
       : buildCronExpression(loopScheduleType.value, schedCfg);
-    createNewLoop({ name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
+    createNewLoop({ name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg, brainMode: loopBrainMode.value });
     // Reset form
     loopSelectedTemplate.value = null;
     loopName.value = '';
     loopPrompt.value = '';
-    loopScheduleType.value = 'daily';
+    loopBrainMode.value = false;    loopScheduleType.value = 'daily';
     loopScheduleHour.value = 9;
     loopScheduleMinute.value = 0;
     loopScheduleDayOfWeek.value = 1;
@@ -425,6 +426,7 @@ export function createLoop(deps) {
     editingLoopId.value = l.id;
     loopName.value = l.name || '';
     loopPrompt.value = l.prompt || '';
+    loopBrainMode.value = l.brainMode || false;
     loopScheduleType.value = l.scheduleType || 'daily';
     const cfg = l.scheduleConfig || {};
     loopScheduleHour.value = cfg.hour ?? 9;
@@ -446,7 +448,7 @@ export function createLoop(deps) {
     const schedule = loopScheduleType.value === 'manual' ? ''
       : loopScheduleType.value === 'cron' ? loopCronExpr.value
       : buildCronExpression(loopScheduleType.value, schedCfg);
-    updateExistingLoop(lid, { name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg });
+    updateExistingLoop(lid, { name, prompt, schedule, scheduleType: loopScheduleType.value, scheduleConfig: schedCfg, brainMode: loopBrainMode.value });
     editingLoopId.value = null;
     loopName.value = '';
     loopPrompt.value = '';
@@ -456,6 +458,7 @@ export function createLoop(deps) {
     editingLoopId.value = null;
     loopName.value = '';
     loopPrompt.value = '';
+    loopBrainMode.value = false;
     loopScheduleType.value = 'daily';
     loopScheduleHour.value = 9;
     loopScheduleMinute.value = 0;
@@ -526,7 +529,7 @@ export function createLoop(deps) {
     // Form state
     loopName, loopPrompt, loopScheduleType,
     loopScheduleHour, loopScheduleMinute, loopScheduleDayOfWeek,
-    loopCronExpr, loopSelectedTemplate,
+    loopCronExpr, loopSelectedTemplate, loopBrainMode,
     // Delete/rename state
     loopDeleteConfirmOpen, loopDeleteConfirmId, loopDeleteConfirmName,
     renamingLoopId, renameLoopText,

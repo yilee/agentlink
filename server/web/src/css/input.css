@@ -710,8 +710,10 @@
   opacity: 0.5;
 }
 
-.brain-mode-btn svg {
+.brain-mode-btn .brain-emoji {
   flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* ── Input card brain mode accent ── */

@@ -77,7 +77,7 @@ const {
           </div>
           <div v-else class="session-title">
             <svg v-if="s.title && s.title.startsWith('You are a team lead')" class="session-team-icon" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-            <svg v-if="isSessionBrainMode(s.sessionId)" class="session-brain-icon" viewBox="0 0 24 24" width="14" height="14" title="Brain Mode"><path fill="currentColor" d="M12 2C9.24 2 7 4.24 7 7c0 1.38.56 2.63 1.46 3.54.08.08.14.18.14.29v1.67c0 .28.22.5.5.5h5.8c.28 0 .5-.22.5-.5v-1.67c0-.11.06-.21.14-.29A4.98 4.98 0 0 0 17 7c0-2.76-2.24-5-5-5zM9.5 14h5v1h-5v-1zm0 2h5v1h-5v-1zm1.25 3h2.5l-.25 1h-2l-.25-1z"/></svg>
+            <span v-if="isSessionBrainMode(s.sessionId)" class="session-brain-icon" title="Brain Mode">🧠</span>
             {{ s.title }}
           </div>
           <div class="session-meta">
