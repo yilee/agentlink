@@ -361,6 +361,7 @@ export function createStore() {
     wsSend, scrollToBottom, loadingLoops,
     setViewMode: (mode) => { team.viewMode.value = mode; },
     formatRelativeTime: (ts) => formatRelativeTime(ts, t),
+    requireVersion,
   });
   setLoop(loop);
   sidebar.setOnSwitchToChat(() => {

@@ -11,7 +11,7 @@ import { buildHistoryBatch } from './backgroundRouting.js';
  * @param {Function} deps.scrollToBottom
  */
 export function createLoop(deps) {
-  const { wsSend, scrollToBottom, loadingLoops, setViewMode, formatRelativeTime } = deps;
+  const { wsSend, scrollToBottom, loadingLoops, setViewMode, formatRelativeTime, requireVersion } = deps;
 
   // ── Reactive state ──────────────────────────────────
 
@@ -403,6 +403,7 @@ export function createLoop(deps) {
     const name = loopName.value.trim();
     const prompt = loopPrompt.value.trim();
     if (!name || !prompt) return;
+    if (loopBrainMode.value && !requireVersion('0.1.117', 'Loop Brain Mode')) return;
     clearLoopError();
     const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
     if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
@@ -441,6 +442,7 @@ export function createLoop(deps) {
     const name = loopName.value.trim();
     const prompt = loopPrompt.value.trim();
     if (!name || !prompt) return;
+    if (loopBrainMode.value && !requireVersion('0.1.117', 'Loop Brain Mode')) return;
     clearLoopError();
     const schedCfg = { hour: loopScheduleHour.value, minute: loopScheduleMinute.value };
     if (loopScheduleType.value === 'weekly') schedCfg.dayOfWeek = loopScheduleDayOfWeek.value;
