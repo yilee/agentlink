@@ -683,8 +683,9 @@ export function createStore() {
   watch(teamsCollapsed, _saveSidebarCollapsed);
   watch(loopsCollapsed, _saveSidebarCollapsed);
 
-  watch(team.teamsList, () => { loadingTeams.value = false; });
-  watch(loop.loopsList, () => { loadingLoops.value = false; });
+  // loadingTeams/loadingLoops are cleared in their respective message handlers
+  // (teams_list / loops_list), not via watch, to avoid false resets when
+  // clearing lists during workdir change.
 
   // ── Lifecycle ──
   function _onVisibilityChange() {

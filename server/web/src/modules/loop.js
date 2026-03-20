@@ -234,6 +234,7 @@ export function createLoop(deps) {
     switch (msg.type) {
       case 'loops_list':
         loopsList.value = msg.loops || [];
+        if (loadingLoops) loadingLoops.value = false;
         return true;
 
       case 'loop_created':

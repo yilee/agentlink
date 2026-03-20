@@ -254,6 +254,7 @@ export function createTeam(deps) {
 
       case 'teams_list':
         teamsList.value = msg.teams || [];
+        if (loadingTeams) loadingTeams.value = false;
         return true;
 
       case 'team_deleted':
