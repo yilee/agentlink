@@ -29,6 +29,7 @@ export function createExecutionHandlers(deps) {
   }
 
   return {
+    clearActiveSession,
     turn_completed(msg, scheduleHighlight) {
       if (deps.clearCancelled) deps.clearCancelled();
       streaming.flushReveal();

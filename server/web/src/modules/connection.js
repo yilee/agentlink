@@ -262,6 +262,9 @@ export function createConnection(deps) {
       queuedMessages.value = [];
       loadingSessions.value = false;
       loadingHistory.value = false;
+      if (deps.activeClaudeSessions) {
+        deps.activeClaudeSessions.value = new Set();
+      }
 
       if (authLocked.value || authRequired.value) return;
       if (wasConnected || reconnectAttempts > 0) {
@@ -441,6 +444,7 @@ export function createConnection(deps) {
     if (currentConversationId && currentConversationId.value) {
       processingConversations.value[currentConversationId.value] = false;
     }
+    executionHandlers.clearActiveSession();
     if (loop && loop.loopError) {
       loop.loopError.value = msg.message || '';
     }
