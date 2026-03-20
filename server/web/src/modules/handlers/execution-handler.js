@@ -30,6 +30,7 @@ export function createExecutionHandlers(deps) {
 
   return {
     turn_completed(msg, scheduleHighlight) {
+      if (deps.clearCancelled) deps.clearCancelled();
       streaming.flushReveal();
       finalizeStreamingMsg(scheduleHighlight);
       isProcessing.value = false;
@@ -45,6 +46,7 @@ export function createExecutionHandlers(deps) {
       deps.dequeueNext();
     },
     execution_cancelled(msg, scheduleHighlight) {
+      if (deps.markCancelled) deps.markCancelled();
       streaming.flushReveal();
       finalizeStreamingMsg(scheduleHighlight);
       isProcessing.value = false;

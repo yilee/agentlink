@@ -10,6 +10,10 @@ export function createClaudeOutputHandlers(deps) {
     currentClaudeSessionId, sidebar,
   } = deps;
 
+  // Track when execution was cancelled to suppress stale output that arrives
+  // after cancellation (race condition: buffered messages in-flight).
+  let cancelledAt = 0;
+
   function finalizeStreamingMsg(scheduleHighlight) {
     const sid = streaming.getStreamingMessageId();
     if (sid === null) return;
@@ -29,8 +33,14 @@ export function createClaudeOutputHandlers(deps) {
     const data = msg.data;
     if (!data) return;
 
-    // Safety net: if streaming output arrives but isProcessing is false
+    // Safety net: if streaming output arrives but isProcessing is false.
+    // Suppress stale output that arrives after cancellation — these are
+    // buffered messages that were in-flight when the cancel was processed.
     if (!isProcessing.value) {
+      if (cancelledAt && Date.now() - cancelledAt < 5000) {
+        // Stale output after cancel — ignore it
+        return;
+      }
       isProcessing.value = true;
       resetIdleCheck();
       if (currentConversationId && currentConversationId.value) {
@@ -99,5 +109,9 @@ export function createClaudeOutputHandlers(deps) {
     },
     // Exposed for other handlers that need to finalize streaming
     finalizeStreamingMsg,
+    // Mark that execution was just cancelled (suppresses stale output)
+    markCancelled() { cancelledAt = Date.now(); },
+    // Clear cancellation flag (e.g., on new turn start)
+    clearCancelled() { cancelledAt = 0; },
   };
 }

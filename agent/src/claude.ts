@@ -1008,6 +1008,11 @@ async function processOutput(
 
   try {
     for await (const msg of messageStream) {
+      // If the conversation was cancelled/removed, stop processing stale output
+      if (conversations.get(state.conversationId) !== state) {
+        break;
+      }
+
       // ── result → turn complete ──
       if (msg.type === 'result') {
         if (state.turnResultReceived) {

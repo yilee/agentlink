@@ -127,6 +127,8 @@ export function createConnection(deps) {
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
   handlerDeps.finalizeStreamingMsg = claudeHandlers.finalizeStreamingMsg;
+  handlerDeps.markCancelled = claudeHandlers.markCancelled;
+  handlerDeps.clearCancelled = claudeHandlers.clearCancelled;
   const sessionHandlers = createSessionHandlers(handlerDeps);
   const executionHandlers = createExecutionHandlers(handlerDeps);
   const fileHandlers = createFileHandlers(handlerDeps);
