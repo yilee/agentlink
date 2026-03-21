@@ -2,8 +2,8 @@
  * Tests for the /btw side question feature.
  *
  * Covers:
- * - handleBtwQuestion: no-session fallback, spawn + streaming, error handling
- * - Connection handler routing for btw_question message type
+ * - handleBtwQuestion: inline context prompt, fallback prompt, spawn + streaming, error handling
+ * - readConversationContext() integration for building composed prompts
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -13,6 +13,7 @@ import { PassThrough } from 'stream';
 // ── Mocks ─────────────────────────────────────────────────────────────────
 
 const mockSpawn = vi.fn();
+const mockReadConversationContext = vi.fn();
 
 vi.mock('child_process', () => ({
   spawn: (...args: unknown[]) => mockSpawn(...args),
@@ -27,6 +28,10 @@ vi.mock('../../agent/src/sdk.js', () => ({
 
 vi.mock('../../agent/src/config.js', () => ({
   CONFIG_DIR: '/tmp/agentlink-test',
+}));
+
+vi.mock('../../agent/src/history.js', () => ({
+  readConversationContext: (...args: unknown[]) => mockReadConversationContext(...args),
 }));
 
 vi.mock('fs', async () => {
@@ -69,6 +74,20 @@ function createMockChild() {
   return child;
 }
 
+/** Helper to complete a btw child process */
+async function completeBtwChild(btwChild: ReturnType<typeof createMockChild>): Promise<void> {
+  await new Promise(r => setTimeout(r, 10));
+  btwChild.stdout.write(JSON.stringify({ type: 'result', result: '' }) + '\n');
+  btwChild.stdout.end();
+}
+
+/** Get the -p argument value from a spawn call */
+function getPromptArg(spawnCall: unknown[]): string {
+  const args = spawnCall[1] as string[];
+  const pIndex = args.indexOf('-p');
+  return pIndex >= 0 ? args[pIndex + 1] : '';
+}
+
 describe('handleBtwQuestion', () => {
   let sentMessages: Record<string, unknown>[];
 
@@ -77,66 +96,235 @@ describe('handleBtwQuestion', () => {
     sentMessages = [];
     setSendFn((msg) => sentMessages.push(msg));
     mockSpawn.mockReset();
+    mockReadConversationContext.mockReset();
+    // Default: no context available
+    mockReadConversationContext.mockReturnValue(null);
   });
 
   afterEach(() => {
     abortAll();
   });
 
-  // ── No session ID available ──────────────────────────────────────────
+  // ── No session ID — fallback prompt ────────────────────────────────────
 
-  it('sends immediate done reply when no conversation exists and no fallback', async () => {
+  it('spawns with fallback prompt when no conversation exists and no fallback', async () => {
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
     const send = vi.fn();
-    await handleBtwQuestion('what is this?', 'nonexistent-conv', '/tmp', send);
+    const promise = handleBtwQuestion('what is this?', 'nonexistent-conv', '/tmp', send);
+    await completeBtwChild(btwChild);
+    await promise;
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith({
-      type: 'btw_answer',
-      delta: 'No active conversation context available.',
-      done: true,
-    });
+    // Should still spawn (not hard-fail)
+    expect(mockSpawn).toHaveBeenCalled();
+    const prompt = getPromptArg(mockSpawn.mock.calls[0]);
+    expect(prompt).toContain('Question: what is this?');
+    expect(prompt).toContain('text answer only');
+    // readConversationContext should NOT have been called (no sessionId)
+    expect(mockReadConversationContext).not.toHaveBeenCalled();
   });
 
-  it('sends immediate done reply when conversation has no session ID', async () => {
+  it('spawns with fallback prompt when conversation has no session ID', async () => {
     // Create a conversation via handleChat (which will spawn a mock child)
     const mockChild = createMockChild();
     mockSpawn.mockReturnValue(mockChild);
     handleChat('conv-btw-1', 'hello', '/tmp');
 
-    // The conversation exists but claudeSessionId starts null until system message
+    // The conversation exists but claudeSessionId starts null
     const conv = getConversation('conv-btw-1');
     expect(conv).not.toBeNull();
     expect(conv!.claudeSessionId).toBeNull();
 
-    const send = vi.fn();
-    await handleBtwQuestion('what is this?', 'conv-btw-1', '/tmp', send);
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith({
-      type: 'btw_answer',
-      delta: 'No active conversation context available.',
-      done: true,
-    });
+    const send = vi.fn();
+    const promise = handleBtwQuestion('what is this?', 'conv-btw-1', '/tmp', send);
+    await completeBtwChild(btwChild);
+    await promise;
+
+    const prompt = getPromptArg(mockSpawn.mock.calls[1]);
+    expect(prompt).toContain('Question: what is this?');
+    expect(prompt).not.toContain('conversation-context');
+  });
+
+  // ── Composed prompt with context ───────────────────────────────────────
+
+  it('includes conversation context in composed prompt when available', async () => {
+    const mainChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(mainChild);
+    handleChat('conv-btw-ctx', 'hello', '/tmp');
+    const conv = getConversation('conv-btw-ctx');
+    conv!.claudeSessionId = 'session-with-ctx';
+
+    mockReadConversationContext.mockReturnValue('[User]\nWhat is X?\n\n[Assistant]\nX is 42.');
+
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
+    const send = vi.fn();
+    const promise = handleBtwQuestion('explain more', 'conv-btw-ctx', '/tmp', send);
+    await completeBtwChild(btwChild);
+    await promise;
+
+    const prompt = getPromptArg(mockSpawn.mock.calls[1]);
+    // Verify composed prompt structure
+    expect(prompt).toContain('side question');
+    expect(prompt).toContain('Do NOT call any tools');
+    expect(prompt).toContain('<conversation-context>');
+    expect(prompt).toContain('[User]\nWhat is X?');
+    expect(prompt).toContain('[Assistant]\nX is 42.');
+    expect(prompt).toContain('</conversation-context>');
+    expect(prompt).toContain('Side question: explain more');
+  });
+
+  it('uses fallback prompt when readConversationContext returns null', async () => {
+    const mainChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(mainChild);
+    handleChat('conv-btw-null', 'hello', '/tmp');
+    const conv = getConversation('conv-btw-null');
+    conv!.claudeSessionId = 'session-null-ctx';
+
+    mockReadConversationContext.mockReturnValue(null);
+
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
+    const send = vi.fn();
+    const promise = handleBtwQuestion('general question', 'conv-btw-null', '/tmp', send);
+    await completeBtwChild(btwChild);
+    await promise;
+
+    const prompt = getPromptArg(mockSpawn.mock.calls[1]);
+    expect(prompt).toContain('Question: general question');
+    expect(prompt).toContain('text answer only');
+    expect(prompt).not.toContain('conversation-context');
+  });
+
+  it('uses fallback prompt when readConversationContext throws', async () => {
+    const mainChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(mainChild);
+    handleChat('conv-btw-err-ctx', 'hello', '/tmp');
+    const conv = getConversation('conv-btw-err-ctx');
+    conv!.claudeSessionId = 'session-err-ctx';
+
+    mockReadConversationContext.mockImplementation(() => { throw new Error('JSONL parse error'); });
+
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
+    const send = vi.fn();
+    const promise = handleBtwQuestion('question', 'conv-btw-err-ctx', '/tmp', send);
+    await completeBtwChild(btwChild);
+    await promise;
+
+    // Should still spawn with fallback prompt (not crash)
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    const prompt = getPromptArg(mockSpawn.mock.calls[1]);
+    expect(prompt).toContain('Question: question');
+    expect(prompt).not.toContain('conversation-context');
+  });
+
+  // ── Spawn args verification ────────────────────────────────────────────
+
+  it('uses -p with composed prompt, no --resume and no --verbose', async () => {
+    const mainChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(mainChild);
+    handleChat('conv-btw-args', 'hello', '/tmp');
+    const conv = getConversation('conv-btw-args');
+    conv!.claudeSessionId = 'session-xyz-789';
+
+    mockReadConversationContext.mockReturnValue('[User]\nHello');
+
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
+    const send = vi.fn();
+    const promise = handleBtwQuestion('test question', 'conv-btw-args', '/tmp', send);
+    await completeBtwChild(btwChild);
+    await promise;
+
+    const spawnCall = mockSpawn.mock.calls[1];
+    const args: string[] = spawnCall[1];
+
+    // Should have -p with composed prompt
+    expect(args).toContain('-p');
+    expect(args).toContain('--no-session-persistence');
+    expect(args).toContain('--output-format');
+    expect(args).toContain('stream-json');
+
+    // Should NOT have --resume or --verbose
+    expect(args).not.toContain('--resume');
+    expect(args).not.toContain('--verbose');
+  });
+
+  // ── Session ID lookup priority ─────────────────────────────────────────
+
+  it('passes claudeSessionId to readConversationContext', async () => {
+    const mainChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(mainChild);
+    handleChat('conv-btw-sid', 'hello', '/tmp');
+    const conv = getConversation('conv-btw-sid');
+    conv!.claudeSessionId = 'primary-session-123';
+
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
+    const send = vi.fn();
+    const promise = handleBtwQuestion('question', 'conv-btw-sid', '/tmp', send);
+    await completeBtwChild(btwChild);
+    await promise;
+
+    expect(mockReadConversationContext).toHaveBeenCalledWith('/tmp', 'primary-session-123');
+  });
+
+  it('uses lastClaudeSessionId for context when claudeSessionId is null', async () => {
+    const mainChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(mainChild);
+    handleChat('conv-btw-last', 'hello', '/tmp');
+    const conv = getConversation('conv-btw-last');
+    conv!.claudeSessionId = null;
+    conv!.lastClaudeSessionId = 'last-session-456';
+
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
+    const send = vi.fn();
+    const promise = handleBtwQuestion('question', 'conv-btw-last', '/tmp', send);
+    await completeBtwChild(btwChild);
+    await promise;
+
+    expect(mockReadConversationContext).toHaveBeenCalledWith('/tmp', 'last-session-456');
+  });
+
+  it('uses fallbackClaudeSessionId for context when conversation is not in map', async () => {
+    const btwChild = createMockChild();
+    mockSpawn.mockReturnValueOnce(btwChild);
+
+    const send = vi.fn();
+    const promise = handleBtwQuestion('question', 'nonexistent-conv', '/tmp', send, 'fallback-session-999');
+    await completeBtwChild(btwChild);
+    await promise;
+
+    expect(mockReadConversationContext).toHaveBeenCalledWith('/tmp', 'fallback-session-999');
   });
 
   // ── Successful streaming ─────────────────────────────────────────────
 
   it('spawns claude and streams btw_answer deltas from assistant messages', async () => {
-    // Set up a conversation with a known session ID
     const mainChild = createMockChild();
     mockSpawn.mockReturnValueOnce(mainChild);
     handleChat('conv-btw-2', 'hello', '/tmp');
     const conv = getConversation('conv-btw-2');
     conv!.claudeSessionId = 'session-abc-123';
 
-    // Set up the btw child that will be spawned
     const btwChild = createMockChild();
     mockSpawn.mockReturnValueOnce(btwChild);
 
     const send = vi.fn();
     const promise = handleBtwQuestion('what is x?', 'conv-btw-2', '/tmp', send);
 
-    // Simulate Claude streaming output
     await new Promise(r => setTimeout(r, 10));
 
     btwChild.stdout.write(JSON.stringify({
@@ -158,112 +346,17 @@ describe('handleBtwQuestion', () => {
       result: '',
     }) + '\n');
 
-    // Close stdout to end the readline loop
     btwChild.stdout.end();
-
     await promise;
 
-    // Verify delta streaming
     const btwAnswers = send.mock.calls.map(c => c[0]).filter(
       (m: Record<string, unknown>) => m.type === 'btw_answer',
     );
 
     expect(btwAnswers.length).toBeGreaterThanOrEqual(3);
-    // First delta
-    expect(btwAnswers[0]).toEqual({
-      type: 'btw_answer',
-      delta: 'X is a variable',
-      done: false,
-    });
-    // Second delta (incremental)
-    expect(btwAnswers[1]).toEqual({
-      type: 'btw_answer',
-      delta: ' that holds the value 42.',
-      done: false,
-    });
-    // Final done
-    expect(btwAnswers[btwAnswers.length - 1]).toMatchObject({
-      type: 'btw_answer',
-      done: true,
-    });
-  });
-
-  it('uses --resume with session ID and --no-session-persistence', async () => {
-    const mainChild = createMockChild();
-    mockSpawn.mockReturnValueOnce(mainChild);
-    handleChat('conv-btw-3', 'hello', '/tmp');
-    const conv = getConversation('conv-btw-3');
-    conv!.claudeSessionId = 'session-xyz-789';
-
-    const btwChild = createMockChild();
-    mockSpawn.mockReturnValueOnce(btwChild);
-
-    const send = vi.fn();
-    const promise = handleBtwQuestion('test question', 'conv-btw-3', '/tmp', send);
-
-    // Send result and end stdout to let the function complete
-    await new Promise(r => setTimeout(r, 10));
-    btwChild.stdout.write(JSON.stringify({ type: 'result', result: '' }) + '\n');
-    btwChild.stdout.end();
-    await promise;
-
-    // Verify spawn was called with correct args
-    const spawnCall = mockSpawn.mock.calls[1]; // second call is the btw spawn
-    expect(spawnCall).toBeDefined();
-    const args: string[] = spawnCall[1];
-    expect(args).toContain('-p');
-    expect(args).toContain('test question');
-    expect(args).toContain('--resume');
-    expect(args).toContain('session-xyz-789');
-    expect(args).toContain('--no-session-persistence');
-    expect(args).toContain('--output-format');
-    expect(args).toContain('stream-json');
-    expect(args).toContain('--verbose');
-  });
-
-  it('uses lastClaudeSessionId when claudeSessionId is null', async () => {
-    const mainChild = createMockChild();
-    mockSpawn.mockReturnValueOnce(mainChild);
-    handleChat('conv-btw-4', 'hello', '/tmp');
-    const conv = getConversation('conv-btw-4');
-    conv!.claudeSessionId = null;
-    conv!.lastClaudeSessionId = 'last-session-456';
-
-    const btwChild = createMockChild();
-    mockSpawn.mockReturnValueOnce(btwChild);
-
-    const send = vi.fn();
-    const promise = handleBtwQuestion('question', 'conv-btw-4', '/tmp', send);
-
-    await new Promise(r => setTimeout(r, 10));
-    btwChild.stdout.write(JSON.stringify({ type: 'result', result: '' }) + '\n');
-    btwChild.stdout.end();
-    await promise;
-
-    const spawnCall = mockSpawn.mock.calls[1];
-    const args: string[] = spawnCall[1];
-    expect(args).toContain('--resume');
-    expect(args).toContain('last-session-456');
-  });
-
-  it('uses fallbackClaudeSessionId when conversation is not in map', async () => {
-    // No conversation exists for this ID — simulates resumed history session
-    const btwChild = createMockChild();
-    mockSpawn.mockReturnValueOnce(btwChild);
-
-    const send = vi.fn();
-    const promise = handleBtwQuestion('question', 'nonexistent-conv', '/tmp', send, 'fallback-session-999');
-
-    await new Promise(r => setTimeout(r, 10));
-    btwChild.stdout.write(JSON.stringify({ type: 'result', result: '' }) + '\n');
-    btwChild.stdout.end();
-    await promise;
-
-    // Should have spawned with the fallback session ID
-    const spawnCall = mockSpawn.mock.calls[0];
-    const args: string[] = spawnCall[1];
-    expect(args).toContain('--resume');
-    expect(args).toContain('fallback-session-999');
+    expect(btwAnswers[0]).toEqual({ type: 'btw_answer', delta: 'X is a variable', done: false });
+    expect(btwAnswers[1]).toEqual({ type: 'btw_answer', delta: ' that holds the value 42.', done: false });
+    expect(btwAnswers[btwAnswers.length - 1]).toMatchObject({ type: 'btw_answer', done: true });
   });
 
   // ── Error handling ───────────────────────────────────────────────────
@@ -281,7 +374,6 @@ describe('handleBtwQuestion', () => {
     const send = vi.fn();
     const promise = handleBtwQuestion('question', 'conv-btw-5', '/tmp', send);
 
-    // Write stderr then close stdout without any JSON output
     await new Promise(r => setTimeout(r, 10));
     btwChild.stderr.emit('data', Buffer.from('Some error occurred'));
     btwChild.stdout.end();
@@ -310,7 +402,6 @@ describe('handleBtwQuestion', () => {
 
     await new Promise(r => setTimeout(r, 10));
 
-    // Result message with text that extends beyond what assistant messages sent
     btwChild.stdout.write(JSON.stringify({
       type: 'result',
       result: 'Full answer text here',
@@ -322,7 +413,6 @@ describe('handleBtwQuestion', () => {
     const lastCall = send.mock.calls[send.mock.calls.length - 1][0] as Record<string, unknown>;
     expect(lastCall.type).toBe('btw_answer');
     expect(lastCall.done).toBe(true);
-    // The result text should appear as delta since no assistant messages were sent
     expect(lastCall.delta).toBe('Full answer text here');
   });
 
@@ -341,11 +431,7 @@ describe('handleBtwQuestion', () => {
 
     const send = vi.fn();
     const promise = handleBtwQuestion('question', 'conv-btw-7', '/tmp', send);
-
-    await new Promise(r => setTimeout(r, 10));
-    btwChild.stdout.write(JSON.stringify({ type: 'result', result: '' }) + '\n');
-    btwChild.stdout.end();
-
+    await completeBtwChild(btwChild);
     await promise;
 
     expect(stdinEndSpy).toHaveBeenCalled();
