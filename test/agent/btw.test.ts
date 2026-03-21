@@ -81,11 +81,17 @@ async function completeBtwChild(btwChild: ReturnType<typeof createMockChild>): P
   btwChild.stdout.end();
 }
 
-/** Get the -p argument value from a spawn call */
-function getPromptArg(spawnCall: unknown[]): string {
-  const args = spawnCall[1] as string[];
-  const pIndex = args.indexOf('-p');
-  return pIndex >= 0 ? args[pIndex + 1] : '';
+/** Read stdin content from a mock child (call after writes have been flushed) */
+async function getStdinContent(child: ReturnType<typeof createMockChild>): Promise<string> {
+  // Small delay to let writes flush through the PassThrough
+  await new Promise(r => setTimeout(r, 5));
+  const chunks: string[] = [];
+  // Read all buffered data from the PassThrough
+  let chunk: Buffer | null;
+  while ((chunk = child.stdin.read()) !== null) {
+    chunks.push(chunk.toString());
+  }
+  return chunks.join('');
 }
 
 describe('handleBtwQuestion', () => {
@@ -113,14 +119,18 @@ describe('handleBtwQuestion', () => {
 
     const send = vi.fn();
     const promise = handleBtwQuestion('what is this?', 'nonexistent-conv', '/tmp', send);
+    const stdinContent = await getStdinContent(btwChild);
     await completeBtwChild(btwChild);
     await promise;
 
     // Should still spawn (not hard-fail)
     expect(mockSpawn).toHaveBeenCalled();
-    const prompt = getPromptArg(mockSpawn.mock.calls[0]);
-    expect(prompt).toContain('Question: what is this?');
-    expect(prompt).toContain('text answer only');
+    // -p receives '-' (stdin marker), actual prompt piped via stdin
+    const args: string[] = mockSpawn.mock.calls[0][1];
+    expect(args).toContain('-p');
+    expect(args[args.indexOf('-p') + 1]).toBe('-');
+    expect(stdinContent).toContain('Question: what is this?');
+    expect(stdinContent).toContain('text answer only');
     // readConversationContext should NOT have been called (no sessionId)
     expect(mockReadConversationContext).not.toHaveBeenCalled();
   });
@@ -141,12 +151,12 @@ describe('handleBtwQuestion', () => {
 
     const send = vi.fn();
     const promise = handleBtwQuestion('what is this?', 'conv-btw-1', '/tmp', send);
+    const stdinContent = await getStdinContent(btwChild);
     await completeBtwChild(btwChild);
     await promise;
 
-    const prompt = getPromptArg(mockSpawn.mock.calls[1]);
-    expect(prompt).toContain('Question: what is this?');
-    expect(prompt).not.toContain('conversation-context');
+    expect(stdinContent).toContain('Question: what is this?');
+    expect(stdinContent).not.toContain('conversation-context');
   });
 
   // ── Composed prompt with context ───────────────────────────────────────
@@ -165,18 +175,18 @@ describe('handleBtwQuestion', () => {
 
     const send = vi.fn();
     const promise = handleBtwQuestion('explain more', 'conv-btw-ctx', '/tmp', send);
+    const stdinContent = await getStdinContent(btwChild);
     await completeBtwChild(btwChild);
     await promise;
 
-    const prompt = getPromptArg(mockSpawn.mock.calls[1]);
-    // Verify composed prompt structure
-    expect(prompt).toContain('side question');
-    expect(prompt).toContain('Do NOT call any tools');
-    expect(prompt).toContain('<conversation-context>');
-    expect(prompt).toContain('[User]\nWhat is X?');
-    expect(prompt).toContain('[Assistant]\nX is 42.');
-    expect(prompt).toContain('</conversation-context>');
-    expect(prompt).toContain('Side question: explain more');
+    // Verify composed prompt structure (piped via stdin)
+    expect(stdinContent).toContain('side question');
+    expect(stdinContent).toContain('Do NOT call any tools');
+    expect(stdinContent).toContain('<conversation-context>');
+    expect(stdinContent).toContain('[User]\nWhat is X?');
+    expect(stdinContent).toContain('[Assistant]\nX is 42.');
+    expect(stdinContent).toContain('</conversation-context>');
+    expect(stdinContent).toContain('Side question: explain more');
   });
 
   it('uses fallback prompt when readConversationContext returns null', async () => {
@@ -193,13 +203,13 @@ describe('handleBtwQuestion', () => {
 
     const send = vi.fn();
     const promise = handleBtwQuestion('general question', 'conv-btw-null', '/tmp', send);
+    const stdinContent = await getStdinContent(btwChild);
     await completeBtwChild(btwChild);
     await promise;
 
-    const prompt = getPromptArg(mockSpawn.mock.calls[1]);
-    expect(prompt).toContain('Question: general question');
-    expect(prompt).toContain('text answer only');
-    expect(prompt).not.toContain('conversation-context');
+    expect(stdinContent).toContain('Question: general question');
+    expect(stdinContent).toContain('text answer only');
+    expect(stdinContent).not.toContain('conversation-context');
   });
 
   it('uses fallback prompt when readConversationContext throws', async () => {
@@ -216,19 +226,19 @@ describe('handleBtwQuestion', () => {
 
     const send = vi.fn();
     const promise = handleBtwQuestion('question', 'conv-btw-err-ctx', '/tmp', send);
+    const stdinContent = await getStdinContent(btwChild);
     await completeBtwChild(btwChild);
     await promise;
 
     // Should still spawn with fallback prompt (not crash)
     expect(mockSpawn).toHaveBeenCalledTimes(2);
-    const prompt = getPromptArg(mockSpawn.mock.calls[1]);
-    expect(prompt).toContain('Question: question');
-    expect(prompt).not.toContain('conversation-context');
+    expect(stdinContent).toContain('Question: question');
+    expect(stdinContent).not.toContain('conversation-context');
   });
 
   // ── Spawn args verification ────────────────────────────────────────────
 
-  it('uses -p with composed prompt and --verbose, no --resume', async () => {
+  it('uses -p - (stdin piping) with --verbose, no --resume', async () => {
     const mainChild = createMockChild();
     mockSpawn.mockReturnValueOnce(mainChild);
     handleChat('conv-btw-args', 'hello', '/tmp');
@@ -242,14 +252,17 @@ describe('handleBtwQuestion', () => {
 
     const send = vi.fn();
     const promise = handleBtwQuestion('test question', 'conv-btw-args', '/tmp', send);
+    const stdinContent = await getStdinContent(btwChild);
     await completeBtwChild(btwChild);
     await promise;
 
     const spawnCall = mockSpawn.mock.calls[1];
     const args: string[] = spawnCall[1];
 
-    // Should have -p with composed prompt
+    // Should have -p with '-' (stdin marker)
     expect(args).toContain('-p');
+    const pIndex = args.indexOf('-p');
+    expect(args[pIndex + 1]).toBe('-');
     expect(args).toContain('--no-session-persistence');
     expect(args).toContain('--output-format');
     expect(args).toContain('stream-json');
@@ -258,6 +271,9 @@ describe('handleBtwQuestion', () => {
     expect(args).not.toContain('--resume');
     // --verbose IS required for -p + stream-json
     expect(args).toContain('--verbose');
+
+    // Prompt content should be piped via stdin
+    expect(stdinContent).toContain('Side question: test question');
   });
 
   // ── Session ID lookup priority ─────────────────────────────────────────
@@ -419,7 +435,7 @@ describe('handleBtwQuestion', () => {
 
   // ── Closes stdin immediately ─────────────────────────────────────────
 
-  it('closes stdin immediately since it is a one-shot query', async () => {
+  it('writes prompt to stdin and closes it (stdin piping)', async () => {
     const mainChild = createMockChild();
     mockSpawn.mockReturnValueOnce(mainChild);
     handleChat('conv-btw-7', 'hello', '/tmp');
@@ -427,6 +443,7 @@ describe('handleBtwQuestion', () => {
     conv!.claudeSessionId = 'session-stdin';
 
     const btwChild = createMockChild();
+    const stdinWriteSpy = vi.spyOn(btwChild.stdin, 'write');
     const stdinEndSpy = vi.spyOn(btwChild.stdin, 'end');
     mockSpawn.mockReturnValueOnce(btwChild);
 
@@ -435,6 +452,8 @@ describe('handleBtwQuestion', () => {
     await completeBtwChild(btwChild);
     await promise;
 
+    // Prompt should be written to stdin then closed
+    expect(stdinWriteSpy).toHaveBeenCalled();
     expect(stdinEndSpy).toHaveBeenCalled();
   });
 });

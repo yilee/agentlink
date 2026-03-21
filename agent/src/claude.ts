@@ -438,9 +438,9 @@ Question: ${question}`;
 Question: ${question}`;
   }
 
-  // 3. Build args — no --resume; --verbose is required by claude CLI for -p + stream-json
+  // 3. Build args — prompt is piped via stdin to avoid OS arg-length limits (ENAMETOOLONG)
   const args = [
-    '-p', composedPrompt,
+    '-p', '-',
     '--no-session-persistence',
     '--output-format', 'stream-json',
     '--verbose',
@@ -465,8 +465,9 @@ Question: ${question}`;
     return;
   }
 
-  // Close stdin immediately — this is a one-shot -p query, no interactive input needed
+  // Pipe the composed prompt via stdin, then close — avoids OS arg-length limits
   if (child.stdin) {
+    child.stdin.write(composedPrompt);
     child.stdin.end();
   }
 
