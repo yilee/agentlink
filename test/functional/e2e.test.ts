@@ -168,23 +168,23 @@ describe('Functional: Delete Session', () => {
       await deleteBtn.click();
 
       // Confirmation dialog should appear
-      await page.waitForSelector('.delete-confirm-dialog', { timeout: 3000 });
-      const dialogText = await page.textContent('.delete-confirm-dialog');
+      await page.waitForSelector('.confirm-dialog', { timeout: 3000 });
+      const dialogText = await page.textContent('.confirm-dialog');
       expect(dialogText).toContain('Old Session To Delete');
       expect(dialogText).toContain('cannot be undone');
 
       // Click cancel - dialog should close
-      await page.click('.delete-confirm-footer .folder-picker-cancel');
-      await page.waitForSelector('.delete-confirm-dialog', { state: 'detached', timeout: 3000 });
+      await page.click('.confirm-dialog-cancel');
+      await page.waitForSelector('.confirm-dialog', { state: 'detached', timeout: 3000 });
 
       // Hover and click delete again, this time confirm
       await secondSession.hover();
       await deleteBtn.click();
-      await page.waitForSelector('.delete-confirm-dialog', { timeout: 3000 });
+      await page.waitForSelector('.confirm-dialog', { timeout: 3000 });
 
       // Set up listener for the delete_session message before clicking confirm
       const deleteReqPromise = agent.waitForMessage((m) => m.type === 'delete_session');
-      await page.click('.delete-confirm-btn');
+      await page.click('.confirm-dialog-btn');
 
       // Agent should receive delete_session
       const deleteReq = await deleteReqPromise;
