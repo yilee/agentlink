@@ -572,13 +572,7 @@ export function createStore() {
     if (currentConversationId.value) {
       processingConversations.value[currentConversationId.value] = true;
     }
-    const instruction = newMode ? 'Enter plan mode now.' : 'Exit plan mode now.';
-    messages.value.push({
-      id: streaming.nextId(), role: 'user', content: instruction,
-      status: 'sent', timestamp: new Date(),
-    });
-    wsSend({ type: 'set_plan_mode', enabled: newMode, conversationId: currentConversationId.value, claudeSessionId: currentClaudeSessionId.value });
-    nextTick(() => scrollToBottom());
+    wsSend({ type: 'set_plan_mode', enabled: newMode, conversationId: currentConversationId.value });
   }
   function setPlanMode(enabled) {
     planMode.value = enabled;
