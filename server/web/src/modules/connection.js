@@ -422,8 +422,16 @@ export function createConnection(deps) {
     // (e.g. after page refresh when the conversationId is new but claude is still processing)
     if (deps.activeClaudeSessions) {
       const activeSet = new Set();
+      // The foreground conversation's claudeSessionId should only be included
+      // if isProcessing is still true. This prevents a stale active_conversations
+      // response (sampled before turn_completed) from re-adding a session that
+      // turn_completed already cleared.
+      const fgClaudeSessionId = !isProcessing.value && deps.currentClaudeSessionId
+        ? deps.currentClaudeSessionId.value : null;
       for (const entry of convs) {
-        if (entry.claudeSessionId) activeSet.add(entry.claudeSessionId);
+        if (entry.claudeSessionId && entry.claudeSessionId !== fgClaudeSessionId) {
+          activeSet.add(entry.claudeSessionId);
+        }
       }
       deps.activeClaudeSessions.value = activeSet;
     }
