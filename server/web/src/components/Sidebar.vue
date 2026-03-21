@@ -21,6 +21,7 @@ const {
   sidebarView,
   workDir,
   hostname,
+  currentView,
 } = store;
 
 const {
@@ -439,6 +440,7 @@ const {
 
           <!-- Normal sidebar content (sessions view) -->
           <template v-else>
+          <FeedNav v-if="isMsRoute" />
           <div class="sidebar-section">
             <div class="sidebar-workdir">
               <div v-if="hostname" class="sidebar-hostname">
@@ -499,8 +501,7 @@ const {
             </div>
           </div>
 
-          <FeedNav v-if="isMsRoute" />
-          <SessionList />
+          <SessionList v-if="!isMsRoute || currentView === 'chat'" />
           <TeamList />
           <LoopList />
 
