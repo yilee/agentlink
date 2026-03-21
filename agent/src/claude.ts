@@ -28,7 +28,7 @@ import {
 } from './sdk.js';
 import { CONFIG_DIR } from './config.js';
 import { saveSessionMetadata } from './session-metadata.js';
-import { readConversationContext } from './history.js';
+import { readConversationContext, readSessionMessages, type HistoryMessage } from './history.js';
 import {
   buildControlResponse,
   handleResultMessage,
@@ -544,90 +544,97 @@ Question: ${question}`;
 
 // ── Internal ───────────────────────────────────────────────────────────────
 
+export interface RestartOptions {
+  /** New plan mode. If undefined, preserves current value. */
+  planMode?: boolean;
+  /** If true, reads JSONL history and includes it in the returned result. */
+  reloadHistory?: boolean;
+}
+
+export interface RestartResult {
+  /** The claudeSessionId that can be used to resume. */
+  claudeSessionId: string | null;
+  /** Whether an active turn was interrupted. */
+  wasTurnActive: boolean;
+  /** Reloaded history messages (only if reloadHistory was true). */
+  history?: HistoryMessage[];
+}
+
 /**
- * Set the permission mode for a conversation.
- * Kills the current Claude process (if any) and stores the new mode so the
- * next `handleChat()` call spawns Claude with the correct `--permission-mode`.
+ * Shared primitive for restarting a conversation.
+ * Kills the current Claude process, preserves session ID, recreates state
+ * with updated parameters. Used by plan mode toggle and (future) reload.
  */
-export function setPermissionMode(
+export function restartConversation(
   conversationId: string | undefined,
-  mode: 'bypassPermissions' | 'plan',
-  claudeSessionId?: string,
-): 'injected' | 'immediate' {
+  options: RestartOptions = {},
+): RestartResult {
   const convId = conversationId || DEFAULT_CONVERSATION_ID;
   const existing = conversations.get(convId);
-  const enteringPlan = mode === 'plan';
 
-  if (existing) {
-    // If the process is alive and idle, inject a user message to make Claude
-    // call EnterPlanMode / ExitPlanMode natively — this records the mode switch
-    // in the JSONL history so Claude stays aware of the current mode across resumes.
-    if (existing.child && !existing.child.killed && existing.inputStream && !existing.turnActive) {
-      existing.planMode = enteringPlan;
-      const instruction = enteringPlan
-        ? 'Enter plan mode now.'
-        : 'Exit plan mode now.';
-      existing.turnActive = true;
-      existing.turnResultReceived = false;
-      existing.inputStream.enqueue({
-        type: 'user',
-        message: { role: 'user', content: instruction },
-      });
-      console.log(`[Claude:${convId.slice(0, 8)}] Injected ${enteringPlan ? 'EnterPlanMode' : 'ExitPlanMode'} instruction into running process`);
-      return 'injected';
-    }
-
-    // Process is not running or turn is active — kill and recreate state.
-    // The next handleChat() will start a fresh process with the correct --permission-mode.
-    const wasTurnActive = existing.turnActive;
-    const lastSession = existing.claudeSessionId || existing.lastClaudeSessionId;
-    const workDir = existing.workDir;
-
-    cleanupConversation(convId);
-
-    // Notify UI if we interrupted an active turn
-    if (wasTurnActive) {
-      sendFn({ type: 'execution_cancelled', conversationId: convId });
-    }
-
-    const newState: ConversationState = {
-      child: null,
-      inputStream: null,
-      abortController: null,
-      claudeSessionId: null,
-      workDir,
-      turnActive: false,
-      turnResultReceived: false,
-      conversationId: convId,
-      lastClaudeSessionId: lastSession || null,
-      isCompacting: false,
-      createdAt: Date.now(),
-      planMode: enteringPlan,
-      brainMode: false,
-    };
-    conversations.set(convId, newState);
-    return 'immediate';
-  } else {
-    // No existing conversation yet (e.g. user toggled plan mode before first message).
-    // Create a placeholder so handleChat()/startQuery() picks up the plan mode.
-    const placeholder: ConversationState = {
-      child: null,
-      inputStream: null,
-      abortController: null,
-      claudeSessionId: null,
-      workDir: '',  // will be overridden by handleChat's workDir param
-      turnActive: false,
-      turnResultReceived: false,
-      conversationId: convId,
-      lastClaudeSessionId: claudeSessionId || null,
-      isCompacting: false,
-      createdAt: Date.now(),
-      planMode: enteringPlan,
-      brainMode: false,
-    };
-    conversations.set(convId, placeholder);
-    return 'immediate';
+  if (!existing) {
+    return { claudeSessionId: null, wasTurnActive: false };
   }
+
+  const wasTurnActive = existing.turnActive;
+  const sessionId = existing.claudeSessionId || existing.lastClaudeSessionId;
+  const workDir = existing.workDir;
+  const newPlanMode = options.planMode ?? existing.planMode;
+
+  // Kill current process, cleanup resources
+  cleanupConversation(convId);
+
+  // Recreate state with updated parameters
+  const newState: ConversationState = {
+    child: null,
+    inputStream: null,
+    abortController: null,
+    claudeSessionId: null,
+    workDir,
+    turnActive: false,
+    turnResultReceived: false,
+    conversationId: convId,
+    lastClaudeSessionId: sessionId,
+    isCompacting: false,
+    createdAt: Date.now(),
+    planMode: newPlanMode,
+    brainMode: existing.brainMode,
+  };
+  conversations.set(convId, newState);
+
+  // Optionally reload history from JSONL
+  let history: HistoryMessage[] | undefined;
+  if (options.reloadHistory && sessionId) {
+    history = readSessionMessages(workDir, sessionId);
+  }
+
+  return { claudeSessionId: sessionId, wasTurnActive, history };
+}
+
+/**
+ * Create a placeholder conversation state (for toggling plan mode before first message).
+ */
+export function createPlaceholderConversation(
+  conversationId: string | undefined,
+  options: { planMode?: boolean } = {},
+): void {
+  const convId = conversationId || DEFAULT_CONVERSATION_ID;
+  const placeholder: ConversationState = {
+    child: null,
+    inputStream: null,
+    abortController: null,
+    claudeSessionId: null,
+    workDir: '',  // will be overridden by handleChat's workDir param
+    turnActive: false,
+    turnResultReceived: false,
+    conversationId: convId,
+    lastClaudeSessionId: null,
+    isCompacting: false,
+    createdAt: Date.now(),
+    planMode: options.planMode ?? false,
+    brainMode: false,
+  };
+  conversations.set(convId, placeholder);
 }
 
 function processFilesForClaude(files: ChatFile[], workDir: string, prompt: string): unknown[] {
