@@ -24,7 +24,8 @@ claude -p "user's question" --resume SESSION_ID --no-session-persistence --outpu
 ### After (proposed)
 
 ```
-claude -p "<composed prompt with inline context>" --no-session-persistence --output-format stream-json --verbose
+claude -p - --no-session-persistence --output-format stream-json --verbose
+# prompt piped via stdin to avoid ENAMETOOLONG
 ```
 
 ## Implementation
@@ -119,22 +120,30 @@ Question: {user's question}
 
 This is better than the current "No active conversation context available" hard failure — BTW can still answer general knowledge questions.
 
-### 3. Remove `--resume` and `--verbose` from BTW spawn args
+### 3. Update BTW spawn args
 
 **Final spawn args:**
 
 ```typescript
 const args = [
-  '-p', composedPrompt,
+  '-p', '-',                        // stdin piping — see "Implementation Fixes" below
   '--no-session-persistence',
   '--output-format', 'stream-json',
+  '--verbose',                      // required by Claude CLI for -p + stream-json
 ];
+```
+
+After spawning, the composed prompt is piped via stdin:
+
+```typescript
+child.stdin.write(composedPrompt);
+child.stdin.end();
 ```
 
 Changes:
 - Removed `--resume sessionId` — context is now inline
-- Removed `--verbose` — BTW doesn't need system/debug messages in output
-- The `-p` value changes from the raw question to the composed prompt
+- **Kept `--verbose`** — Claude CLI requires it when using `-p` with `--output-format stream-json`
+- Uses `-p -` (stdin marker) instead of `-p composedPrompt` to avoid OS argument length limits (see "Implementation Fixes" below)
 
 ### 4. Brain mode
 
@@ -161,6 +170,46 @@ When `conv?.brainMode` is true, the `brain` command is used instead of `claude`.
 | Compact summary is very large | Include it; it replaces all prior context so it's essential |
 | JSONL file is being written to by main process | `readFileSync` reads a snapshot; partial last line is handled by existing try/catch in JSON.parse |
 | `readConversationContext()` throws | Catch in `handleBtwQuestion()`, use fallback prompt |
+| Composed prompt exceeds OS arg-length limit | Handled by `-p -` stdin piping — no size limit |
+
+## Implementation Fixes
+
+Two runtime bugs were discovered during implementation and fixed:
+
+### Fix 1: `--verbose` is required
+
+**Symptom:** `Error: When using --print, --output-format=stream-json requires --verbose`
+
+**Root cause:** The original design (Section 3) said to remove `--verbose`, but Claude CLI mandates it when `-p` is used with `--output-format stream-json`. Without it, the CLI refuses to start.
+
+**Fix:** Keep `--verbose` in the spawn args. Updated Section 3 above.
+
+**Commit:** `cd2dfcd` — "Restore --verbose flag for BTW spawn args"
+
+### Fix 2: `ENAMETOOLONG` — stdin piping
+
+**Symptom:** `Failed to spawn Claude: spawn ENAMETOOLONG`
+
+**Root cause:** The composed prompt includes up to 100,000 characters of conversation context (the `CONTEXT_MAX_CHARS` limit). Passing this as a `-p` command-line argument exceeds the OS argument length limit on Windows (32,767 chars) and can also hit limits on Linux/macOS (~2MB but still risky for very long conversations).
+
+**Fix:** Use `-p -` (the `-` tells Claude CLI to read the prompt from stdin) and pipe the prompt via `child.stdin`:
+
+```typescript
+const args = [
+  '-p', '-',
+  '--no-session-persistence',
+  '--output-format', 'stream-json',
+  '--verbose',
+];
+
+// After spawn:
+child.stdin.write(composedPrompt);
+child.stdin.end();
+```
+
+This avoids OS argument length limits entirely since stdin has no practical size limit.
+
+**Commit:** `8bc5146` — "Fix ENAMETOOLONG by piping BTW prompt via stdin"
 
 ## Test Changes
 

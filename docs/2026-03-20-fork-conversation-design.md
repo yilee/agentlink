@@ -191,11 +191,11 @@ Frontend:
 
 1. **`handleForkSummaryRequest(conversationId, forkPointIndex)`**
    - Get the `claudeSessionId` for the given conversation
-   - Call `readRawSessionMessages(workDir, claudeSessionId, forkPointIndex)` to extract messages from JSONL
+   - Call `readConversationContext(workDir, claudeSessionId)` (already exists in `history.ts`, needs `upToIndex` extension) to extract messages from JSONL
    - Spawn a temporary Claude process (no `--resume`, one-shot):
      ```bash
-     claude --output-format stream-json --input-format stream-json
-       --verbose --permission-mode bypassPermissions
+     claude -p - --no-session-persistence --output-format stream-json --verbose
+     # prompt piped via stdin to avoid ENAMETOOLONG (see BTW doc for details)
      ```
    - Send a single prompt: "Summarize the following conversation concisely, preserving key decisions, context, and current state:\n\n{formatted messages}"
    - Collect the `result` text output
@@ -210,11 +210,13 @@ Frontend:
 
 **Changes to `history.ts`:**
 
-- New function: `readRawSessionMessages(workDir, sessionId, upToIndex?)` — similar to existing `readSessionMessages()` but:
+- ~~New function: `readRawSessionMessages(workDir, sessionId, upToIndex?)`~~ **Already implemented** as `readConversationContext(workDir, sessionId)` in `history.ts` (added by the [BTW Lightweight Context](2026-03-21-btw-lightweight-context.md) feature). This function:
   - Returns messages from the last `summary` entry (compact point) onward
-  - Stops at `upToIndex` if provided
   - **Only includes user and assistant text content** — strips all tool_use and tool_result blocks
-  - Returns formatted text (not `HistoryMessage[]`)
+  - Formats as readable `[Summary]/[User]/[Assistant]` dialogue text
+  - Truncates from the beginning if exceeding 100,000 characters (`CONTEXT_MAX_CHARS`)
+  - Returns `null` if no extractable content
+  - **For fork**: needs an `upToIndex?` parameter to stop at the fork point (currently reads to the end). This is the only addition needed.
 
 **Changes to `connection.ts`:**
 - Add handler for `fork_summary_request` and `fork_history_request` message types
@@ -269,7 +271,7 @@ Great, here are the 5 tasks:
 | File | Change |
 |------|--------|
 | `agent/src/fork.ts` | New: fork summary generation, history extraction |
-| `agent/src/history.ts` | New: `readRawSessionMessages()` for JSONL extraction from compact point |
+| `agent/src/history.ts` | Extend existing `readConversationContext()` with optional `upToIndex` parameter (base function already implemented by BTW feature) |
 | `agent/src/connection.ts` | Handle `fork_summary_request`, `fork_history_request` |
 | `server/web/src/components/ChatView.vue` | Add Fork button on assistant message hover |
 | `server/web/src/components/ForkDialog.vue` | New: fork modal dialog component |
