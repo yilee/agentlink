@@ -9,6 +9,7 @@ import { handleGitStatus, handleGitDiff, handleGitStage, handleGitUnstage, handl
 import { handleCreateTeam, handleDissolveTeam, handleListTeams, handleGetTeam, handleGetTeamAgentHistory, handleDeleteTeam, handleRenameTeam } from './team-handlers.js';
 import { handleCreateLoop, handleUpdateLoop, handleDeleteLoop, handleListLoops, handleGetLoop, handleRunLoop, handleCancelLoopExecution, handleListLoopExecutions, handleGetLoopExecutionMessages, handleQueryLoopStatus } from './loop-handlers.js';
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
+import { listRecaps, getRecapDetail } from './recap.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -251,6 +252,7 @@ function scheduleReconnect(config: AgentConfig): void {
 }
 
 const BRAIN_HOME_DIR = path.resolve(os.homedir(), '.brain', 'BrainCore');
+const BRAIN_DATA_DIR = path.resolve(os.homedir(), 'BrainData');
 
 function isBrainHomeDir(dir: string): boolean {
   return path.resolve(dir) === BRAIN_HOME_DIR;
@@ -524,9 +526,37 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'git_commit':
       handleGitCommit(msg as unknown as { message: string; type: string }, state.workDir, send);
       break;
+    case 'list_recaps':
+      handleListRecaps();
+      break;
+    case 'get_recap_detail':
+      handleGetRecapDetailMsg(msg as unknown as { recapId: string; sidecarPath: string });
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
+  }
+}
+
+async function handleListRecaps(): Promise<void> {
+  try {
+    const recaps = await listRecaps(BRAIN_DATA_DIR);
+    console.log(`[AgentLink] → recaps_list (${recaps.length} recaps)`);
+    send({ type: 'recaps_list', recaps });
+  } catch (err) {
+    console.error('[AgentLink] listRecaps failed:', err);
+    send({ type: 'recaps_list', recaps: [], error: String(err) });
+  }
+}
+
+async function handleGetRecapDetailMsg(msg: { recapId: string; sidecarPath: string }): Promise<void> {
+  try {
+    const detail = await getRecapDetail(BRAIN_DATA_DIR, msg.sidecarPath);
+    console.log(`[AgentLink] → recap_detail (${msg.recapId})`);
+    send({ type: 'recap_detail', recapId: msg.recapId, detail });
+  } catch (err) {
+    console.error(`[AgentLink] getRecapDetail failed for ${msg.recapId}:`, err);
+    send({ type: 'recap_detail', recapId: msg.recapId, detail: null, error: String(err) });
   }
 }
 
