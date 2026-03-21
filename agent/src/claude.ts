@@ -685,11 +685,9 @@ function processFilesForClaude(files: ChatFile[], workDir: string, prompt: strin
 function startQuery(conversationId: string, workDir: string, resumeSessionId?: string, brainMode?: boolean): void {
   // Tear down previous process for THIS conversation only (not others)
   const existing = conversations.get(conversationId);
-  console.log(`[Claude:${conversationId.slice(0, 8)}] startQuery: existing=${!!existing}, existing.planMode=${existing?.planMode}`);
   if (existing) {
     abort(conversationId);
   }
-  console.log(`[Claude:${conversationId.slice(0, 8)}] startQuery after abort: existing.planMode=${existing?.planMode}`);
 
   // Evict oldest idle conversation if at capacity (quota-aware)
   const convType = isLoopConversation(conversationId) ? 'loop' : 'chat';

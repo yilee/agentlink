@@ -339,8 +339,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const isSameSession = currentConv?.claudeSessionId === m.claudeSessionId
         || currentConv?.lastClaudeSessionId === m.claudeSessionId;
 
-      // Plan mode: use in-memory state for same session, otherwise reset to false
-      const planMode = isSameSession ? (currentConv?.planMode === true) : false;
+      // Plan mode always resets to false on resume — it's ephemeral and should
+      // not persist across page refreshes or sidebar navigation.
+      // Also reset the in-memory state so subsequent operations start clean.
+      if (currentConv) {
+        currentConv.planMode = false;
+      }
 
       // Determine brain mode from persisted metadata or workDir
       const sessionMeta = loadSessionMetadata(m.claudeSessionId);
@@ -353,7 +357,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         history,
         isCompacting: isSameSession && (convId ? getIsCompacting(convId) : getIsCompacting()),
         isProcessing: isSameSession && currentConv?.turnActive === true,
-        planMode,
+        planMode: false,
         brainMode: resumeBrainMode,
       });
       break;
