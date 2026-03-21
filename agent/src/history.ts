@@ -72,6 +72,78 @@ function extractCommandOutput(text: string): string | null {
   return null;
 }
 
+// ── User message preprocessing pipeline ─────────────────────────────────────
+// All special-case logic for transforming raw JSONL user messages into display
+// entries lives here. Add new transformations as steps in processUserMessage().
+
+const PLAN_MODE_NOTICE_RE = /^\[SYSTEM NOTICE: Plan mode has been (activated|deactivated)\.[^\]]*\]\s*/;
+
+interface ProcessedUserMessage {
+  /** Synthetic entries to insert before the user message (e.g. plan mode dividers) */
+  prefixEntries: HistoryMessage[];
+  /** The cleaned user message, or null if it should be skipped entirely */
+  userEntry: HistoryMessage | null;
+}
+
+/**
+ * Process a raw user message text through the full cleanup pipeline.
+ * Each step can filter, transform, or emit synthetic prefix entries.
+ *
+ * Steps (in order):
+ *  1. Skip hidden CLI commands
+ *  2. Extract command output (e.g. /cost results)
+ *  3. Strip system-injected XML tags
+ *  4. Extract plan mode notices → synthetic EnterPlanMode/ExitPlanMode dividers
+ *  (future steps go here)
+ */
+function processUserMessage(text: string, ts?: string): ProcessedUserMessage {
+  const none: ProcessedUserMessage = { prefixEntries: [], userEntry: null };
+
+  // 1. Hidden command → skip entirely
+  if (isHiddenCommand(text)) return none;
+
+  // 2. Command output → return as-is with flag
+  const cmdOutput = extractCommandOutput(text);
+  if (cmdOutput) {
+    return { prefixEntries: [], userEntry: { role: 'user', content: cmdOutput, timestamp: ts, isCommandOutput: true } };
+  }
+
+  // 3. Strip system tags
+  let cleaned = stripSystemTags(text);
+  if (!cleaned) return none;
+
+  // 4. Plan mode notice → synthetic tool divider + cleaned text
+  const prefixEntries: HistoryMessage[] = [];
+  const planMatch = cleaned.match(PLAN_MODE_NOTICE_RE);
+  if (planMatch) {
+    const planMode = planMatch[1] === 'activated' ? 'enter' : 'exit';
+    prefixEntries.push({
+      role: 'tool', content: '',
+      toolName: planMode === 'enter' ? 'EnterPlanMode' : 'ExitPlanMode',
+      toolInput: '{}', toolId: `plan-${ts || Date.now()}`,
+      timestamp: ts,
+    });
+    cleaned = cleaned.replace(PLAN_MODE_NOTICE_RE, '');
+  }
+
+  // (future preprocessing steps go here)
+
+  if (!cleaned) return { prefixEntries, userEntry: null };
+  return { prefixEntries, userEntry: { role: 'user', content: cleaned, timestamp: ts } };
+}
+
+/**
+ * Clean user message text for display (title, preview, context).
+ * Strips all system artifacts without emitting synthetic entries.
+ */
+function cleanUserText(text: string): string {
+  if (isHiddenCommand(text)) return '';
+  if (extractCommandOutput(text)) return '';
+  let cleaned = stripSystemTags(text);
+  if (cleaned) cleaned = cleaned.replace(PLAN_MODE_NOTICE_RE, '');
+  return cleaned;
+}
+
 /**
  * List sessions for a given working directory by scanning JSONL files.
  * Returns sessions sorted by lastModified descending.
@@ -126,8 +198,9 @@ export function listSessions(workDir: string): SessionInfo[] {
               ? data.message.content
               : data.message.content[0]?.text || '';
             if (text.trim() && !isHiddenCommand(text) && !extractCommandOutput(text)) {
-              preview = text.substring(0, 100);
-              title = text.substring(0, 100);
+              const displayText = cleanUserText(text);
+              preview = displayText.substring(0, 100);
+              title = displayText.substring(0, 100);
               hasUserMessage = true;
             }
           }
@@ -188,18 +261,9 @@ export function readSessionMessages(workDir: string, sessionId: string): History
                 .map((b: { text: string }) => b.text || '')
                 .join('');
           if (!text.trim()) continue;
-          // Skip caveat and command-name metadata
-          if (isHiddenCommand(text)) continue;
-          // Extract command output (e.g. /cost, /context results)
-          const cmdOutput = extractCommandOutput(text);
-          if (cmdOutput) {
-            result.push({ role: 'user', content: cmdOutput, timestamp: ts, isCommandOutput: true });
-          } else {
-            const cleaned = stripSystemTags(text);
-            if (cleaned) {
-              result.push({ role: 'user', content: cleaned, timestamp: ts });
-            }
-          }
+          const processed = processUserMessage(text, ts);
+          result.push(...processed.prefixEntries);
+          if (processed.userEntry) result.push(processed.userEntry);
         }
 
         if (data.type === 'assistant' && data.message?.content && Array.isArray(data.message.content)) {
@@ -313,7 +377,7 @@ export function readConversationContext(workDir: string, sessionId: string): str
           if (!text.trim()) continue;
           if (isHiddenCommand(text)) continue;
 
-          const cleaned = stripSystemTags(text);
+          const cleaned = cleanUserText(text);
           if (cleaned) {
             entries.push({ type: 'user', text: cleaned });
           }

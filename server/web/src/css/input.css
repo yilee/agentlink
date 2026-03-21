@@ -721,6 +721,12 @@
   border-top: 2px solid var(--brain-mode);
 }
 
+/* ── Dual mode: both plan + brain active ── */
+.input-card.plan-mode.brain-mode {
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(to right, var(--plan-mode) 50%, var(--brain-mode) 50%) 1;
+}
+
 /* ── Slash menu category headers ── */
 .slash-menu-category {
   padding: 6px 12px 4px;

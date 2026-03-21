@@ -28,7 +28,7 @@ import {
 } from './sdk.js';
 import { CONFIG_DIR } from './config.js';
 import { saveSessionMetadata } from './session-metadata.js';
-import { readConversationContext } from './history.js';
+import { readConversationContext, readSessionMessages, type HistoryMessage } from './history.js';
 import {
   buildControlResponse,
   handleResultMessage,
@@ -74,6 +74,10 @@ export interface ConversationState {
   createdAt: number;
   // Plan mode: when true, agent uses --permission-mode plan (Claude natively enforces read-only)
   planMode: boolean;
+  // Set when plan mode was just toggled via restartConversation — cleared after
+  // the first message is sent, used to prepend a mode-change notice so Claude
+  // doesn't get confused by its old conversation history.
+  planModeJustChanged: boolean;
   // Brain mode: when true, session metadata is persisted with brainMode flag
   brainMode: boolean;
 }
@@ -300,10 +304,24 @@ export function handleChat(
   state.turnResultReceived = false;
   if (options?.brainMode) state.brainMode = true;
 
-  console.log(`[Claude:${convId.slice(0, 8)}] Sending: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
+  // When plan mode was just toggled, prepend a notice to the user's message
+  // so Claude knows the mode changed (its old conversation history may say
+  // otherwise). The --permission-mode flag already changed the system prompt,
+  // but this explicit notice overrides any in-context confusion.
+  let effectivePrompt = prompt;
+  if (state.planModeJustChanged) {
+    const modeNotice = state.planMode
+      ? '[SYSTEM NOTICE: Plan mode has been activated. You are now in plan mode — only use read-only tools.]'
+      : '[SYSTEM NOTICE: Plan mode has been deactivated. You are now in normal mode — you can use all tools freely.]';
+    effectivePrompt = `${modeNotice}\n\n${prompt}`;
+    state.planModeJustChanged = false;
+    console.log(`[Claude:${convId.slice(0, 8)}] Prepended plan mode change notice`);
+  }
+
+  console.log(`[Claude:${convId.slice(0, 8)}] Sending: ${effectivePrompt.substring(0, 100)}${effectivePrompt.length > 100 ? '...' : ''}`);
 
   if (files && files.length > 0) {
-    const content = processFilesForClaude(files, workDir, prompt);
+    const content = processFilesForClaude(files, workDir, effectivePrompt);
     state.inputStream!.enqueue({
       type: 'user',
       message: { role: 'user', content },
@@ -311,7 +329,7 @@ export function handleChat(
   } else {
     state.inputStream!.enqueue({
       type: 'user',
-      message: { role: 'user', content: prompt },
+      message: { role: 'user', content: effectivePrompt },
     });
   }
 }
@@ -544,90 +562,104 @@ Question: ${question}`;
 
 // ── Internal ───────────────────────────────────────────────────────────────
 
+export interface RestartOptions {
+  /** New plan mode. If undefined, preserves current value. */
+  planMode?: boolean;
+  /** If true, reads JSONL history and includes it in the returned result. */
+  reloadHistory?: boolean;
+}
+
+export interface RestartResult {
+  /** The claudeSessionId that can be used to resume. */
+  claudeSessionId: string | null;
+  /** Whether an active turn was interrupted. */
+  wasTurnActive: boolean;
+  /** Reloaded history messages (only if reloadHistory was true). */
+  history?: HistoryMessage[];
+}
+
 /**
- * Set the permission mode for a conversation.
- * Kills the current Claude process (if any) and stores the new mode so the
- * next `handleChat()` call spawns Claude with the correct `--permission-mode`.
+ * Shared primitive for restarting a conversation.
+ * Kills the current Claude process, preserves session ID, recreates state
+ * with updated parameters. Used by plan mode toggle and (future) reload.
  */
-export function setPermissionMode(
+export function restartConversation(
   conversationId: string | undefined,
-  mode: 'bypassPermissions' | 'plan',
-  claudeSessionId?: string,
-): 'injected' | 'immediate' {
+  options: RestartOptions = {},
+): RestartResult {
   const convId = conversationId || DEFAULT_CONVERSATION_ID;
   const existing = conversations.get(convId);
-  const enteringPlan = mode === 'plan';
 
-  if (existing) {
-    // If the process is alive and idle, inject a user message to make Claude
-    // call EnterPlanMode / ExitPlanMode natively — this records the mode switch
-    // in the JSONL history so Claude stays aware of the current mode across resumes.
-    if (existing.child && !existing.child.killed && existing.inputStream && !existing.turnActive) {
-      existing.planMode = enteringPlan;
-      const instruction = enteringPlan
-        ? 'Enter plan mode now.'
-        : 'Exit plan mode now.';
-      existing.turnActive = true;
-      existing.turnResultReceived = false;
-      existing.inputStream.enqueue({
-        type: 'user',
-        message: { role: 'user', content: instruction },
-      });
-      console.log(`[Claude:${convId.slice(0, 8)}] Injected ${enteringPlan ? 'EnterPlanMode' : 'ExitPlanMode'} instruction into running process`);
-      return 'injected';
-    }
-
-    // Process is not running or turn is active — kill and recreate state.
-    // The next handleChat() will start a fresh process with the correct --permission-mode.
-    const wasTurnActive = existing.turnActive;
-    const lastSession = existing.claudeSessionId || existing.lastClaudeSessionId;
-    const workDir = existing.workDir;
-
-    cleanupConversation(convId);
-
-    // Notify UI if we interrupted an active turn
-    if (wasTurnActive) {
-      sendFn({ type: 'execution_cancelled', conversationId: convId });
-    }
-
-    const newState: ConversationState = {
-      child: null,
-      inputStream: null,
-      abortController: null,
-      claudeSessionId: null,
-      workDir,
-      turnActive: false,
-      turnResultReceived: false,
-      conversationId: convId,
-      lastClaudeSessionId: lastSession || null,
-      isCompacting: false,
-      createdAt: Date.now(),
-      planMode: enteringPlan,
-      brainMode: false,
-    };
-    conversations.set(convId, newState);
-    return 'immediate';
-  } else {
-    // No existing conversation yet (e.g. user toggled plan mode before first message).
-    // Create a placeholder so handleChat()/startQuery() picks up the plan mode.
-    const placeholder: ConversationState = {
-      child: null,
-      inputStream: null,
-      abortController: null,
-      claudeSessionId: null,
-      workDir: '',  // will be overridden by handleChat's workDir param
-      turnActive: false,
-      turnResultReceived: false,
-      conversationId: convId,
-      lastClaudeSessionId: claudeSessionId || null,
-      isCompacting: false,
-      createdAt: Date.now(),
-      planMode: enteringPlan,
-      brainMode: false,
-    };
-    conversations.set(convId, placeholder);
-    return 'immediate';
+  if (!existing) {
+    return { claudeSessionId: null, wasTurnActive: false };
   }
+
+  const wasTurnActive = existing.turnActive;
+  const sessionId = existing.claudeSessionId || existing.lastClaudeSessionId;
+  const workDir = existing.workDir;
+  const newPlanMode = options.planMode ?? existing.planMode;
+  const planModeChanged = newPlanMode !== existing.planMode;
+
+  // Kill current process, cleanup resources
+  cleanupConversation(convId);
+
+  // Recreate state with updated parameters
+  const newState: ConversationState = {
+    child: null,
+    inputStream: null,
+    abortController: null,
+    claudeSessionId: null,
+    workDir,
+    turnActive: false,
+    turnResultReceived: false,
+    conversationId: convId,
+    lastClaudeSessionId: sessionId,
+    isCompacting: false,
+    createdAt: Date.now(),
+    planMode: newPlanMode,
+    planModeJustChanged: planModeChanged,
+    brainMode: existing.brainMode,
+  };
+  conversations.set(convId, newState);
+
+  // Optionally reload history from JSONL
+  let history: HistoryMessage[] | undefined;
+  if (options.reloadHistory && sessionId) {
+    history = readSessionMessages(workDir, sessionId);
+  }
+
+  if (planModeChanged) {
+    console.log(`[Claude:${convId.slice(0, 8)}] Plan mode changed (${existing.planMode} → ${newPlanMode}) — will notify Claude on next message`);
+  }
+
+  return { claudeSessionId: sessionId, wasTurnActive, history };
+}
+
+/**
+ * Create a placeholder conversation state (for toggling plan mode before first message).
+ */
+export function createPlaceholderConversation(
+  conversationId: string | undefined,
+  options: { planMode?: boolean } = {},
+): void {
+  const convId = conversationId || DEFAULT_CONVERSATION_ID;
+  const placeholder: ConversationState = {
+    child: null,
+    inputStream: null,
+    abortController: null,
+    claudeSessionId: null,
+    workDir: '',  // will be overridden by handleChat's workDir param
+    turnActive: false,
+    turnResultReceived: false,
+    conversationId: convId,
+    lastClaudeSessionId: null,
+    isCompacting: false,
+    createdAt: Date.now(),
+    planMode: options.planMode ?? false,
+    planModeJustChanged: false,
+    brainMode: false,
+  };
+  conversations.set(convId, placeholder);
 }
 
 function processFilesForClaude(files: ChatFile[], workDir: string, prompt: string): unknown[] {
@@ -678,11 +710,9 @@ function processFilesForClaude(files: ChatFile[], workDir: string, prompt: strin
 function startQuery(conversationId: string, workDir: string, resumeSessionId?: string, brainMode?: boolean): void {
   // Tear down previous process for THIS conversation only (not others)
   const existing = conversations.get(conversationId);
-  console.log(`[Claude:${conversationId.slice(0, 8)}] startQuery: existing=${!!existing}, existing.planMode=${existing?.planMode}`);
   if (existing) {
     abort(conversationId);
   }
-  console.log(`[Claude:${conversationId.slice(0, 8)}] startQuery after abort: existing.planMode=${existing?.planMode}`);
 
   // Evict oldest idle conversation if at capacity (quota-aware)
   const convType = isLoopConversation(conversationId) ? 'loop' : 'chat';
@@ -707,6 +737,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     isCompacting: false,
     createdAt: Date.now(),
     planMode: existing?.planMode || false,
+    planModeJustChanged: existing?.planModeJustChanged || false,
     brainMode: brainMode || existing?.brainMode || false,
   };
 
@@ -940,24 +971,20 @@ async function processOutput(
 
         lastSentText = handleAssistantMessage(msg, lastSentText, sendWithConvId);
 
-        // Detect EnterPlanMode/ExitPlanMode tool calls — Claude is toggling
-        // plan mode natively. Sync state and notify the web UI.
-        const msgContent = (msg.message as { content?: Array<Record<string, unknown>> }).content;
-        if (Array.isArray(msgContent)) {
-          const hasExitPlan = msgContent.some(
-            (b) => b.type === 'tool_use' && b.name === 'ExitPlanMode'
-          );
-          const hasEnterPlan = msgContent.some(
-            (b) => b.type === 'tool_use' && b.name === 'EnterPlanMode'
-          );
-          if (hasExitPlan && state.planMode) {
-            console.log(`[Claude:${state.conversationId.slice(0, 8)}] ExitPlanMode detected — switching to normal mode`);
-            state.planMode = false;
-            sendWithConvId({ type: 'plan_mode_changed', enabled: false });
-          } else if (hasEnterPlan && !state.planMode) {
-            console.log(`[Claude:${state.conversationId.slice(0, 8)}] EnterPlanMode detected — switching to plan mode`);
-            state.planMode = true;
-            sendWithConvId({ type: 'plan_mode_changed', enabled: true });
+        // Detect EnterPlanMode / ExitPlanMode tool_use blocks in the assistant
+        // message. This is the reliable path — control_request only fires when
+        // the tool needs permission (plan→bypass has it, bypass→plan may not).
+        const assistantContent = (msg.message as { content?: Array<Record<string, unknown>> }).content;
+        if (Array.isArray(assistantContent)) {
+          for (const block of assistantContent) {
+            if (block.type === 'tool_use' && (block.name === 'EnterPlanMode' || block.name === 'ExitPlanMode')) {
+              const entering = block.name === 'EnterPlanMode';
+              if (state.planMode !== entering) {
+                console.log(`[Claude:${state.conversationId.slice(0, 8)}] ${block.name} tool_use detected — syncing planMode=${entering}`);
+                state.planMode = entering;
+                sendWithConvId({ type: 'plan_mode_changed', enabled: entering });
+              }
+            }
           }
         }
 
@@ -1051,10 +1078,9 @@ async function processOutput(
 
 /**
  * Handle an incoming control_request from Claude's stdout.
- * For AskUserQuestion: forward to web UI and wait for user answer.
- * For other tools: auto-approve immediately.
- * Note: plan mode tool restrictions are handled natively by Claude's
- * --permission-mode plan flag — no custom deny logic needed here.
+ * - AskUserQuestion: forward to web UI and wait for user answer.
+ * - ExitPlanMode / EnterPlanMode: sync agent + UI state, then approve.
+ * - Other tools: auto-approve immediately.
  */
 function handleControlRequest(
   request: ControlRequest,
@@ -1079,7 +1105,20 @@ function handleControlRequest(
     return;
   }
 
-  // Auto-approve all other tool calls
+  // Sync plan mode state when Claude exits/enters plan mode on its own
+  // (This is a fallback — the primary detection is in processOutput via tool_use blocks.
+  //  Only send plan_mode_changed if state is actually changing, to avoid duplicates.)
+  if (subtype === 'can_use_tool' && (toolName === 'ExitPlanMode' || toolName === 'EnterPlanMode')) {
+    const entering = toolName === 'EnterPlanMode';
+    const conv = getConversation(conversationId);
+    if (conv && conv.planMode !== entering) {
+      console.log(`[Claude:${conversationId.slice(0, 8)}] ${toolName} control_request — syncing planMode=${entering}`);
+      conv.planMode = entering;
+      sendFn({ type: 'plan_mode_changed', enabled: entering, conversationId });
+    }
+  }
+
+  // Auto-approve all other tool calls (including plan mode tools)
   const response = buildControlResponse(requestId, request.request.input || {});
 
   if (child.stdin && !child.stdin.destroyed) {

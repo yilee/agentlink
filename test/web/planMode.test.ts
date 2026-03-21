@@ -187,4 +187,62 @@ describe('planMode', () => {
       expect(planMode.value).toBe(false);
     });
   });
+
+  describe('plan_mode_changed handler', () => {
+    it('always clears isProcessing', () => {
+      const planMode = ref(false);
+      const isProcessing = ref(true);
+      const processingConversations = ref<Record<string, boolean>>({ 'conv-1': true });
+      const currentConversationId = ref('conv-1');
+
+      function setPlanMode(enabled: boolean) {
+        planMode.value = enabled;
+      }
+
+      // Simulate plan_mode_changed handler (no immediate check needed)
+      function handlePlanModeChanged(msg: { enabled: boolean }) {
+        setPlanMode(msg.enabled);
+        isProcessing.value = false;
+        if (currentConversationId.value) {
+          processingConversations.value[currentConversationId.value] = false;
+        }
+      }
+
+      handlePlanModeChanged({ enabled: true });
+      expect(planMode.value).toBe(true);
+      expect(isProcessing.value).toBe(false);
+      expect(processingConversations.value['conv-1']).toBe(false);
+    });
+  });
+
+  describe('togglePlanMode does not inject user messages', () => {
+    it('sends set_plan_mode without pushing a user message', () => {
+      const planMode = ref(false);
+      const isProcessing = ref(false);
+      const messages = ref<any[]>([]);
+      const sent: any[] = [];
+      const wsSend = (msg: any) => sent.push(msg);
+      const currentConversationId = ref('conv-1');
+      const processingConversations = ref<Record<string, boolean>>({});
+
+      function togglePlanMode() {
+        if (isProcessing.value) return;
+        const newMode = !planMode.value;
+        isProcessing.value = true;
+        if (currentConversationId.value) {
+          processingConversations.value[currentConversationId.value] = true;
+        }
+        wsSend({ type: 'set_plan_mode', enabled: newMode, conversationId: currentConversationId.value });
+      }
+
+      togglePlanMode();
+      expect(sent).toHaveLength(1);
+      expect(sent[0].type).toBe('set_plan_mode');
+      expect(sent[0].enabled).toBe(true);
+      // No user message pushed to messages array
+      expect(messages.value).toHaveLength(0);
+      // isProcessing set to true (cleared when plan_mode_changed arrives)
+      expect(isProcessing.value).toBe(true);
+    });
+  });
 });

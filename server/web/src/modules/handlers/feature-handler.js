@@ -24,12 +24,9 @@ export function createFeatureHandlers(deps) {
     },
     plan_mode_changed(msg) {
       if (setPlanMode) setPlanMode(msg.enabled);
-      // For the immediate path (no injected turn), clear isProcessing here
-      if (msg.immediate) {
-        isProcessing.value = false;
-        if (currentConversationId.value) {
-          processingConversations.value[currentConversationId.value] = false;
-        }
+      isProcessing.value = false;
+      if (currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = false;
       }
     },
     workdir_changed(msg) {

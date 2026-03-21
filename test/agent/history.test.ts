@@ -165,6 +165,37 @@ describe('History', () => {
       const msgs = readSessionMessages(TEST_WORK_DIR, 's-stdout');
       expect(msgs[0]).toMatchObject({ role: 'user', content: 'output text', isCommandOutput: true });
     });
+
+    it('strips plan mode activation notice and emits EnterPlanMode divider', () => {
+      writeJsonl('s-plan-enter', [
+        { type: 'user', message: { content: '[SYSTEM NOTICE: Plan mode has been activated. You are now in plan mode — only use read-only tools.]\n\nwhat is this?' } },
+      ]);
+      const msgs = readSessionMessages(TEST_WORK_DIR, 's-plan-enter');
+      expect(msgs.length).toBe(2);
+      expect(msgs[0]).toMatchObject({ role: 'tool', toolName: 'EnterPlanMode' });
+      expect(msgs[1]).toMatchObject({ role: 'user', content: 'what is this?' });
+    });
+
+    it('strips plan mode deactivation notice and emits ExitPlanMode divider', () => {
+      writeJsonl('s-plan-exit', [
+        { type: 'user', message: { content: '[SYSTEM NOTICE: Plan mode has been deactivated. You are now in normal mode — you can use all tools freely.]\n\ndo the thing' } },
+      ]);
+      const msgs = readSessionMessages(TEST_WORK_DIR, 's-plan-exit');
+      expect(msgs.length).toBe(2);
+      expect(msgs[0]).toMatchObject({ role: 'tool', toolName: 'ExitPlanMode' });
+      expect(msgs[1]).toMatchObject({ role: 'user', content: 'do the thing' });
+    });
+
+    it('strips plan mode notice from session title/preview in listSessions', () => {
+      writeJsonl('s-plan-title', [
+        { type: 'user', message: { content: '[SYSTEM NOTICE: Plan mode has been activated. You are now in plan mode — only use read-only tools.]\n\nhello world' } },
+      ]);
+      const sessions = listSessions(TEST_WORK_DIR);
+      const s = sessions.find(x => x.sessionId === 's-plan-title');
+      expect(s).toBeDefined();
+      expect(s!.title).toBe('hello world');
+      expect(s!.title).not.toContain('SYSTEM NOTICE');
+    });
   });
 
   describe('readConversationContext', () => {
