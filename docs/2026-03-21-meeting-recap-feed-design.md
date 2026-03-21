@@ -123,7 +123,7 @@ interface IndexEntry {
   series_name: string;
   date_utc: string;           // ISO 8601
   date_local: string;         // ISO 8601 with timezone offset
-  meeting_type: string;       // general_sync | strategy_architecture | standup | brainstorm | kickoff | post_mortem
+  meeting_type: string;       // general_sync | strategy | standup | brainstorm | kickoff | post_mortem
   project: string | null;
   for_you_count: number;
   tldr_snippet: string;
@@ -285,7 +285,7 @@ Rendered above chat history list, only when `brainMode=true`.
 | Card element | Source field |
 |---|---|
 | Title | `meeting_name` |
-| Time + badge | Computed from `date_local` + `meeting_type` display name |
+| Time + badge | Computed from `date_local` + fallback badge map on `meeting_type` (detail view uses `feed.type_badge` instead) |
 | 📌 count | `for_you_count` |
 | TL;DR snippet | `tldr_snippet` (clamp to 3 lines CSS) |
 
@@ -320,16 +320,22 @@ function getDateGroup(dateLocal) {
 └─────────────────────────────────┘
 ```
 
-**Type badge colors:**
+**Type badge display:**
 
-| Meeting type | Badge label | Color |
+For the **detail view**, use `feed.type_badge` from the sidecar JSON directly (e.g., `"Strategy / Architecture"`). Brain provides a display-ready string — no client-side mapping needed.
+
+For **feed cards** (which only have the index entry, not the full sidecar), use a fallback map from `meeting_type`:
+
+| `meeting_type` value | Fallback badge label | Color |
 |---|---|---|
 | `general_sync` | General Sync | Blue |
-| `strategy_architecture` | Strategy | Purple |
+| `strategy` | Strategy | Purple |
 | `standup` | Standup | Green |
 | `brainstorm` | Brainstorm | Orange |
 | `kickoff` | Kickoff | Teal |
 | `post_mortem` | Post-Mortem | Red |
+
+> **Note:** The real Brain skill uses `strategy` (not `strategy_architecture` from the earlier sample data). The fallback map should handle both values for forward compatibility, but `strategy` is the canonical value.
 
 **Hover:** Subtle elevation/shadow. **Click:** Sends `get_recap_detail`, switches to detail view.
 
@@ -392,7 +398,7 @@ function getDateGroup(dateLocal) {
 
 | Section | Source |
 |---|---|
-| Header | `meta.meeting_name`, `meta.occurred_at_local`, `meta.duration`, `meta.meeting_type` |
+| Header | `meta.meeting_name`, `meta.occurred_at_local`, `meta.duration`, `feed.type_badge` (display-ready from Brain) |
 | Project | `meta.project` |
 | Participants | `meta.participants` (show first names or truncate if >6) |
 | For You | `detail.for_you[]` — show `text` + `reason` (smaller, muted) |
@@ -436,16 +442,18 @@ const expanded = ref(false); // "Show all" toggle
 
 **Section icon mapping:**
 
-| section_type | Icon | Display title |
-|---|---|---|
-| `decisions` | 📋 | Decisions / Emerging Direction |
-| `action_items` | 📋 | Action Items |
-| `blockers` | 🔴 | Blockers |
-| `key_themes` | 💡 | Key Themes |
-| `context` | 💡 | Context / Why It Matters |
-| `vision` | 🎯 | Vision |
-| `root_cause` | 🔍 | Root Cause |
-| `preventative_actions` | 🛡️ | Preventative Actions |
+The display title comes from the sidecar's `hook_sections[].title` field (e.g., Brain may use `"Emerging Directions"` instead of `"Decisions"` for Strategy meetings). The UI uses the sidecar title directly and only maps `section_type` to an icon:
+
+| section_type | Icon |
+|---|---|
+| `decisions` | 📋 |
+| `action_items` | 📋 |
+| `blockers` | 🔴 |
+| `key_themes` | 💡 |
+| `context` | 💡 |
+| `vision` | 🎯 |
+| `root_cause` | 🔍 |
+| `preventative_actions` | 🛡️ |
 
 ### 5.7 Type-Adaptive Detail — Strategy Example
 
@@ -735,7 +743,44 @@ function stopAutoRefresh() {
 
 No new web dependencies — all rendering uses existing Vue 3 + vanilla CSS.
 
-## 12. Risks & Mitigations
+## 12. Real Data Validation (2026-03-22)
+
+Ran the updated `meeting-recap` skill on the "UI Shell vs Brain Strategy" meeting (March 20). Validated real output against the documented schemas.
+
+**Files generated:**
+- `~/BrainData/reports/meeting-recap/recap_index.yaml` — 1 entry
+- `~/BrainData/reports/meeting-recap/Discussion_UI_Shell_vs._Brain_Server_Integration_Strategy/recap-2026-03-20-meeting_20260320_080240_82728052.json` — full sidecar
+
+**Index entry — schema match: YES**
+
+All 12 fields present and correct. Notable real values:
+- `meeting_type: strategy` (not `strategy_architecture` from earlier sample data)
+- `project: null` (sample data had it populated — field is optional as expected)
+- `sharing_link` populated with SharePoint URL (upload succeeded)
+
+**Sidecar JSON — schema match: YES**
+
+All top-level sections present: `schema_version`, `meta`, `feed`, `detail`, `decisions`, `action_items`, `open_items`.
+
+Key observations from real data:
+- `meta.timezone` = `"CST (UTC+8)"` — display string, not IANA zone ID. Fine for UI display.
+- `meta.duration` = `"~2 hours"` — free-text, not a number. Display as-is.
+- `meta.user_attended` = `true` — correctly detected.
+- `feed.type_badge` = `"Strategy / Architecture"` — Brain provides display-ready badge text. UI should use this directly instead of maintaining a separate mapping. Updated design to use `feed.type_badge` for detail view.
+- `feed.date_group` = `"This week"` — pre-computed by Brain but gets stale. Client-side computation is correct approach.
+- `detail.hook_sections` — Strategy meeting produced `context` + `decisions` sections as expected.
+- `detail.hook_sections[].title` = `"Emerging Directions"` (not generic `"Decisions"`). Brain provides context-appropriate titles per meeting. UI uses the sidecar title directly.
+- `detail.for_you` — 3 items with `kind` ∈ {`stakeholder_decision`, `action`, `watch_item`}, each with `text` + `reason`. Matches schema.
+- `decisions[]` — 5 entries, all `tag: "Leaning"`. Has `championed_by` arrays. `quote` populated on one entry (Chinese text from transcript). Match.
+- `action_items[]` — 5 entries with `owner`, `action`, `due` (some null), `carried_over: false`. Match.
+- `open_items[]` — 4 entries with `text`, `owner` (some null). Match.
+
+**Design changes from validation:**
+1. Updated `meeting_type` enum: `strategy` is canonical (not `strategy_architecture`). Fallback map handles both.
+2. Detail view uses `feed.type_badge` for display instead of client-side mapping from `meeting_type`.
+3. Hook section titles come from sidecar (`hook_sections[].title`), not hard-coded in UI. Client only maps `section_type` → icon.
+
+## 13. Risks & Mitigations
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
@@ -745,7 +790,7 @@ No new web dependencies — all rendering uses existing Vue 3 + vanilla CSS.
 | Contextual chat scope (Phase 2) | High | Defer to Phase 2; Phase 1 is static read-only |
 | Sidebar refactor breaks existing functionality | Med | Minimal changes (add slot for FeedNav), thorough functional test coverage |
 
-## 13. Testing Plan
+## 14. Testing Plan
 
 **Unit tests** (`test/web/`):
 - Date grouping logic
