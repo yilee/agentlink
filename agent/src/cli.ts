@@ -167,6 +167,9 @@ program
           qrcode.generate(state.sessionUrl, { small: true }, (code: string) => {
             console.log(code);
           });
+          if (config.entra) {
+            console.log('\x1b[33m  Tip: Use your phone\'s native camera to scan. WeChat scanner will not work.\x1b[0m');
+          }
           console.log(`  Log: ${logFile}`);
           if (options.pidFile) {
             writePidFile(resolve(options.pidFile), { pid: state.pid, sessionUrl: state.sessionUrl, password: config.password });
@@ -265,6 +268,9 @@ program
       qrcode.generate(agentState.sessionUrl, { small: true }, (code: string) => {
         console.log(code);
       });
+      if (config.entra) {
+        console.log('\x1b[33m  Tip: Use your phone\'s native camera to scan. WeChat scanner will not work.\x1b[0m');
+      }
     }
   });
 

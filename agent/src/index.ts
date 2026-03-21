@@ -45,6 +45,9 @@ export async function start(config: AgentConfig, daemon = false, pidFile?: strin
     qrcode.generate(sessionUrl, { small: true }, (code: string) => {
       console.log(code);
     });
+    if (config.entra) {
+      console.log('\x1b[33m  Tip: Use your phone\'s native camera to scan. WeChat scanner will not work.\x1b[0m');
+    }
     console.log('[AgentLink] Waiting for connections...');
 
     // Write PID file for test harness (foreground mode)
