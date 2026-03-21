@@ -74,6 +74,10 @@ export interface ConversationState {
   createdAt: number;
   // Plan mode: when true, agent uses --permission-mode plan (Claude natively enforces read-only)
   planMode: boolean;
+  // Set when plan mode was just toggled via restartConversation — cleared after
+  // the first message is sent, used to prepend a mode-change notice so Claude
+  // doesn't get confused by its old conversation history.
+  planModeJustChanged: boolean;
   // Brain mode: when true, session metadata is persisted with brainMode flag
   brainMode: boolean;
 }
@@ -300,10 +304,24 @@ export function handleChat(
   state.turnResultReceived = false;
   if (options?.brainMode) state.brainMode = true;
 
-  console.log(`[Claude:${convId.slice(0, 8)}] Sending: ${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}`);
+  // When plan mode was just toggled, prepend a notice to the user's message
+  // so Claude knows the mode changed (its old conversation history may say
+  // otherwise). The --permission-mode flag already changed the system prompt,
+  // but this explicit notice overrides any in-context confusion.
+  let effectivePrompt = prompt;
+  if (state.planModeJustChanged) {
+    const modeNotice = state.planMode
+      ? '[SYSTEM NOTICE: Plan mode has been activated. You are now in plan mode — only use read-only tools.]'
+      : '[SYSTEM NOTICE: Plan mode has been deactivated. You are now in normal mode — you can use all tools freely.]';
+    effectivePrompt = `${modeNotice}\n\n${prompt}`;
+    state.planModeJustChanged = false;
+    console.log(`[Claude:${convId.slice(0, 8)}] Prepended plan mode change notice`);
+  }
+
+  console.log(`[Claude:${convId.slice(0, 8)}] Sending: ${effectivePrompt.substring(0, 100)}${effectivePrompt.length > 100 ? '...' : ''}`);
 
   if (files && files.length > 0) {
-    const content = processFilesForClaude(files, workDir, prompt);
+    const content = processFilesForClaude(files, workDir, effectivePrompt);
     state.inputStream!.enqueue({
       type: 'user',
       message: { role: 'user', content },
@@ -311,7 +329,7 @@ export function handleChat(
   } else {
     state.inputStream!.enqueue({
       type: 'user',
-      message: { role: 'user', content: prompt },
+      message: { role: 'user', content: effectivePrompt },
     });
   }
 }
@@ -580,6 +598,7 @@ export function restartConversation(
   const sessionId = existing.claudeSessionId || existing.lastClaudeSessionId;
   const workDir = existing.workDir;
   const newPlanMode = options.planMode ?? existing.planMode;
+  const planModeChanged = newPlanMode !== existing.planMode;
 
   // Kill current process, cleanup resources
   cleanupConversation(convId);
@@ -598,6 +617,7 @@ export function restartConversation(
     isCompacting: false,
     createdAt: Date.now(),
     planMode: newPlanMode,
+    planModeJustChanged: planModeChanged,
     brainMode: existing.brainMode,
   };
   conversations.set(convId, newState);
@@ -606,6 +626,10 @@ export function restartConversation(
   let history: HistoryMessage[] | undefined;
   if (options.reloadHistory && sessionId) {
     history = readSessionMessages(workDir, sessionId);
+  }
+
+  if (planModeChanged) {
+    console.log(`[Claude:${convId.slice(0, 8)}] Plan mode changed (${existing.planMode} → ${newPlanMode}) — will notify Claude on next message`);
   }
 
   return { claudeSessionId: sessionId, wasTurnActive, history };
@@ -632,6 +656,7 @@ export function createPlaceholderConversation(
     isCompacting: false,
     createdAt: Date.now(),
     planMode: options.planMode ?? false,
+    planModeJustChanged: false,
     brainMode: false,
   };
   conversations.set(convId, placeholder);
@@ -712,6 +737,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     isCompacting: false,
     createdAt: Date.now(),
     planMode: existing?.planMode || false,
+    planModeJustChanged: existing?.planModeJustChanged || false,
     brainMode: brainMode || existing?.brainMode || false,
   };
 
@@ -945,6 +971,23 @@ async function processOutput(
 
         lastSentText = handleAssistantMessage(msg, lastSentText, sendWithConvId);
 
+        // Detect EnterPlanMode / ExitPlanMode tool_use blocks in the assistant
+        // message. This is the reliable path — control_request only fires when
+        // the tool needs permission (plan→bypass has it, bypass→plan may not).
+        const assistantContent = (msg.message as { content?: Array<Record<string, unknown>> }).content;
+        if (Array.isArray(assistantContent)) {
+          for (const block of assistantContent) {
+            if (block.type === 'tool_use' && (block.name === 'EnterPlanMode' || block.name === 'ExitPlanMode')) {
+              const entering = block.name === 'EnterPlanMode';
+              if (state.planMode !== entering) {
+                console.log(`[Claude:${state.conversationId.slice(0, 8)}] ${block.name} tool_use detected — syncing planMode=${entering}`);
+                state.planMode = entering;
+                sendWithConvId({ type: 'plan_mode_changed', enabled: entering });
+              }
+            }
+          }
+        }
+
         continue;
       }
 
@@ -1063,14 +1106,16 @@ function handleControlRequest(
   }
 
   // Sync plan mode state when Claude exits/enters plan mode on its own
+  // (This is a fallback — the primary detection is in processOutput via tool_use blocks.
+  //  Only send plan_mode_changed if state is actually changing, to avoid duplicates.)
   if (subtype === 'can_use_tool' && (toolName === 'ExitPlanMode' || toolName === 'EnterPlanMode')) {
     const entering = toolName === 'EnterPlanMode';
-    console.log(`[Claude:${conversationId.slice(0, 8)}] ${toolName} control_request — syncing planMode=${entering}`);
     const conv = getConversation(conversationId);
-    if (conv) {
+    if (conv && conv.planMode !== entering) {
+      console.log(`[Claude:${conversationId.slice(0, 8)}] ${toolName} control_request — syncing planMode=${entering}`);
       conv.planMode = entering;
+      sendFn({ type: 'plan_mode_changed', enabled: entering, conversationId });
     }
-    sendFn({ type: 'plan_mode_changed', enabled: entering, conversationId });
   }
 
   // Auto-approve all other tool calls (including plan mode tools)
