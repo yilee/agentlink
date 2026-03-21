@@ -1,4 +1,4 @@
-# AgentLink
+# AgenticWorker
 
 [![CI](https://github.com/yilee/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/yilee/agentlink/actions/workflows/ci.yml)
 [![npm server](https://img.shields.io/npm/v/@agent-link/server?label=server)](https://www.npmjs.com/package/@agent-link/server)
@@ -9,7 +9,7 @@ English | [中文](./README.zh-CN.md)
 
 Access your local Claude Code agent from anywhere — through a shareable web URL.
 
-AgentLink runs a lightweight agent on your dev machine, connects it to a cloud relay, and gives you a clean chat interface at `https://msclaude.ai/xxxx`. All code execution happens locally. The relay just forwards encrypted messages.
+AgenticWorker runs a lightweight agent on your dev machine, connects it to a cloud relay, and gives you a clean chat interface at `https://msclaude.ai/xxxx`. All code execution happens locally. The relay just forwards encrypted messages.
 
 ```
 Browser (any device)  ←→  Cloud Relay  ←→  Local Agent  ←→  Your Codebase
@@ -38,7 +38,7 @@ Orchestrate multiple Claude agents in parallel. A Lead agent plans and delegates
 ### Loop
 Schedule recurring prompts with cron expressions. Automate code reviews, dependency checks, report generation, and other routine tasks that run on your local codebase.
 
-## Why AgentLink?
+## Why AgenticWorker?
 
 - **Access from anywhere.** Phone, tablet, another machine — just open the URL.
 - **Everything runs locally.** Your files never leave your machine. The relay only sees encrypted messages.

@@ -1,4 +1,4 @@
-# AgentLink
+# AgenticWorker
 
 [![CI](https://github.com/yilee/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/yilee/agentlink/actions/workflows/ci.yml)
 [![npm server](https://img.shields.io/npm/v/@agent-link/server?label=server)](https://www.npmjs.com/package/@agent-link/server)
@@ -9,7 +9,7 @@
 
 在任何设备上远程访问你本地的 Claude Code —— 只需一个链接。
 
-AgentLink 在你的开发机器上运行一个轻量级客户端，通过云端中继服务器，让你可以在手机、平板或任何浏览器上以 `https://msclaude.ai/xxxx` 的形式与 Claude 对话。所有代码执行都在本地完成，中继服务器只转发加密消息。
+AgenticWorker 在你的开发机器上运行一个轻量级客户端，通过云端中继服务器，让你可以在手机、平板或任何浏览器上以 `https://msclaude.ai/xxxx` 的形式与 Claude 对话。所有代码执行都在本地完成，中继服务器只转发加密消息。
 
 ```
 浏览器（任意设备）  ←→  云端中继  ←→  本地 Agent  ←→  你的代码库
@@ -38,7 +38,7 @@ agentlink-client start --daemon
 ### Loop
 通过 Cron 表达式定时调度自动化任务。自动执行代码审查、依赖检查、报告生成等在本地代码库上运行的例行工作。
 
-## 为什么选择 AgentLink？
+## 为什么选择 AgenticWorker？
 
 - **随时随地访问** —— 手机、平板、另一台电脑，打开链接即可使用，无需任何额外配置。
 - **代码不离本地** —— 文件始终留在你的机器上，中继服务器只转发端到端加密后的消息。
