@@ -10,6 +10,7 @@ const {
   messages,
   status,
   viewMode,
+  currentView,
   t,
   getRenderedContent,
   getToolSummary,
@@ -34,7 +35,7 @@ const { teamState: team } = teamStore;
 </script>
 
 <template>
-          <template v-if="viewMode === 'chat'">
+          <template v-if="viewMode === 'chat' && currentView === 'chat'">
           <div class="message-list" @scroll="onMessageListScroll">
             <div class="message-list-inner">
               <div v-if="messages.length === 0 && status === 'Connected' && !loadingHistory" class="empty-state">

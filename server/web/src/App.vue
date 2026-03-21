@@ -1,5 +1,5 @@
 <script setup>
-import { provide } from 'vue';
+import { provide, computed } from 'vue';
 import { createStore } from './store.js';
 
 import BtwOverlay from './components/BtwOverlay.vue';
@@ -16,6 +16,8 @@ import ChatView from './components/ChatView.vue';
 import ChatInput from './components/ChatInput.vue';
 import PreviewPanel from './components/PreviewPanel.vue';
 import ToastContainer from './components/ToastContainer.vue';
+import RecapFeed from './components/RecapFeed.vue';
+import RecapDetail from './components/RecapDetail.vue';
 
 // Create store inside component setup() so onMounted/onUnmounted hooks fire correctly
 const store = createStore();
@@ -24,11 +26,14 @@ provide('team', store._team);
 provide('loop', store._loop);
 provide('sidebar', store._sidebar);
 provide('files', store._files);
+if (store._recap) {
+  provide('recap', store._recap);
+}
 
 // Only destructure what App.vue template actually needs
 const {
   status, displayStatus, agentName, workDir, sessionId, error,
-  messages, viewMode, t,
+  messages, viewMode, currentView, t,
   _files: { fileBrowser, fileContextMenu, filePanelOpen, previewPanelOpen },
   _sidebar: { sidebarOpen, workdirSwitching },
 } = store;
@@ -70,6 +75,10 @@ const {
 
           <!-- ══ Normal Chat ══ -->
           <ChatView />
+
+          <!-- ══ Recap Views ══ -->
+          <RecapFeed v-if="currentView === 'recap-feed'" />
+          <RecapDetail v-if="currentView === 'recap-detail'" />
 
           <BtwOverlay />
 

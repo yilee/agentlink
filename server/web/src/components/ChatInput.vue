@@ -5,6 +5,7 @@ const store = inject('store');
 const {
   status,
   viewMode,
+  currentView,
   inputText,
   planMode,
   brainMode,
@@ -57,7 +58,7 @@ function selectableIndex(cmd, i) {
 </script>
 
 <template>
-          <div class="input-area" v-if="viewMode === 'chat'">
+          <div class="input-area" v-if="viewMode === 'chat' && currentView === 'chat'">
             <input
               type="file"
               ref="fileInputRef"

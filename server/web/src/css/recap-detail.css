@@ -1,0 +1,245 @@
+/* ── Recap Detail ── */
+
+.recap-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.recap-detail-back {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.75rem 1.25rem 0;
+  font-size: 0.85rem;
+  color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.recap-detail-back:hover {
+  text-decoration: underline;
+}
+
+.recap-detail-loading,
+.recap-detail-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  padding: 2rem;
+}
+
+.recap-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1.25rem 1.25rem;
+}
+
+/* Header */
+.recap-detail-header {
+  margin-bottom: 1rem;
+}
+
+.recap-detail-meeting-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  line-height: 1.3;
+}
+
+.recap-detail-series {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.recap-detail-meta-row {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.2rem;
+}
+
+.recap-detail-project {
+  font-size: 0.82rem;
+  color: var(--accent);
+  margin-bottom: 0.15rem;
+}
+
+.recap-detail-participants {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+/* TL;DR */
+.recap-detail-tldr {
+  font-size: 0.87rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0;
+}
+
+/* Sharing link */
+.recap-detail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.83rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
+}
+
+.recap-detail-link:hover {
+  text-decoration: underline;
+}
+
+/* ── For You ── */
+
+.recap-for-you {
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.recap-for-you-header {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin-bottom: 0.6rem;
+}
+
+.recap-for-you-icon {
+  font-size: 0.9rem;
+}
+
+.recap-for-you-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.recap-for-you-item {
+  padding-left: 0.2rem;
+}
+
+.recap-for-you-text {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.recap-for-you-reason {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding-left: 0.7rem;
+  margin-top: 0.15rem;
+  line-height: 1.4;
+}
+
+/* ── Hook Section ── */
+
+.recap-hook-section {
+  margin-bottom: 0.8rem;
+  padding-top: 0.5rem;
+}
+
+.recap-hook-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+
+.recap-hook-icon {
+  font-size: 0.9rem;
+}
+
+.recap-hook-title {
+  color: var(--text-primary);
+}
+
+.recap-hook-count {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.recap-hook-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.recap-hook-item {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.83rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.recap-hook-bullet {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.recap-hook-item-content {
+  flex: 1;
+}
+
+.recap-hook-tag {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.78rem;
+  margin-right: 0.25rem;
+}
+
+.recap-hook-owner {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.recap-hook-due {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.recap-hook-show-more {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.3rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.recap-hook-show-more:hover {
+  color: var(--accent);
+}
+
+.recap-hook-expand-icon {
+  font-size: 0.7rem;
+}

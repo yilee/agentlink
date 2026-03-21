@@ -22,6 +22,7 @@ import { createTeam } from './modules/team.js';
 import { createMemory } from './modules/memory.js';
 import { createGit } from './modules/git.js';
 import { createLoop } from './modules/loop.js';
+import { createRecap } from './modules/recap.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
 import { useTheme } from './composables/useTheme.js';
@@ -122,6 +123,7 @@ export function createStore() {
   // Brain mode state (per-conversation, locks after first message)
   const brainMode = ref(false);
   const brainModeLocked = ref(false);
+  const currentView = ref('chat'); // 'chat' | 'recap-feed' | 'recap-detail'
 
   // File browser state
   const filePanelOpen = ref(false);
@@ -317,7 +319,7 @@ export function createStore() {
     // i18n
     t,
   });
-  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -406,6 +408,10 @@ export function createStore() {
   });
   setGit(git);
   sidebar.setGit(git);
+
+  // Recap module (only in brain/ms mode)
+  const recap = isMsRoute ? createRecap({ wsSend }) : null;
+  if (recap) setRecap(recap);
 
   const isMemoryPreview = computed(() => {
     if (!previewFile.value?.filePath || !memoryDir.value) return false;
@@ -788,6 +794,7 @@ export function createStore() {
     planMode, pendingPlanMode, togglePlanMode,
     // Brain mode
     brainMode, brainModeLocked, toggleBrainMode, showBrainButton,
+    currentView,
     // Side question (/btw)
     btwState, btwPending, dismissBtw,
     // Message rendering helpers
@@ -831,6 +838,6 @@ export function createStore() {
     // Team feed helpers (depend on both store + team)
     feedAgentName, feedContentRest,
     // Domain modules (for App.vue to provide separately)
-    _team, _loop, _sidebar, _files,
+    _team, _loop, _sidebar, _files, _recap: recap,
   };
 }

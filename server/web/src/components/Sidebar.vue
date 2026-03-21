@@ -4,6 +4,7 @@ import { inject } from 'vue';
 import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
+import FeedNav from './FeedNav.vue';
 
 const vFocus = { mounted: (el) => el.focus() };
 
@@ -498,6 +499,7 @@ const {
             </div>
           </div>
 
+          <FeedNav v-if="isMsRoute" />
           <SessionList />
           <TeamList />
           <LoopList />
