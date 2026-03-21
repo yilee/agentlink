@@ -6,6 +6,8 @@ import type { AgentConfig } from './config.js';
 import { loadRuntimeState, saveRuntimeState } from './config.js';
 import { handleListDirectory, handleReadFile, handleChangeWorkDir, handleUpdateFile, handleCreateFile, handleCreateDirectory, handleDeleteFile } from './directory-handlers.js';
 import { handleGitStatus, handleGitDiff, handleGitStage, handleGitUnstage, handleGitDiscard, handleGitCommit } from './git-handlers.js';
+import { handleCreateTeam, handleDissolveTeam, handleListTeams, handleGetTeam, handleGetTeamAgentHistory, handleDeleteTeam, handleRenameTeam } from './team-handlers.js';
+import { handleCreateLoop, handleUpdateLoop, handleDeleteLoop, handleListLoops, handleGetLoop, handleRunLoop, handleCancelLoopExecution, handleListLoopExecutions, handleGetLoopExecutionMessages, handleQueryLoopStatus } from './loop-handlers.js';
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
 
 const require = createRequire(import.meta.url);
@@ -14,19 +16,10 @@ import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortA
 import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
 import { listMemoryFiles, updateMemoryFile, deleteMemoryFile } from './memory.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
-import { setTeamSendFn, setTeamClaudeFns, createTeam, dissolveTeam, getActiveTeam, loadTeam, listTeams, deleteTeam, renameTeam, serializeTeam, type TeamConfig } from './team.js';
+import { setTeamSendFn, setTeamClaudeFns, getActiveTeam, serializeTeam } from './team.js';
 import {
   initScheduler,
   shutdownScheduler,
-  createLoop,
-  updateLoop,
-  deleteLoop,
-  listLoops,
-  getLoop,
-  runLoopNow,
-  cancelLoopExecution,
-  listLoopExecutions,
-  getLoopExecutionMessages,
   getRunningExecutions,
 } from './scheduler.js';
 
@@ -419,211 +412,58 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       });
       break;
     }
-    case 'create_team': {
-      const m = msg as unknown as { instruction: string; template?: string; leadPrompt?: string; agents?: Record<string, unknown> };
-      try {
-        createTeam({
-          instruction: m.instruction,
-          template: m.template,
-          leadPrompt: m.leadPrompt,
-          agents: m.agents as TeamConfig['agents'],
-        }, state.workDir);
-      } catch (err) {
-        send({ type: 'error', message: (err as Error).message });
-      }
+    case 'create_team':
+      handleCreateTeam(msg as unknown as { instruction: string; template?: string; leadPrompt?: string; agents?: Record<string, unknown> }, state.workDir, send);
       break;
-    }
     case 'dissolve_team':
-      dissolveTeam();
+      handleDissolveTeam();
       break;
     case 'list_teams':
-      send({ type: 'teams_list', teams: listTeams(state.workDir) });
+      handleListTeams(state.workDir, send);
       break;
-    case 'get_team': {
-      const m = msg as unknown as { teamId: string };
-      const active = getActiveTeam();
-      if (active && active.teamId === m.teamId) {
-        send({ type: 'team_detail', team: serializeTeam(active) });
-      } else {
-        const team = loadTeam(m.teamId);
-        if (team) {
-          send({ type: 'team_detail', team: serializeTeam(team) });
-        } else {
-          send({ type: 'error', message: `Team not found: ${m.teamId}` });
-        }
-      }
+    case 'get_team':
+      handleGetTeam(msg as unknown as { teamId: string }, send);
       break;
-    }
-    case 'get_team_agent_history': {
-      const m = msg as unknown as { teamId: string; agentId: string };
-      const active = getActiveTeam();
-      if (active && active.teamId === m.teamId) {
-        if (m.agentId === 'lead') {
-          send({ type: 'team_agent_history', teamId: m.teamId, agentId: 'lead', messages: active.leadMessages || [] });
-        } else {
-          const agent = active.agents.get(m.agentId);
-          if (agent) {
-            send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
-          } else {
-            send({ type: 'error', message: `Agent not found: ${m.agentId}` });
-          }
-        }
-      } else {
-        // Historical team — load from disk (messages are persisted)
-        const team = loadTeam(m.teamId);
-        if (team) {
-          if (m.agentId === 'lead') {
-            send({ type: 'team_agent_history', teamId: m.teamId, agentId: 'lead', messages: team.leadMessages || [] });
-          } else if (team.agents.has(m.agentId)) {
-            const agent = team.agents.get(m.agentId)!;
-            send({ type: 'team_agent_history', teamId: m.teamId, agentId: m.agentId, messages: agent.messages });
-          } else {
-            send({ type: 'error', message: `Agent not found: ${m.agentId}` });
-          }
-        } else {
-          send({ type: 'error', message: `Team not found: ${m.teamId}` });
-        }
-      }
+    case 'get_team_agent_history':
+      handleGetTeamAgentHistory(msg as unknown as { teamId: string; agentId: string }, send);
       break;
-    }
-    case 'delete_team': {
-      const m = msg as unknown as { teamId: string };
-      const active = getActiveTeam();
-      if (active && active.teamId === m.teamId) {
-        send({ type: 'error', message: 'Cannot delete an active team.' });
-        break;
-      }
-      const deleted = deleteTeam(m.teamId);
-      if (deleted) {
-        send({ type: 'team_deleted', teamId: m.teamId });
-      } else {
-        send({ type: 'error', message: 'Team not found or could not be deleted.' });
-      }
+    case 'delete_team':
+      handleDeleteTeam(msg as unknown as { teamId: string }, send);
       break;
-    }
-    case 'rename_team': {
-      const m = msg as unknown as { teamId: string; newTitle: string };
-      const active = getActiveTeam();
-      // If renaming the active team, update in-memory state too
-      if (active && active.teamId === m.teamId) {
-        active.title = m.newTitle;
-      }
-      const renamed = renameTeam(m.teamId, m.newTitle);
-      if (renamed) {
-        send({ type: 'team_renamed', teamId: m.teamId, newTitle: m.newTitle });
-      } else {
-        send({ type: 'error', message: 'Team not found or could not be renamed.' });
-      }
+    case 'rename_team':
+      handleRenameTeam(msg as unknown as { teamId: string; newTitle: string }, send);
       break;
-    }
     // ── Loop (Scheduled Tasks) handlers ────────────────────────────────
-    case 'create_loop': {
-      const m = msg as unknown as {
-        name: string;
-        prompt: string;
-        schedule: string;
-        scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron';
-        scheduleConfig: { hour?: number; minute?: number; dayOfWeek?: number };
-        brainMode?: boolean;
-      };
-      try {
-        const loop = createLoop({
-          name: m.name,
-          prompt: m.prompt,
-          schedule: m.schedule,
-          scheduleType: m.scheduleType,
-          scheduleConfig: m.scheduleConfig,
-          workDir: state.workDir,
-          brainMode: m.brainMode,
-        });
-        send({ type: 'loop_created', loop });
-      } catch (err) {
-        send({ type: 'error', message: (err as Error).message });
-      }
+    case 'create_loop':
+      handleCreateLoop(msg as unknown as { name: string; prompt: string; schedule: string; scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron'; scheduleConfig: { hour?: number; minute?: number; dayOfWeek?: number }; brainMode?: boolean }, state.workDir, send);
       break;
-    }
-    case 'update_loop': {
-      const m = msg as unknown as {
-        loopId: string;
-        updates: Partial<{
-          name: string;
-          prompt: string;
-          schedule: string;
-          scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron';
-          scheduleConfig: { hour?: number; minute?: number; dayOfWeek?: number };
-          enabled: boolean;
-          brainMode: boolean;
-        }>;
-      };
-      try {
-        const loop = updateLoop(m.loopId, m.updates);
-        if (loop) {
-          send({ type: 'loop_updated', loop });
-        } else {
-          send({ type: 'error', message: `Loop not found: ${m.loopId}` });
-        }
-      } catch (err) {
-        send({ type: 'error', message: (err as Error).message });
-      }
+    case 'update_loop':
+      handleUpdateLoop(msg as unknown as { loopId: string; updates: Partial<{ name: string; prompt: string; schedule: string; scheduleType: 'hourly' | 'daily' | 'weekly' | 'cron'; scheduleConfig: { hour?: number; minute?: number; dayOfWeek?: number }; enabled: boolean; brainMode: boolean }> }, send);
       break;
-    }
-    case 'delete_loop': {
-      const m = msg as unknown as { loopId: string };
-      const deleted = deleteLoop(m.loopId);
-      if (deleted) {
-        send({ type: 'loop_deleted', loopId: m.loopId });
-      } else {
-        send({ type: 'error', message: 'Loop not found or could not be deleted.' });
-      }
+    case 'delete_loop':
+      handleDeleteLoop(msg as unknown as { loopId: string }, send);
       break;
-    }
     case 'list_loops':
-      send({ type: 'loops_list', loops: listLoops(state.workDir) });
+      handleListLoops(state.workDir, send);
       break;
-    case 'get_loop': {
-      const m = msg as unknown as { loopId: string };
-      const loop = getLoop(m.loopId);
-      if (loop) {
-        send({ type: 'loop_detail', loop });
-      } else {
-        send({ type: 'error', message: `Loop not found: ${m.loopId}` });
-      }
+    case 'get_loop':
+      handleGetLoop(msg as unknown as { loopId: string }, send);
       break;
-    }
-    case 'run_loop': {
-      const m = msg as unknown as { loopId: string };
-      try {
-        runLoopNow(m.loopId);
-      } catch (err) {
-        send({ type: 'error', message: (err as Error).message });
-      }
+    case 'run_loop':
+      handleRunLoop(msg as unknown as { loopId: string }, send);
       break;
-    }
-    case 'cancel_loop_execution': {
-      const m = msg as unknown as { loopId: string };
-      cancelLoopExecution(m.loopId);
+    case 'cancel_loop_execution':
+      handleCancelLoopExecution(msg as unknown as { loopId: string });
       break;
-    }
-    case 'list_loop_executions': {
-      const m = msg as unknown as { loopId: string; limit?: number };
-      const executions = listLoopExecutions(m.loopId, m.limit);
-      send({ type: 'loop_executions_list', loopId: m.loopId, executions });
+    case 'list_loop_executions':
+      handleListLoopExecutions(msg as unknown as { loopId: string; limit?: number }, send);
       break;
-    }
-    case 'get_loop_execution_messages': {
-      const m = msg as unknown as { loopId: string; executionId: string };
-      const messages = getLoopExecutionMessages(m.loopId, m.executionId);
-      send({ type: 'loop_execution_messages', loopId: m.loopId, executionId: m.executionId, messages });
+    case 'get_loop_execution_messages':
+      handleGetLoopExecutionMessages(msg as unknown as { loopId: string; executionId: string }, send);
       break;
-    }
-    case 'query_loop_status': {
-      const running: Array<{ executionId: string; loopId: string; conversationId?: string }> = [];
-      for (const [execId, exec] of getRunningExecutions()) {
-        running.push({ executionId: execId, loopId: exec.loopId, conversationId: exec.conversationId });
-      }
-      send({ type: 'loop_status', loops: listLoops(), runningExecutions: running });
+    case 'query_loop_status':
+      handleQueryLoopStatus(send);
       break;
-    }
     case 'ping':
       send({ type: 'pong', ts: (msg as unknown as { ts: number }).ts });
       break;
