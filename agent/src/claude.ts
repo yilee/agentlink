@@ -947,27 +947,6 @@ async function processOutput(
 
         lastSentText = handleAssistantMessage(msg, lastSentText, sendWithConvId);
 
-        // Detect EnterPlanMode/ExitPlanMode tool calls — Claude is toggling
-        // plan mode natively. Sync state and notify the web UI.
-        const msgContent = (msg.message as { content?: Array<Record<string, unknown>> }).content;
-        if (Array.isArray(msgContent)) {
-          const hasExitPlan = msgContent.some(
-            (b) => b.type === 'tool_use' && b.name === 'ExitPlanMode'
-          );
-          const hasEnterPlan = msgContent.some(
-            (b) => b.type === 'tool_use' && b.name === 'EnterPlanMode'
-          );
-          if (hasExitPlan && state.planMode) {
-            console.log(`[Claude:${state.conversationId.slice(0, 8)}] ExitPlanMode detected — switching to normal mode`);
-            state.planMode = false;
-            sendWithConvId({ type: 'plan_mode_changed', enabled: false });
-          } else if (hasEnterPlan && !state.planMode) {
-            console.log(`[Claude:${state.conversationId.slice(0, 8)}] EnterPlanMode detected — switching to plan mode`);
-            state.planMode = true;
-            sendWithConvId({ type: 'plan_mode_changed', enabled: true });
-          }
-        }
-
         continue;
       }
 
