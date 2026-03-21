@@ -81,6 +81,23 @@ describe('listRecaps', () => {
     expect(result[0].recap_id).toBe('r1');
     expect(result[1].recap_id).toBe('r2');
   });
+
+  it('parses bare array YAML (no recaps wrapper key)', async () => {
+    const yaml = `- recap_id: r1
+  meeting_name: "Standup"
+  meeting_type: standup
+  date_local: "2026-03-22T10:00:00"
+- recap_id: r2
+  meeting_name: "Retro"
+  meeting_type: post_mortem
+  date_local: "2026-03-21T14:00:00"
+`;
+    writeFileSync(join(tempDir, 'reports', 'meeting-recap', 'recap_index.yaml'), yaml);
+    const result = await listRecaps(tempDir);
+    expect(result).toHaveLength(2);
+    expect(result[0].recap_id).toBe('r1');
+    expect(result[1].meeting_type).toBe('post_mortem');
+  });
 });
 
 describe('getRecapDetail', () => {

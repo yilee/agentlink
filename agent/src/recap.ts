@@ -46,11 +46,12 @@ export async function listRecaps(brainHome: string): Promise<IndexEntry[]> {
   const indexPath = path.join(brainHome, RECAP_INDEX_PATH);
   try {
     const content = fs.readFileSync(indexPath, 'utf-8');
-    const parsed = yaml.load(content) as { recaps?: IndexEntry[] } | null;
-    if (!parsed || !Array.isArray(parsed.recaps)) {
-      return [];
-    }
-    return parsed.recaps;
+    const parsed = yaml.load(content) as { recaps?: IndexEntry[] } | IndexEntry[] | null;
+    if (!parsed) return [];
+    // Support both bare array and { recaps: [...] } wrapper
+    const entries = Array.isArray(parsed) ? parsed : parsed.recaps;
+    if (!Array.isArray(entries)) return [];
+    return entries;
   } catch (err: unknown) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') {

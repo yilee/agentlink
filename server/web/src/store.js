@@ -410,6 +410,7 @@ export function createStore() {
   sidebar.setGit(git);
 
   // Recap module (only in brain/ms mode)
+  const isMsRoute = window.location.pathname.startsWith('/ms/');
   const recap = isMsRoute ? createRecap({ wsSend }) : null;
   if (recap) setRecap(recap);
 
@@ -603,7 +604,6 @@ export function createStore() {
   }
 
   // Hide brain button for resumed non-brain sessions, and only show on /ms/ routes
-  const isMsRoute = window.location.pathname.startsWith('/ms/');
   const showBrainButton = computed(() => isMsRoute && (brainMode.value || !currentClaudeSessionId.value));
 
   function handleKeydown(e) {
