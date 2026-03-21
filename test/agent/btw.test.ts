@@ -228,7 +228,7 @@ describe('handleBtwQuestion', () => {
 
   // ── Spawn args verification ────────────────────────────────────────────
 
-  it('uses -p with composed prompt, no --resume and no --verbose', async () => {
+  it('uses -p with composed prompt and --verbose, no --resume', async () => {
     const mainChild = createMockChild();
     mockSpawn.mockReturnValueOnce(mainChild);
     handleChat('conv-btw-args', 'hello', '/tmp');
@@ -254,9 +254,10 @@ describe('handleBtwQuestion', () => {
     expect(args).toContain('--output-format');
     expect(args).toContain('stream-json');
 
-    // Should NOT have --resume or --verbose
+    // Should NOT have --resume
     expect(args).not.toContain('--resume');
-    expect(args).not.toContain('--verbose');
+    // --verbose IS required for -p + stream-json
+    expect(args).toContain('--verbose');
   });
 
   // ── Session ID lookup priority ─────────────────────────────────────────

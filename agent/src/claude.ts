@@ -438,11 +438,12 @@ Question: ${question}`;
 Question: ${question}`;
   }
 
-  // 3. Build args — no --resume, no --verbose
+  // 3. Build args — no --resume; --verbose is required by claude CLI for -p + stream-json
   const args = [
     '-p', composedPrompt,
     '--no-session-persistence',
     '--output-format', 'stream-json',
+    '--verbose',
   ];
 
   const { command, prefixArgs, spawnOpts } = conv?.brainMode
