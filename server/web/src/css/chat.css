@@ -11,14 +11,13 @@
 .message-list {
   flex: 1 1 auto;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   min-height: 0;
   overscroll-behavior: contain;
   padding: 1.5rem 1.5rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  min-height: 0;
-  overscroll-behavior: contain;
 }
 
 .message-list-inner {

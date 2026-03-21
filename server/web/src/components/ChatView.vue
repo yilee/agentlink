@@ -84,7 +84,7 @@ const { teamState: team } = teamStore;
                         <svg v-else viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                       </button>
                     </div>
-                    <div class="message-content markdown-body" v-html="getRenderedContent(msg)"></div>
+                    <div class="message-content markdown-body" :key="msg.id + (msg.isStreaming ? '-s' : '-d')" v-html="getRenderedContent(msg)"></div>
                   </div>
                 </template>
 

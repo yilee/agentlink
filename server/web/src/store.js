@@ -682,8 +682,27 @@ export function createStore() {
   // clearing lists during workdir change.
 
   // ── Lifecycle ──
+  function _forceRepaint() {
+    const el = document.querySelector('.message-list');
+    if (!el) return;
+    el.style.transform = 'translateZ(0)';
+    requestAnimationFrame(() => { el.style.transform = ''; });
+  }
+
   function _onVisibilityChange() {
     if (!document.hidden) {
+      // Safari/WebKit on iPad may freeze rendering of chat messages when the
+      // tab loses focus (e.g. switching apps). Force a repaint on return.
+      _forceRepaint();
+      nextTick(() => scrollToBottom());
+    }
+  }
+
+  function _onPageShow(e) {
+    // pageshow fires more reliably than visibilitychange on iOS Safari when
+    // returning from another app. persisted=true means bfcache restore.
+    if (e.persisted) {
+      _forceRepaint();
       nextTick(() => scrollToBottom());
     }
   }
@@ -691,6 +710,7 @@ export function createStore() {
   onMounted(() => {
     connect(scheduleHighlight);
     document.addEventListener('visibilitychange', _onVisibilityChange);
+    window.addEventListener('pageshow', _onPageShow);
   });
   onUnmounted(() => {
     closeWs(); streaming.cleanup(); cleanupScroll(); cleanupHighlight();
@@ -698,6 +718,7 @@ export function createStore() {
     document.removeEventListener('click', _workdirMenuClickHandler);
     document.removeEventListener('keydown', _workdirMenuKeyHandler);
     document.removeEventListener('visibilitychange', _onVisibilityChange);
+    window.removeEventListener('pageshow', _onPageShow);
   });
 
   // ── Public API ──
