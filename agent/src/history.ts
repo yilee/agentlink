@@ -259,6 +259,129 @@ export function deleteSession(workDir: string, sessionId: string): boolean {
 }
 
 /**
+ * Read lightweight conversation context from a session's JSONL file.
+ * Extracts only user/assistant text from the last compact point (summary) onward,
+ * stripping all tool_use/tool_result blocks. Used by BTW side questions to provide
+ * conversation context without the full session history overhead.
+ *
+ * Returns null if the JSONL file doesn't exist or has no extractable content.
+ */
+export const CONTEXT_MAX_CHARS = 100_000;
+
+export function readConversationContext(workDir: string, sessionId: string): string | null {
+  const projectsDir = getClaudeProjectsDir();
+  const projectFolder = pathToProjectFolder(workDir);
+  const filePath = join(projectsDir, projectFolder, `${sessionId}.jsonl`);
+
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.trim());
+
+    // Parse all lines, tracking the last summary position
+    interface ParsedEntry {
+      type: 'summary' | 'user' | 'assistant';
+      text: string;
+    }
+
+    const entries: ParsedEntry[] = [];
+    let lastSummaryIndex = -1;
+
+    for (const line of lines) {
+      try {
+        const data = JSON.parse(line);
+
+        // Summary entry (compact point)
+        if (data.type === 'summary' && data.summary) {
+          lastSummaryIndex = entries.length;
+          entries.push({ type: 'summary', text: data.summary });
+          continue;
+        }
+
+        // User messages — text only, skip hidden commands
+        if (data.type === 'user' && data.message?.content) {
+          const text = typeof data.message.content === 'string'
+            ? data.message.content
+            : data.message.content
+                .filter((b: { type: string }) => b.type === 'text')
+                .map((b: { text: string }) => b.text || '')
+                .join('');
+
+          if (!text.trim()) continue;
+          if (isHiddenCommand(text)) continue;
+
+          const cleaned = stripSystemTags(text);
+          if (cleaned) {
+            entries.push({ type: 'user', text: cleaned });
+          }
+          continue;
+        }
+
+        // Assistant messages — text blocks only, skip tool_use
+        if (data.type === 'assistant' && data.message?.content && Array.isArray(data.message.content)) {
+          const textParts: string[] = [];
+          for (const block of data.message.content) {
+            if (block.type === 'text' && block.text) {
+              textParts.push(block.text);
+            }
+            // Skip tool_use blocks entirely
+          }
+          if (textParts.length > 0) {
+            entries.push({ type: 'assistant', text: textParts.join('\n\n') });
+          }
+          continue;
+        }
+
+        // Skip everything else: tool_result, system, custom-title, etc.
+      } catch { /* skip malformed lines */ }
+    }
+
+    // Start from the last summary (compact point), or from the beginning
+    const startIndex = lastSummaryIndex >= 0 ? lastSummaryIndex : 0;
+    const relevantEntries = entries.slice(startIndex);
+
+    if (relevantEntries.length === 0) {
+      return null;
+    }
+
+    // Format as readable dialogue
+    const parts: string[] = [];
+    for (const entry of relevantEntries) {
+      switch (entry.type) {
+        case 'summary':
+          parts.push(`[Summary]\n${entry.text}`);
+          break;
+        case 'user':
+          parts.push(`[User]\n${entry.text}`);
+          break;
+        case 'assistant':
+          parts.push(`[Assistant]\n${entry.text}`);
+          break;
+      }
+    }
+
+    let formatted = parts.join('\n\n');
+
+    // Truncate from the beginning if too large (keep most recent messages)
+    if (formatted.length > CONTEXT_MAX_CHARS) {
+      formatted = formatted.slice(-CONTEXT_MAX_CHARS);
+      // Find the first complete section marker to avoid partial text
+      const firstSectionIdx = formatted.indexOf('\n[');
+      if (firstSectionIdx > 0) {
+        formatted = formatted.slice(firstSectionIdx + 1); // skip the leading newline
+      }
+    }
+
+    return formatted;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Rename a session by appending a custom-title entry to its JSONL file.
  * This matches what Claude CLI's /rename command does.
  */

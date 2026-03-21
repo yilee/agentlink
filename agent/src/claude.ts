@@ -28,6 +28,7 @@ import {
 } from './sdk.js';
 import { CONFIG_DIR } from './config.js';
 import { saveSessionMetadata } from './session-metadata.js';
+import { readConversationContext } from './history.js';
 import {
   buildControlResponse,
   handleResultMessage,
@@ -385,8 +386,8 @@ export function handleUserAnswer(requestId: string, answers: Record<string, unkn
 
 /**
  * Handle a /btw side question. Spawns a lightweight, ephemeral Claude query
- * that resumes the current conversation's session for context but does not
- * persist any changes. Streams btw_answer deltas back to the web client.
+ * with inline conversation context (stripped-down dialogue) instead of
+ * --resume. Streams btw_answer deltas back to the web client.
  */
 export async function handleBtwQuestion(
   question: string,
@@ -400,17 +401,46 @@ export async function handleBtwQuestion(
   const conv = conversations.get(convId);
   const sessionId = conv?.claudeSessionId || conv?.lastClaudeSessionId || fallbackClaudeSessionId || null;
 
-  if (!sessionId) {
-    send({ type: 'btw_answer', delta: 'No active conversation context available.', done: true });
-    return;
-  }
-
   const effectiveWorkDir = conv?.workDir || workDir;
 
-  // 2. Build args for a lightweight one-shot query
+  // 2. Build inline context from the session JSONL
+  let composedPrompt: string;
+  if (sessionId) {
+    let context: string | null = null;
+    try {
+      context = readConversationContext(effectiveWorkDir, sessionId);
+    } catch (err) {
+      console.warn(`[Claude:btw] Failed to read context: ${(err as Error).message}`);
+    }
+
+    if (context) {
+      composedPrompt = `This is a side question from the user — a quick, read-only query that should not affect the current task.
+
+Rules:
+- Answer concisely based on the conversation context and your knowledge
+- Do NOT call any tools (no file reads, no bash commands, no edits)
+- Do NOT produce any tool_use blocks
+- Do NOT continue or modify the main task
+
+<conversation-context>
+${context}
+</conversation-context>
+
+Side question: ${question}`;
+    } else {
+      composedPrompt = `Answer this question concisely. No tool calls, no file operations — text answer only.
+
+Question: ${question}`;
+    }
+  } else {
+    composedPrompt = `Answer this question concisely. No tool calls, no file operations — text answer only.
+
+Question: ${question}`;
+  }
+
+  // 3. Build args — prompt is piped via stdin to avoid OS arg-length limits (ENAMETOOLONG)
   const args = [
-    '-p', question,
-    '--resume', sessionId,
+    '-p', '-',
     '--no-session-persistence',
     '--output-format', 'stream-json',
     '--verbose',
@@ -435,12 +465,13 @@ export async function handleBtwQuestion(
     return;
   }
 
-  // Close stdin immediately — this is a one-shot -p query, no interactive input needed
+  // Pipe the composed prompt via stdin, then close — avoids OS arg-length limits
   if (child.stdin) {
+    child.stdin.write(composedPrompt);
     child.stdin.end();
   }
 
-  // 3. Parse streaming JSON output and forward text deltas
+  // 4. Parse streaming JSON output and forward text deltas
   const rl = createInterface({ input: child.stdout! });
   let lastSentText = '';
   let sentAnyDelta = false;
