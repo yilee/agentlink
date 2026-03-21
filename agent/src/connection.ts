@@ -341,8 +341,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
 
       // Plan mode always resets to false on resume — it's ephemeral and should
       // not persist across page refreshes or sidebar navigation.
-      // Also reset the in-memory state so subsequent operations start clean.
-      if (currentConv) {
+      // If the Claude process was running with --permission-mode plan, we must
+      // kill it so the next message spawns a fresh process with bypassPermissions.
+      if (currentConv && currentConv.planMode) {
+        restartConversation(convId, { planMode: false });
+      } else if (currentConv) {
         currentConv.planMode = false;
       }
 

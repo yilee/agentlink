@@ -1035,10 +1035,9 @@ async function processOutput(
 
 /**
  * Handle an incoming control_request from Claude's stdout.
- * For AskUserQuestion: forward to web UI and wait for user answer.
- * For other tools: auto-approve immediately.
- * Note: plan mode tool restrictions are handled natively by Claude's
- * --permission-mode plan flag — no custom deny logic needed here.
+ * - AskUserQuestion: forward to web UI and wait for user answer.
+ * - ExitPlanMode / EnterPlanMode: sync agent + UI state, then approve.
+ * - Other tools: auto-approve immediately.
  */
 function handleControlRequest(
   request: ControlRequest,
@@ -1063,7 +1062,18 @@ function handleControlRequest(
     return;
   }
 
-  // Auto-approve all other tool calls
+  // Sync plan mode state when Claude exits/enters plan mode on its own
+  if (subtype === 'can_use_tool' && (toolName === 'ExitPlanMode' || toolName === 'EnterPlanMode')) {
+    const entering = toolName === 'EnterPlanMode';
+    console.log(`[Claude:${conversationId.slice(0, 8)}] ${toolName} control_request — syncing planMode=${entering}`);
+    const conv = getConversation(conversationId);
+    if (conv) {
+      conv.planMode = entering;
+    }
+    sendFn({ type: 'plan_mode_changed', enabled: entering, conversationId });
+  }
+
+  // Auto-approve all other tool calls (including plan mode tools)
   const response = buildControlResponse(requestId, request.request.input || {});
 
   if (child.stdin && !child.stdin.destroyed) {
