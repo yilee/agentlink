@@ -161,7 +161,7 @@ New module with two functions:
 ```typescript
 /**
  * Read recap_index.yaml from Brain Home, parse YAML, return entries.
- * Brain Home path: ~/.brain/BrainCore
+ * Brain Home path: ~/BrainData
  */
 export async function listRecaps(brainHome: string): Promise<IndexEntry[]>
 
@@ -194,7 +194,7 @@ case 'get_recap_detail':
   break;
 ```
 
-**Brain Home resolution:** Use the same `brainHome` path that the existing Brain Home sidebar button uses. Expected: `~/.brain/BrainCore`.
+**Brain Home resolution:** Use the same `brainHome` path that the existing Brain Home sidebar button uses. Expected: `~/BrainData` (i.e., `C:\Users\<user>\BrainData` on Windows).
 
 ## 5. Web UI Implementation
 
@@ -740,7 +740,7 @@ No new web dependencies — all rendering uses existing Vue 3 + vanilla CSS.
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | YAML parsing adds dependency | Low | `js-yaml` is 50KB, well-maintained, no native deps |
-| Brain Home path unknown | Med | Reuse existing Brain Home resolution from sidebar button |
+| Brain Home path unknown | Low | Brain Home is `~/BrainData`; reuse existing sidebar button resolution |
 | Large index file (hundreds of recaps) | Low | Unlikely near-term; add pagination if needed later |
 | Contextual chat scope (Phase 2) | High | Defer to Phase 2; Phase 1 is static read-only |
 | Sidebar refactor breaks existing functionality | Med | Minimal changes (add slot for FeedNav), thorough functional test coverage |
