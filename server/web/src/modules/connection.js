@@ -83,16 +83,32 @@ export function createConnection(deps) {
     latency.value = null;
   }
 
-  // Idle-check: if isProcessing stays true with no claude_output for 15s,
-  // poll the agent to reconcile stale state.
-  const IDLE_CHECK_MS = 15000;
-  function resetIdleCheck() {
+  // Idle-check: if isProcessing stays true with no claude_output for a while,
+  // poll the agent to reconcile stale state. After the first poll, re-check
+  // on a shorter interval in case the response was lost.
+  const IDLE_CHECK_MS = 10000;
+  const FAST_IDLE_CHECK_MS = 3000;
+  const IDLE_RETRY_MS = 8000;
+  function resetIdleCheck(fast) {
     if (idleCheckTimer) { clearTimeout(idleCheckTimer); idleCheckTimer = null; }
     if (isProcessing.value) {
+      const ms = fast ? FAST_IDLE_CHECK_MS : IDLE_CHECK_MS;
       idleCheckTimer = setTimeout(() => {
         idleCheckTimer = null;
-        if (isProcessing.value) wsSend({ type: 'query_active_conversations' });
-      }, IDLE_CHECK_MS);
+        if (isProcessing.value) {
+          wsSend({ type: 'query_active_conversations' });
+          // Schedule a retry in case the response is lost. This self-chains:
+          // if still processing and no resetIdleCheck/clearIdleCheck is called,
+          // another query fires after IDLE_RETRY_MS, and so on.
+          idleCheckTimer = setTimeout(function retryLoop() {
+            idleCheckTimer = null;
+            if (isProcessing.value) {
+              wsSend({ type: 'query_active_conversations' });
+              idleCheckTimer = setTimeout(retryLoop, IDLE_RETRY_MS);
+            }
+          }, IDLE_RETRY_MS);
+        }
+      }, ms);
     }
   }
   function clearIdleCheck() {

@@ -13,7 +13,7 @@ export function createExecutionHandlers(deps) {
     needsResume, usageStats, toolMsgMap, sidebar,
     currentConversationId, processingConversations, activeClaudeSessions,
     currentClaudeSessionId,
-    clearIdleCheck, t,
+    resetIdleCheck, clearIdleCheck, t,
     finalizeStreamingMsg,
   } = deps;
 
@@ -85,6 +85,8 @@ export function createExecutionHandlers(deps) {
           startMsg.compactDone = true;
         }
         scrollToBottom();
+        // After compaction, schedule a fast idle check to detect lost turn_completed
+        resetIdleCheck(true);
       }
     },
     ask_user_question(msg, scheduleHighlight) {
