@@ -65,7 +65,7 @@ export function createSessionHandlers(deps) {
           timestamp: new Date(),
         });
       }
-      scrollToBottom();
+      scrollToBottom(true);
     },
   };
 }

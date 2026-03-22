@@ -177,6 +177,7 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
   let refreshInterval = null;
   let _previousConvId = null;   // saved conversation ID before entering recap chat
+  let _pendingRecapTitle = null; // first question text to use as session title
 
   function loadFeed() {
     loading.value = true;
@@ -224,7 +225,8 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     setBrainMode(true);  // Recap chat always uses brain mode
 
     // Always scroll to bottom when entering recap chat (override cached scrollTop)
-    nextTick(() => scrollToBottom(true));
+    // Use double nextTick to run AFTER switchConversation's nextTick scroll restoration
+    nextTick(() => nextTick(() => scrollToBottom(true)));
 
     // Resume prior Claude session if one exists and conversation cache is empty
     const claudeSessionId = recapChatSessionMap.value[recapId];
@@ -266,6 +268,8 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     if (isFirstMessage || liveEmpty) {
       const ctx = buildMeetingContext(detail);
       prompt = ctx + '\n---\n' + text;
+      // Save user's actual question for auto-rename when session_started arrives
+      _pendingRecapTitle = text.trim().substring(0, 100);
     }
 
     wsSend({
@@ -424,12 +428,24 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     detailLoading.value = false;
   }
 
+  /**
+   * Called by session_started handler when a new Claude session is created.
+   * If we have a pending recap title (from the first recap chat message),
+   * auto-rename the session so it shows the user's question instead of meeting name.
+   */
+  function handleRecapSessionStarted(claudeSessionId) {
+    if (!_pendingRecapTitle || !recapChatActive.value) return;
+    const title = _pendingRecapTitle;
+    _pendingRecapTitle = null;
+    wsSend({ type: 'rename_session', sessionId: claudeSessionId, newTitle: title });
+  }
+
   return {
     feedEntries, selectedRecapId, selectedDetail, loading, detailLoading,
     groupedEntries, detailExpanded,
     loadFeed, selectRecap, goBackToFeed,
     startAutoRefresh, stopAutoRefresh,
-    handleRecapsList, handleRecapDetail,
+    handleRecapsList, handleRecapDetail, handleRecapSessionStarted,
     // Recap chat
     recapChatActive, recapChatSessionMap,
     enterRecapChat, exitRecapChat, sendRecapChat, resetRecapChat,

@@ -56,7 +56,6 @@ function focusInput(e) {
         <!-- Normal mode -->
         <template v-else>
           <div class="recap-chat-item-title">
-            <span class="recap-chat-brain-icon" title="Brain Mode">&#x1F9E0;</span>
             {{ s.displayTitle }}
           </div>
           <div class="recap-chat-item-meta">

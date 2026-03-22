@@ -106,6 +106,10 @@ export function createClaudeOutputHandlers(deps) {
     session_started(msg) {
       currentClaudeSessionId.value = msg.claudeSessionId;
       sidebar.requestSessionList();
+      // Auto-rename recap chat session with user's first question
+      if (deps.recap) {
+        deps.recap.handleRecapSessionStarted(msg.claudeSessionId);
+      }
     },
     // Exposed for other handlers that need to finalize streaming
     finalizeStreamingMsg,

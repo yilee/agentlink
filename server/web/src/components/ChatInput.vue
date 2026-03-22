@@ -92,7 +92,7 @@ function selectableIndex(cmd, i) {
               </template>
             </div>
             <div
-              :class="['input-card', { 'drag-over': dragOver, 'plan-mode': planMode, 'brain-mode': brainMode }]"
+              :class="['input-card', { 'drag-over': dragOver, 'plan-mode': planMode, 'brain-mode': brainMode && currentView !== 'recap-detail' }]"
               @dragover="handleDragOver"
               @dragleave="handleDragLeave"
               @drop="handleDrop"
