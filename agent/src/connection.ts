@@ -576,7 +576,22 @@ function handleListSessions(): void {
       // All sessions under Brain Home are brain sessions
       ...(isBrainHome ? { brainMode: true } : {}),
     }));
-    console.log(`[AgentLink] → sessions_list (${sessions.length} sessions for ${state.workDir}, brainHome=${isBrainHome})`);
+
+    // Merge in recap chat sessions from BrainData directory (they live under a
+    // different Claude project folder, so listSessions(state.workDir) misses them).
+    if (!isBrainHome) {
+      const brainSessions = listSessions(BRAIN_DATA_DIR);
+      const existingIds = new Set(enriched.map(s => s.sessionId));
+      for (const bs of brainSessions) {
+        if (existingIds.has(bs.sessionId)) continue;
+        const meta = metaMap.get(bs.sessionId);
+        if (meta?.recapId) {
+          enriched.push({ ...bs, ...meta });
+        }
+      }
+    }
+
+    console.log(`[AgentLink] → sessions_list (${enriched.length} sessions for ${state.workDir}, brainHome=${isBrainHome})`);
     send({ type: 'sessions_list', sessions: enriched, workDir: state.workDir });
   } catch (err) {
     console.error(`[AgentLink] listSessions failed:`, err);
@@ -590,7 +605,14 @@ function handleDeleteSession(sessionId: string): void {
     send({ type: 'error', message: 'Cannot delete a session while it is processing.' });
     return;
   }
-  const deleted = deleteSession(state.workDir, sessionId);
+  // Try current workDir first; if not found, check if it's a recap session in BrainData
+  let deleted = deleteSession(state.workDir, sessionId);
+  if (!deleted) {
+    const meta = loadSessionMetadata(sessionId);
+    if (meta.recapId) {
+      deleted = deleteSession(BRAIN_DATA_DIR, sessionId);
+    }
+  }
   if (deleted) {
     deleteSessionMetadata(sessionId);
     send({ type: 'session_deleted', sessionId });
@@ -600,7 +622,14 @@ function handleDeleteSession(sessionId: string): void {
 }
 
 function handleRenameSession(sessionId: string, newTitle: string): void {
-  const renamed = renameSession(state.workDir, sessionId, newTitle);
+  // Try current workDir first; if not found, check if it's a recap session in BrainData
+  let renamed = renameSession(state.workDir, sessionId, newTitle);
+  if (!renamed) {
+    const meta = loadSessionMetadata(sessionId);
+    if (meta.recapId) {
+      renamed = renameSession(BRAIN_DATA_DIR, sessionId, newTitle);
+    }
+  }
   if (renamed) {
     send({ type: 'session_renamed', sessionId, newTitle });
   } else {
