@@ -327,6 +327,7 @@ export function createConnection(deps) {
       sidebar.requestSessionList();
       if (team) team.requestTeamsList();
       if (loop) loop.requestLoopsList();
+      if (recap && team && team.viewMode.value === 'feed') recap.loadFeed();
       startPing();
       wsSend({ type: 'query_active_conversations' });
     } else {
@@ -373,6 +374,7 @@ export function createConnection(deps) {
     sidebar.requestSessionList();
     if (team) team.requestTeamsList();
     if (loop) loop.requestLoopsList();
+    if (recap && team && team.viewMode.value === 'feed') recap.loadFeed();
     startPing();
     wsSend({ type: 'query_active_conversations' });
   }
