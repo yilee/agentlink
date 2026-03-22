@@ -45,7 +45,7 @@ export function getDateGroup(dateLocal) {
   return 'Older';
 }
 
-function groupByDate(entries) {
+export function groupByDate(entries) {
   const order = ['Today', 'Yesterday', 'This Week', 'Last Week', 'Older'];
   const groups = {};
   for (const entry of entries) {

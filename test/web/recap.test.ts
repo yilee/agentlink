@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getDateGroup, getMeetingTypeBadge, getSectionIcon, buildMeetingContext } from '../../server/web/src/modules/recap.js';
+import { getDateGroup, getMeetingTypeBadge, getSectionIcon, buildMeetingContext, groupByDate } from '../../server/web/src/modules/recap.js';
 
 describe('getMeetingTypeBadge', () => {
   it('returns correct badge for general_sync', () => {
@@ -257,5 +257,138 @@ describe('buildMeetingContext', () => {
     expect(metaIdx).toBeLessThan(tldrIdx);
     expect(tldrIdx).toBeLessThan(forYouIdx);
     expect(forYouIdx).toBeLessThan(blockersIdx);
+  });
+
+  it('includes top-level decisions array', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Test' },
+      detail: {},
+      decisions: [
+        { tag: 'DECIDED', text: 'Use REST over GraphQL' },
+        { tag: 'PROPOSED', text: 'Add caching layer' },
+      ],
+    });
+    expect(result).toContain('## Decisions');
+    expect(result).toContain('- [DECIDED] Use REST over GraphQL');
+    expect(result).toContain('- [PROPOSED] Add caching layer');
+  });
+
+  it('includes top-level action_items array', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Test' },
+      detail: {},
+      action_items: [
+        { owner: 'Alice', action: 'Write API spec', due: '2026-03-25' },
+        { owner: 'Bob', action: 'Review PR' },
+      ],
+    });
+    expect(result).toContain('## Action Items');
+    expect(result).toContain('- [Alice] Write API spec — 2026-03-25');
+    expect(result).toContain('- [Bob] Review PR');
+    expect(result).not.toContain('— undefined');
+  });
+
+  it('includes top-level open_items array', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Test' },
+      detail: {},
+      open_items: [
+        { text: 'Database migration plan', owner: 'Charlie' },
+      ],
+    });
+    expect(result).toContain('## Open Items');
+    expect(result).toContain('Database migration plan');
+  });
+
+  it('includes source files section when transcript/recap paths present', () => {
+    const result = buildMeetingContext({
+      meta: {
+        meeting_name: 'Test',
+        transcript_path: 'reports/transcript/t1.md',
+        full_recap_path: 'reports/meeting-recap/r1.md',
+      },
+      detail: {},
+    });
+    expect(result).toContain('## Source Files');
+    expect(result).toContain('Full transcript: reports/transcript/t1.md');
+    expect(result).toContain('Detailed recap: reports/meeting-recap/r1.md');
+  });
+
+  it('omits source files section when no paths present', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Test' },
+      detail: {},
+    });
+    expect(result).not.toContain('## Source Files');
+  });
+
+  it('includes only transcript path when recap path is absent', () => {
+    const result = buildMeetingContext({
+      meta: {
+        meeting_name: 'Test',
+        transcript_path: 'reports/transcript/t1.md',
+      },
+      detail: {},
+    });
+    expect(result).toContain('Full transcript: reports/transcript/t1.md');
+    expect(result).not.toContain('Detailed recap:');
+  });
+});
+
+describe('groupByDate', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 22, 10, 0, 0));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('groups entries by date bucket in correct order', () => {
+    const entries = [
+      { date_local: '2026-03-22T09:00:00', meeting_name: 'Today Meeting' },
+      { date_local: '2026-03-21T14:00:00', meeting_name: 'Yesterday Meeting' },
+      { date_local: '2026-03-20T10:00:00', meeting_name: 'This Week Meeting' },
+      { date_local: '2026-02-15T10:00:00', meeting_name: 'Older Meeting' },
+    ];
+    const groups = groupByDate(entries);
+    expect(groups.map(g => g.label)).toEqual(['Today', 'Yesterday', 'This Week', 'Older']);
+    expect(groups[0].entries).toHaveLength(1);
+    expect(groups[0].entries[0].meeting_name).toBe('Today Meeting');
+  });
+
+  it('omits empty date buckets', () => {
+    const entries = [
+      { date_local: '2026-03-22T09:00:00', meeting_name: 'A' },
+      { date_local: '2025-01-01T00:00:00', meeting_name: 'B' },
+    ];
+    const groups = groupByDate(entries);
+    expect(groups.map(g => g.label)).toEqual(['Today', 'Older']);
+  });
+
+  it('returns empty array for empty input', () => {
+    expect(groupByDate([])).toEqual([]);
+  });
+
+  it('groups multiple entries in the same bucket', () => {
+    const entries = [
+      { date_local: '2026-03-22T08:00:00', meeting_name: 'A' },
+      { date_local: '2026-03-22T14:00:00', meeting_name: 'B' },
+    ];
+    const groups = groupByDate(entries);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe('Today');
+    expect(groups[0].entries).toHaveLength(2);
+  });
+
+  it('preserves entry order within each group', () => {
+    const entries = [
+      { date_local: '2026-03-22T08:00:00', meeting_name: 'First' },
+      { date_local: '2026-03-22T14:00:00', meeting_name: 'Second' },
+    ];
+    const groups = groupByDate(entries);
+    expect(groups[0].entries[0].meeting_name).toBe('First');
+    expect(groups[0].entries[1].meeting_name).toBe('Second');
   });
 });
