@@ -172,6 +172,7 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
   // ── Recap Chat State ──
   const recapChatActive = ref(false);    // whether current view is in recap chat mode
   const activeRecapSessionId = ref(null); // claudeSessionId of the active recap chat (null = new chat)
+  const collapsedGroups = ref({});        // { [recapId]: true } — collapsed meeting groups in sidebar
 
   const groupedEntries = computed(() => groupByDate(feedEntries.value));
 
@@ -507,6 +508,6 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     navigateToRecapChat, refreshRecapChats, setRequestSessionList,
     deleteRecapChatSession, renameRecapChatSession,
     startChatRename, cancelChatRename,
-    renamingChatSessionId, renameChatText,
+    renamingChatSessionId, renameChatText, collapsedGroups,
   };
 }

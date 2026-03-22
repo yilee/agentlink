@@ -18,10 +18,15 @@ const {
   renameChatText,
   activeRecapSessionId,
   recapChatActive,
+  collapsedGroups,
 } = recap;
 
 function focusInput(e) {
   nextTick(() => e.el.focus());
+}
+
+function toggleGroup(recapId) {
+  collapsedGroups.value[recapId] = !collapsedGroups.value[recapId];
 }
 </script>
 
@@ -44,11 +49,12 @@ function focusInput(e) {
 
     <div v-else class="recap-chat-history-list">
       <div v-for="group in groupedRecapChatSessions" :key="group.recapId" class="recap-chat-group">
-        <div class="recap-chat-group-header">
-          <span class="recap-chat-group-icon">&#x1F4CB;</span>
+        <div class="recap-chat-group-header" @click="toggleGroup(group.recapId)">
+          <svg :class="['recap-chat-group-chevron', { collapsed: collapsedGroups[group.recapId] }]" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
           <span class="recap-chat-group-name">{{ group.meetingName }}</span>
+          <span class="recap-chat-group-count">{{ group.sessions.length }}</span>
         </div>
-        <div class="recap-chat-group-items">
+        <div v-show="!collapsedGroups[group.recapId]" class="recap-chat-group-items">
           <div
             v-for="s in group.sessions" :key="s.sessionId"
             :class="['recap-chat-item', { active: recapChatActive && activeRecapSessionId === s.sessionId }]"

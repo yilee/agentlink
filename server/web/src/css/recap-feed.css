@@ -374,11 +374,22 @@
   font-size: 0.72rem;
   color: var(--text-secondary);
   overflow: hidden;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
 }
 
-.recap-chat-group-icon {
-  font-size: 0.7rem;
+.recap-chat-group-header:hover {
+  background: var(--bg-hover, rgba(128, 128, 128, 0.08));
+}
+
+.recap-chat-group-chevron {
   flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.recap-chat-group-chevron.collapsed {
+  transform: rotate(-90deg);
 }
 
 .recap-chat-group-name {
@@ -391,12 +402,16 @@
   min-width: 0;
 }
 
-.recap-chat-group-date {
-  font-size: 0.65rem;
+.recap-chat-group-count {
+  font-size: 0.62rem;
   color: var(--text-secondary);
   opacity: 0.7;
   flex-shrink: 0;
   white-space: nowrap;
+  background: var(--bg-tertiary, rgba(128, 128, 128, 0.1));
+  border-radius: 8px;
+  padding: 0 5px;
+  line-height: 1.4;
 }
 
 .recap-chat-group-items {
