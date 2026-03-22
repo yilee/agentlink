@@ -584,17 +584,16 @@ function handleListSessions(): void {
       ...(isBrainHome ? { brainMode: true } : {}),
     }));
 
-    // Merge in recap chat sessions from BrainData directory (they live under a
-    // different Claude project folder, so listSessions(state.workDir) misses them).
-    if (!isBrainHome) {
-      const brainSessions = listSessions(BRAIN_DATA_DIR);
-      const existingIds = new Set(enriched.map(s => s.sessionId));
-      for (const bs of brainSessions) {
-        if (existingIds.has(bs.sessionId)) continue;
-        const meta = metaMap.get(bs.sessionId);
-        if (meta?.recapId) {
-          enriched.push({ ...bs, ...meta });
-        }
+    // Always merge recap chat sessions from BrainData directory — they live under a
+    // different Claude project folder, so listSessions(state.workDir) misses them.
+    // Recap history should be visible regardless of the current workDir.
+    const brainSessions = listSessions(BRAIN_DATA_DIR);
+    const existingIds = new Set(enriched.map(s => s.sessionId));
+    for (const bs of brainSessions) {
+      if (existingIds.has(bs.sessionId)) continue;
+      const meta = metaMap.get(bs.sessionId);
+      if (meta?.recapId) {
+        enriched.push({ ...bs, ...meta });
       }
     }
 
