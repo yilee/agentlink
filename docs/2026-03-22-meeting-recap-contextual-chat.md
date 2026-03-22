@@ -6,24 +6,24 @@
 
 ## Overview
 
-在 RecapDetail 详情页中添加 "Ask about this meeting" 聊天功能。用户可以在查看会议纪要的同时，针对会议内容进行对话（提问、总结、深入探讨等）。
+Add an "Ask about this meeting" chat feature to the RecapDetail page. Users can have a conversation about the meeting content (ask questions, summarize, drill into topics, etc.) while viewing the meeting recap.
 
-### 核心需求
+### Core Requirements
 
-1. RecapDetail 页面分两部分：上方详情内容 + 下方聊天区域
-2. 点击 "Ask about this meeting" 启动新聊天，首条消息注入会议上下文
-3. 完整聊天能力：消息渲染、工具调用、流式输出、取消等，与普通聊天窗口一致
-4. 会话持久化：退出再进入同一个 recap 时恢复历史聊天
-5. 最大化复用现有聊天组件（消息渲染、输入框等）
-6. 未来在 Feed sidebar 显示所有 recap chat history
+1. RecapDetail page has two sections: detail content on top + chat area below
+2. Clicking "Ask about this meeting" starts a new chat; the first message injects meeting context
+3. Full chat capabilities: message rendering, tool calls, streaming output, cancel, etc. — identical to the regular chat window
+4. Session persistence: exiting and re-entering the same recap restores the chat history
+5. Maximize reuse of existing chat components (message rendering, input box, etc.)
+6. Show all recap chat history in the Feed sidebar (future)
 
 ---
 
 ## Architecture
 
-### 设计原则：Recap Chat = 普通对话 + 会议上下文
+### Design Principle: Recap Chat = Regular Conversation + Meeting Context
 
-核心思路：每个 recap chat 就是一个独立的 conversation（与普通多会话并行完全一致），唯一区别是首条消息包含会议上下文。不引入新的 WebSocket 消息类型，不修改 agent 消息处理主逻辑。
+Core idea: each recap chat is an independent conversation (exactly like regular multi-session parallel), the only difference being the first message includes meeting context. No new WebSocket message types are introduced, and the agent's main message handling logic is not modified.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -36,16 +36,16 @@
 │  │  ─── Ask about this meeting ────────────────  │  │  ← divider
 │  └───────────────────────────────────────────────┘  │
 │  ┌───────────────────────────────────────────────┐  │
-│  │  Chat Message List (reuses message rendering) │  │  ← 复用 ChatView 消息渲染
+│  │  Chat Message List (reuses message rendering) │  │  ← reuses ChatView message rendering
 │  │  - user, assistant, tool, system roles         │  │
 │  └───────────────────────────────────────────────┘  │
 │  ┌───────────────────────────────────────────────┐  │
-│  │  Chat Input (reuses ChatInput pattern)        │  │  ← 复用输入框
+│  │  Chat Input (reuses ChatInput pattern)        │  │  ← reuses input box
 │  └───────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────┘
 ```
 
-### 数据流
+### Data Flow
 
 ```
 User types question in RecapDetail
@@ -66,34 +66,34 @@ User types question in RecapDetail
 
 ## Implementation Plan
 
-### Phase 1: Session Metadata 扩展
+### Phase 1: Session Metadata Extension
 
-**文件:** `agent/src/session-metadata.ts`
+**File:** `agent/src/session-metadata.ts`
 
-扩展 `SessionMetadata` 接口，新增 `recapId` 字段：
+Extend the `SessionMetadata` interface with a new `recapId` field:
 
 ```typescript
 export interface SessionMetadata {
   brainMode?: boolean;
-  recapId?: string;       // 关联的 recap ID，用于持久化映射
+  recapId?: string;       // Associated recap ID for persistent mapping
 }
 ```
 
-**写入时机:** 当 recap chat 的 Claude session 启动时（收到 `session_started`），agent 端调用 `saveSessionMetadata(claudeSessionId, { recapId, brainMode: true })`。
+**Write timing:** When the recap chat's Claude session starts (on `session_started`), the agent calls `saveSessionMetadata(claudeSessionId, { recapId, brainMode: true })`.
 
-**读取时机:** `handleListSessions()` 已经通过 `loadAllSessionMetadata()` 把全部 metadata merge 到 session 列表，web 端直接能拿到 `recapId` 字段。
+**Read timing:** `handleListSessions()` already merges all metadata via `loadAllSessionMetadata()`, so the web client can directly access the `recapId` field.
 
-变更范围：
-| 文件 | 改动 |
-|------|------|
-| `agent/src/session-metadata.ts` | `SessionMetadata` 加 `recapId?: string` |
-| `agent/src/connection.ts` | chat handler：如果 payload 带 `recapId`，在 session_started 时 save 到 metadata |
+Change scope:
+| File | Change |
+|------|--------|
+| `agent/src/session-metadata.ts` | Add `recapId?: string` to `SessionMetadata` |
+| `agent/src/connection.ts` | Chat handler: if payload includes `recapId`, save to metadata on session_started |
 
-### Phase 2: Web 端 recap.js 扩展聊天状态
+### Phase 2: Web-side recap.js Chat State Extension
 
-**文件:** `server/web/src/modules/recap.js`
+**File:** `server/web/src/modules/recap.js`
 
-现有的 `chatMessages` ref 已预留但未使用。扩展 `createRecap()` 添加聊天管理：
+The existing `chatMessages` ref was reserved but unused. Extend `createRecap()` to add chat management:
 
 ```javascript
 export function createRecap({ wsSend, switchConversation, conversationCache, messages,
@@ -101,23 +101,23 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
   // ... existing state ...
 
   // ── Recap Chat State ──
-  const recapChatSessionMap = ref({});   // { [recapId]: claudeSessionId } — 从 sessions_list 构建
-  const recapChatActive = ref(false);    // 当前 recap 是否有聊天进行中
+  const recapChatSessionMap = ref({});   // { [recapId]: claudeSessionId } — built from sessions_list
+  const recapChatActive = ref(false);    // whether the current recap has an active chat
 
-  // 切换到 recap chat 的 conversation
+  // Switch to the recap chat conversation
   function enterRecapChat(recapId) {
     const convId = `recap-chat-${recapId}`;
     switchConversation(convId);
     recapChatActive.value = true;
   }
 
-  // 退出 recap chat，恢复之前的 conversation
+  // Exit recap chat, restore the previous conversation
   function exitRecapChat(previousConvId) {
     switchConversation(previousConvId);
     recapChatActive.value = false;
   }
 
-  // 发送 recap chat 消息
+  // Send a recap chat message
   function sendRecapChat(text, recapId, detail) {
     const convId = `recap-chat-${recapId}`;
     const isFirstMessage = !conversationCache.value[convId]
@@ -133,11 +133,11 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
       conversationId: convId,
       prompt,
       brainMode: true,
-      recapId,                // agent 用于 session metadata 关联
+      recapId,                // agent uses this for session metadata association
     });
   }
 
-  // 从 sessions_list 中提取 recap chat sessions
+  // Extract recap chat sessions from sessions_list
   function updateRecapChatSessions(sessions) {
     const map = {};
     for (const s of sessions) {
@@ -157,16 +157,16 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 }
 ```
 
-**变更范围:**
-| 文件 | 改动 |
-|------|------|
-| `server/web/src/modules/recap.js` | 添加聊天状态管理、context builder、session map |
+**Change scope:**
+| File | Change |
+|------|--------|
+| `server/web/src/modules/recap.js` | Add chat state management, context builder, session map |
 
-### Phase 3: 构建会议上下文 (Context Builder)
+### Phase 3: Meeting Context Builder
 
-**文件:** `server/web/src/modules/recap.js`
+**File:** `server/web/src/modules/recap.js`
 
-首条消息发送时，自动拼接会议上下文，让 Claude 了解会议背景：
+When the first message is sent, meeting context is automatically prepended so Claude understands the meeting background:
 
 ```javascript
 function buildMeetingContext(sidecarDetail) {
@@ -215,19 +215,19 @@ function buildMeetingContext(sidecarDetail) {
 }
 ```
 
-这样 Claude 收到的首条消息是完整的会议摘要 + 用户实际问题，无需读取额外文件。
+This way Claude receives the full meeting summary + the user's actual question in the first message, with no need to read additional files.
 
-### Phase 4: 组件重构 — 提取 MessageList
+### Phase 4: Component Refactor — Extract MessageList
 
-**问题:** 现在 `ChatView.vue` 的消息渲染逻辑和 `v-if="viewMode === 'chat' && currentView === 'chat'"` 绑定在一起，无法在 RecapDetail 里复用。
+**Problem:** The message rendering logic in `ChatView.vue` is tied to `v-if="viewMode === 'chat' && currentView === 'chat'"`, making it impossible to reuse in RecapDetail.
 
-**方案:** 提取 `MessageList.vue` 组件，封装消息列表渲染逻辑。
+**Solution:** Extract a `MessageList.vue` component that encapsulates message list rendering logic.
 
-#### 4a. 新建 `MessageList.vue`
+#### 4a. Create `MessageList.vue`
 
-**文件:** `server/web/src/components/MessageList.vue`
+**File:** `server/web/src/components/MessageList.vue`
 
-从 `ChatView.vue` 提取消息循环渲染（原 lines 39-151），使其成为一个通用组件：
+Extract the message loop rendering from `ChatView.vue` (original lines 39-151) into a reusable component:
 
 ```vue
 <script setup>
@@ -235,7 +235,7 @@ import { inject } from 'vue';
 import ToolBlock from './ToolBlock.vue';
 import AskQuestionCard from './AskQuestionCard.vue';
 
-// Props 控制数据源（而非硬编码 store）
+// Props control data source (instead of hardcoding store)
 const props = defineProps({
   messages: { type: Array, required: true },
   visibleMessages: { type: Array, required: true },
@@ -245,12 +245,12 @@ const props = defineProps({
   loadingHistory: { type: Boolean, default: false },
   showEmptyState: { type: Boolean, default: true },
   emptyStateText: { type: String, default: '' },
-  compact: { type: Boolean, default: false },  // recap chat 用紧凑模式
+  compact: { type: Boolean, default: false },  // compact mode for recap chat
 });
 
 const emit = defineEmits(['scroll', 'load-more']);
 
-// 渲染辅助函数仍从 store 注入（它们是纯函数，与数据源无关）
+// Rendering helpers are still injected from store (they are pure functions, independent of data source)
 const store = inject('store');
 const {
   t, getRenderedContent, getToolSummary, isPrevAssistant,
@@ -280,7 +280,7 @@ const {
       <!-- Message loop (identical to current ChatView rendering) -->
       <div v-for="(msg, msgIdx) in visibleMessages" :key="msg.id"
            :class="['message', 'message-' + msg.role]">
-        <!-- ... 所有消息角色的渲染模板，与当前 ChatView 完全一致 ... -->
+        <!-- ... all message role rendering templates, identical to current ChatView ... -->
       </div>
 
       <!-- Typing indicator -->
@@ -292,9 +292,9 @@ const {
 </template>
 ```
 
-#### 4b. 重构 `ChatView.vue`
+#### 4b. Refactor `ChatView.vue`
 
-`ChatView.vue` 变为薄封装，使用 `MessageList`：
+`ChatView.vue` becomes a thin wrapper using `MessageList`:
 
 ```vue
 <template>
@@ -313,64 +313,64 @@ const {
 </template>
 ```
 
-#### 4c. RecapDetail 中使用 `MessageList`
+#### 4c. Use `MessageList` in RecapDetail
 
-RecapDetail 用同样的 `MessageList` 渲染 recap chat 消息，传入 recap conversation 的消息数组。
+RecapDetail uses the same `MessageList` to render recap chat messages, passing in the recap conversation's message array.
 
-**变更范围:**
-| 文件 | 改动 |
-|------|------|
-| `server/web/src/components/MessageList.vue` | **新建**，从 ChatView 提取消息渲染 |
-| `server/web/src/components/ChatView.vue` | 重构为 MessageList 的薄封装 |
+**Change scope:**
+| File | Change |
+|------|--------|
+| `server/web/src/components/MessageList.vue` | **New**, extracted from ChatView for message rendering |
+| `server/web/src/components/ChatView.vue` | Refactored to a thin wrapper around MessageList |
 
-### Phase 5: RecapDetail 集成聊天
+### Phase 5: RecapDetail Chat Integration
 
-**文件:** `server/web/src/components/RecapDetail.vue`
+**File:** `server/web/src/components/RecapDetail.vue`
 
-#### 5a. 布局改造
+#### 5a. Layout Redesign
 
 ```
 ┌──────────────────────────────────────┐
 │  [← Back]                            │
 │                                      │
-│  Detail Content                      │   ← 可折叠
+│  Detail Content                      │   ← collapsible
 │  (header, for-you, tldr, sections)   │
 │                                      │
-│  ──── Ask about this meeting ─────   │   ← 分割线/按钮
+│  ──── Ask about this meeting ─────   │   ← divider/button
 │                                      │
-│  Chat Messages (MessageList)         │   ← 复用 MessageList
+│  Chat Messages (MessageList)         │   ← reuses MessageList
 │  ...                                 │
 │                                      │
 │  ┌──────────────────────────────┐    │
-│  │  Input Box                    │    │   ← 简化版 ChatInput
+│  │  Input Box                    │    │   ← simplified ChatInput
 │  └──────────────────────────────┘    │
 └──────────────────────────────────────┘
 ```
 
-#### 5b. Conversation 切换策略
+#### 5b. Conversation Switching Strategy
 
-进入 RecapDetail 时：
-1. 保存当前 `currentConversationId` 到临时变量
-2. 调用 `switchConversation('recap-chat-{recapId}')` 切入 recap 会话
-3. 此时 store 的 `messages`, `isProcessing` 等都指向 recap chat 的状态
-4. `MessageList` 和输入框直接用 store 的数据
+When entering RecapDetail:
+1. Save the current `currentConversationId` to a temporary variable
+2. Call `switchConversation('recap-chat-{recapId}')` to switch into the recap conversation
+3. At this point, the store's `messages`, `isProcessing`, etc. all point to the recap chat's state
+4. `MessageList` and the input box directly use the store's data
 
-退出 RecapDetail（点 Back）时：
-1. 调用 `switchConversation(savedConversationId)` 切回主会话
+When exiting RecapDetail (clicking Back):
+1. Call `switchConversation(savedConversationId)` to switch back to the main conversation
 
-这样 **零数据源重定向**——store 的 reactive state 就是当前 recap chat 的状态。
+This achieves **zero data source redirection** — the store's reactive state IS the current recap chat's state.
 
-#### 5c. 输入框
+#### 5c. Input Box
 
-可以选择：
-- **方案 A：复用 ChatInput.vue** — 修改其 `v-if` 条件为 `currentView === 'chat' || currentView === 'recap-detail'`。优点：完全复用，包括附件、slash commands。缺点：recap chat 不一定需要 plan mode / brain mode 切换。
-- **方案 B：简化版输入框** — RecapDetail 内联一个简单的 textarea + send button。优点：干净、无多余按钮。缺点：不能复用附件等功能。
+Options:
+- **Option A: Reuse ChatInput.vue** — Modify its `v-if` condition to `currentView === 'chat' || currentView === 'recap-detail'`. Pros: full reuse including attachments, slash commands. Cons: recap chat may not need plan mode / brain mode toggles.
+- **Option B: Simplified input box** — Inline a simple textarea + send button within RecapDetail. Pros: clean, no extra buttons. Cons: can't reuse attachments, etc.
 
-**推荐方案 A**，修改 `v-if` 即可，按钮可以通过 prop 或 `currentView` 条件隐藏不需要的（如 plan mode）。
+**Recommended: Option A** — just modify the `v-if`; unnecessary buttons can be hidden via prop or `currentView` condition.
 
-#### 5d. 首次聊天引导
+#### 5d. First Chat Onboarding
 
-当 recap chat 没有历史消息时，显示一个引导状态：
+When the recap chat has no message history, show a guidance state:
 
 ```
   ─── Ask about this meeting ───
@@ -381,27 +381,27 @@ RecapDetail 用同样的 `MessageList` 渲染 recap chat 消息，传入 recap c
   [input box]
 ```
 
-**变更范围:**
-| 文件 | 改动 |
-|------|------|
-| `server/web/src/components/RecapDetail.vue` | 布局改造，添加 MessageList + 输入框，conversation 切换 |
-| `server/web/src/components/ChatInput.vue` | 修改 `v-if` 条件，recap-detail 模式下隐藏 plan/brain 按钮 |
-| `server/web/src/css/recap-feed.css` | 详情+聊天分割布局样式 |
+**Change scope:**
+| File | Change |
+|------|--------|
+| `server/web/src/components/RecapDetail.vue` | Layout redesign: detail + divider + chat + input, conversation switching |
+| `server/web/src/components/ChatInput.vue` | Extend `v-if` condition, hide plan/brain buttons in recap-detail mode |
+| `server/web/src/css/recap-feed.css` | Split layout and chat section styles |
 
-### Phase 6: Agent 端 — recapId 传递与持久化
+### Phase 6: Agent-side — recapId Passing and Persistence
 
-**文件:** `agent/src/connection.ts`
+**File:** `agent/src/connection.ts`
 
-chat handler 扩展：如果 payload 带 `recapId`，在收到 `session_started` 时持久化映射。
+Extend the chat handler: if the payload includes `recapId`, persist the mapping when `session_started` is received.
 
 ```typescript
 case 'chat': {
   const chatConvId = msg.conversationId;
-  const recapId = msg.recapId;      // ← 新增
+  const recapId = msg.recapId;      // ← new
   // ... existing logic ...
   claudeHandleChat(chatConvId, prompt, workDir, chatOptions, files);
 
-  // 存下 recapId，等 session_started 时写入 metadata
+  // Store recapId, write to metadata when session_started fires
   if (recapId && chatConvId) {
     pendingRecapIds.set(chatConvId, recapId);
   }
@@ -409,7 +409,7 @@ case 'chat': {
 }
 ```
 
-在 `claude.ts` 的 session_started handler 中：
+In `claude.ts`'s session_started handler:
 
 ```typescript
 // Existing: save brainMode
@@ -424,28 +424,28 @@ if (recapId) {
 }
 ```
 
-**变更范围:**
-| 文件 | 改动 |
-|------|------|
-| `agent/src/connection.ts` | 提取 `recapId` 从 chat payload，暂存到 pending map |
-| `agent/src/claude.ts` | session_started 时写入 `recapId` 到 metadata |
+**Change scope:**
+| File | Change |
+|------|--------|
+| `agent/src/connection.ts` | Extract `recapId` from chat payload, store in pending map |
+| `agent/src/claude.ts` | Write `recapId` to metadata on session_started |
 
-### Phase 7: 会话恢复（持久化读取）
+### Phase 7: Session Restore (Persistent Read)
 
-用户刷新页面后再次进入同一 recap detail：
+When the user refreshes the page and re-enters the same recap detail:
 
-1. Sidebar 或 Feed 页加载时，`sessions_list` 已经带了每个 session 的 `recapId`（因为 `handleListSessions()` 已经 merge `loadAllSessionMetadata()`）
-2. Web 端从 `sessions_list` 中提取有 `recapId` 的 sessions，构建 `recapChatSessionMap: { [recapId]: claudeSessionId }`
-3. 进入 RecapDetail 时，检查 `recapChatSessionMap[recapId]`：
-   - **有值：** 先 `switchConversation('recap-chat-{recapId}')`，然后发 `resume_conversation` 恢复历史
-   - **无值：** 空白聊天，显示引导状态
+1. On sidebar or Feed page load, `sessions_list` already includes each session's `recapId` (because `handleListSessions()` already merges `loadAllSessionMetadata()`)
+2. Web client extracts sessions with `recapId` from `sessions_list`, building `recapChatSessionMap: { [recapId]: claudeSessionId }`
+3. On entering RecapDetail, check `recapChatSessionMap[recapId]`:
+   - **Has value:** First `switchConversation('recap-chat-{recapId}')`, then send `resume_conversation` to restore history
+   - **No value:** Empty chat, show guidance state
 
 ```javascript
 function enterRecapChat(recapId) {
   const convId = `recap-chat-${recapId}`;
   switchConversation(convId);
 
-  // 如果 conversationCache 为空（刷新后），尝试从持久化恢复
+  // If conversationCache is empty (after refresh), try to restore from persistence
   if (messages.value.length === 0 && recapChatSessionMap.value[recapId]) {
     const claudeSessionId = recapChatSessionMap.value[recapId];
     wsSend({
@@ -457,80 +457,242 @@ function enterRecapChat(recapId) {
 }
 ```
 
-**变更范围:**
-| 文件 | 改动 |
-|------|------|
-| `server/web/src/modules/recap.js` | `enterRecapChat` 加恢复逻辑 |
-| `server/web/src/modules/handlers/session-handler.js` | `sessions_list` handler 中调用 `recap.updateRecapChatSessions()` |
+**Change scope:**
+| File | Change |
+|------|--------|
+| `server/web/src/modules/recap.js` | Add restore logic to `enterRecapChat` |
+| `server/web/src/modules/handlers/session-handler.js` | Call `recap.updateRecapChatSessions()` in `sessions_list` handler |
 
-### Phase 8: Feed Sidebar 显示 Recap Chat History（未来）
+### Phase 8: Feed Sidebar — Chat History List
 
-为后续需求预留。所有 recap chat 的 `claudeSessionId` 已通过 session metadata 持久化，`sessions_list` 返回数据中已包含 `recapId` 字段。
+Show a list of user chat sessions with Recaps (and future Briefings) in the Feed mode sidebar, supporting click-to-navigate, delete, and rename.
 
-Sidebar 显示逻辑：
-1. 从 `sessions_list` 中 filter `s => s.recapId` → recap chat sessions
-2. 与 `feedEntries` 关联：用 `recapId` 匹配 → 获取 meeting_name, date 等展示信息
-3. 渲染为独立列表（类似 SessionList），点击切换到对应 recap detail + chat
+#### 8a. Data Source
 
-无需新增消息类型，复用现有 `sessions_list` 数据。
+**No new WebSocket message types needed.** All data already exists in the `sessions_list` response:
+
+```
+sessions_list (agent → web)
+  → historySessions: [ { sessionId, title, lastModified, recapId?, brainMode?, ... }, ... ]
+  → filter: recapChatSessions = historySessions.filter(s => s.recapId)
+  → cross-ref feedEntries: match by recapId → get meeting_name, date, meeting_type for display
+```
+
+**Session title strategy:**
+- Priority: custom-title (user-renamed title)
+- Fallback: cross-ref `feedEntries` by `recapId` to get `meeting_name`
+- Last resort: session.title (auto-generated from first message)
+
+```javascript
+// New computed in recap.js
+const recapChatSessions = computed(() => {
+  const feedMap = {};
+  for (const entry of feedEntries.value) {
+    feedMap[entry.recap_id] = entry;
+  }
+
+  return historySessions.value
+    .filter(s => s.recapId)
+    .map(s => {
+      const feedEntry = feedMap[s.recapId];
+      return {
+        ...s,
+        displayTitle: s.customTitle || feedEntry?.meeting_name || s.title,
+        meetingDate: feedEntry?.date_local,
+        meetingType: feedEntry?.meeting_type,
+        sidecarPath: feedEntry?.sidecar_path,   // used to load detail when clicked
+      };
+    })
+    .sort((a, b) => b.lastModified - a.lastModified);
+});
+```
+
+**Briefing extension reserved:** Future Briefing chats will use the same pattern — session metadata with `briefingId`, `sessions_list` returns the field similarly. Sidebar groups by type.
+
+#### 8b. UI Component Design
+
+**New `RecapChatHistory.vue`** (does not reuse SessionList.vue — it is deeply coupled with the main chat and has a different display format)
+
+```
+Feed Sidebar layout:
+┌──────────────────────────┐
+│  [Recaps] [Briefings]    │  ← existing nav buttons
+├──────────────────────────┤
+│  Chat History            │  ← section title
+│                          │
+│  ┌────────────────────┐  │
+│  │ 🧠 Sprint Planning  │  │  ← chat session item
+│  │ Mar 21 · Recap      │  │     meeting_name + date + type badge
+│  │           [✏️] [🗑]  │  │     rename + delete buttons (shown on hover)
+│  └────────────────────┘  │
+│  ┌────────────────────┐  │
+│  │ 🧠 Design Review    │  │
+│  │ Mar 20 · Recap      │  │
+│  │           [✏️] [🗑]  │  │
+│  └────────────────────┘  │
+│                          │
+│  (No briefing chats yet) │  ← briefing placeholder
+└──────────────────────────┘
+```
+
+Each session item displays:
+- **Title row:** Brain icon + displayTitle (meeting_name or custom title)
+- **Subtitle row:** date + type badge (Recap / Briefing)
+- **Action buttons:** rename + delete (shown on hover, delete hidden for active session)
+- **Active highlight:** currently viewed recap chat item is highlighted
+
+#### 8c. Interaction Behavior
+
+**Click session item → navigate to recap detail + restore chat:**
+
+```javascript
+function navigateToRecapChat(session) {
+  // 1. Find feedEntry by recapId to get sidecarPath
+  // 2. selectRecap(recapId, sidecarPath) — load detail
+  // 3. currentView → 'recap-detail'
+  // 4. enterRecapChat(recapId) — called directly (not relying on onMounted)
+  //    → switchConversation('recap-chat-{recapId}')
+  //    → detects existing claudeSessionId → resume_conversation to restore history
+}
+```
+
+**Delete session:**
+
+```javascript
+function deleteRecapChatSession(session) {
+  // Uses useConfirmDialog (follows project confirm dialog pattern)
+  showConfirm({
+    title: 'Delete Chat History',
+    message: `Delete chat history for this meeting?`,
+    itemName: session.displayTitle,
+    warning: 'Chat history will be permanently deleted.',
+    confirmText: 'Delete',
+    onConfirm: () => {
+      // 1. If currently viewing this recap chat → go back to feed first
+      // 2. wsSend({ type: 'delete_session', sessionId: session.sessionId })
+      // 3. delete recapChatSessionMap[session.recapId]
+      // 4. Clear conversationCache['recap-chat-{recapId}']
+    },
+  });
+}
+```
+
+Guard checks (reuses sidebar.js logic):
+- Prevent deleting a session that is currently processing (check conversationCache's isProcessing state)
+- After deletion, the `session_deleted` message automatically removes the entry from `historySessions`
+
+**Rename session:**
+
+```javascript
+function renameRecapChatSession(session, newTitle) {
+  // 1. wsSend({ type: 'rename_session', sessionId: session.sessionId, newTitle })
+  // 2. session_renamed handler updates historySession's title
+  // 3. recapChatSessions computed auto-recalculates (customTitle takes priority over meeting_name)
+}
+```
+
+Inline edit mode: clicking the rename button turns the session item into an input field (similar to SessionList.vue's rename interaction).
+
+#### 8d. Data Dependencies and Timing
+
+```
+Page load / Feed mode activation
+  → loadFeed() — load feedEntries (recap list)
+  → wsSend({ type: 'list_sessions' }) — trigger session list refresh
+  → sessions_list handler:
+      → historySessions.value = sessions
+      → updateRecapChatSessions(sessions) — update recapChatSessionMap
+  → recapChatSessions computed auto-calculates (cross-ref feedEntries + historySessions)
+  → RecapChatHistory.vue renders the list
+```
+
+**Key point:** `list_sessions` and `list_recaps` are two independent requests. Both must complete for correct cross-referencing. In practice, no strict ordering is needed — `recapChatSessions` is a computed property, and any data source update triggers recalculation.
+
+#### 8e. Sidebar.vue Integration
+
+```vue
+<!-- Replace existing feed-sidebar area -->
+<div v-if="viewMode === 'feed'" class="feed-sidebar">
+  <div class="feed-sidebar-nav">
+    <button class="feed-sidebar-btn" :class="{ active: ... }">Recaps</button>
+    <button class="feed-sidebar-btn disabled" disabled>Briefings</button>
+  </div>
+  <RecapChatHistory />   <!-- New: chat history list -->
+</div>
+```
+
+#### 8f. Change Scope
+
+| File | Change | Risk |
+|------|--------|------|
+| `server/web/src/components/RecapChatHistory.vue` | **New**, chat history list component for Feed sidebar | Low: new component |
+| `server/web/src/modules/recap.js` | Add `recapChatSessions` computed, `navigateToRecapChat()`, `deleteRecapChatSession()`, `renameRecapChatSession()` | Medium: new logic |
+| `server/web/src/components/Sidebar.vue` | Add `RecapChatHistory` to feed-sidebar area | Low: template change |
+| `server/web/src/css/sidebar.css` or `recap-feed.css` | Chat history list styles | Low: pure styling |
+
+**Files that do NOT need changes:**
+- `agent/src/` — Agent already has full delete/rename/session-metadata capabilities
+- `server/src/` — Server is a transparent relay
+- `SessionList.vue` — Main chat session list is unaffected
+- `session-handler.js` — `session_deleted` / `session_renamed` handlers are already generic
 
 ---
 
-## 变更汇总
+## Change Summary
 
-### 新建文件
+### New Files
 
-| 文件 | 说明 |
-|------|------|
-| `server/web/src/components/MessageList.vue` | 通用消息列表渲染组件，从 ChatView 提取 |
+| File | Description |
+|------|-------------|
+| `server/web/src/components/MessageList.vue` | Reusable message list rendering component, extracted from ChatView |
 
-### 修改文件
+### Modified Files
 
-| 文件 | 改动说明 | 风险 |
-|------|---------|------|
-| `agent/src/session-metadata.ts` | `SessionMetadata` 加 `recapId` 字段 | 低：纯添加，向后兼容 |
-| `agent/src/connection.ts` | chat handler 提取 `recapId`，暂存 pending map | 低：新字段，不影响现有逻辑 |
-| `agent/src/claude.ts` | session_started 写入 `recapId` metadata | 低：条件写入，仅 recap chat 触发 |
-| `server/web/src/modules/recap.js` | 添加聊天状态、context builder、session map、enter/exit | 中：核心新逻辑 |
-| `server/web/src/components/RecapDetail.vue` | 布局改造：detail + divider + chat + input | 中：模板重构 |
-| `server/web/src/components/ChatView.vue` | 重构为 MessageList 的薄封装 | 中：需确保不破坏现有聊天 |
-| `server/web/src/components/ChatInput.vue` | `v-if` 条件扩展，recap-detail 模式下隐藏部分按钮 | 低：条件修改 |
-| `server/web/src/modules/handlers/session-handler.js` | `sessions_list` handler 调用 `updateRecapChatSessions()` | 低：纯添加 |
-| `server/web/src/css/recap-feed.css` | 分割布局、chat section 样式 | 低：纯样式 |
+| File | Change Description | Risk |
+|------|-------------------|------|
+| `agent/src/session-metadata.ts` | Add `recapId` field to `SessionMetadata` | Low: pure addition, backward compatible |
+| `agent/src/connection.ts` | Chat handler extracts `recapId`, stores in pending map | Low: new field, doesn't affect existing logic |
+| `agent/src/claude.ts` | Write `recapId` to metadata on session_started | Low: conditional write, only triggered by recap chat |
+| `server/web/src/modules/recap.js` | Add chat state, context builder, session map, enter/exit | Medium: core new logic |
+| `server/web/src/components/RecapDetail.vue` | Layout redesign: detail + divider + chat + input | Medium: template refactor |
+| `server/web/src/components/ChatView.vue` | Refactored to thin wrapper around MessageList | Medium: must ensure no regression in existing chat |
+| `server/web/src/components/ChatInput.vue` | Extend `v-if` condition, hide plan/brain buttons in recap-detail mode | Low: condition change |
+| `server/web/src/modules/handlers/session-handler.js` | Call `updateRecapChatSessions()` in `sessions_list` handler | Low: pure addition |
+| `server/web/src/css/recap-feed.css` | Split layout and chat section styles | Low: pure styling |
 
-### 不需要修改的文件
+### Files That Do NOT Need Changes
 
-| 文件 | 原因 |
-|------|------|
-| `server/src/` (server) | 透明中继，无需感知 recap chat |
-| `agent/src/history.ts` | session history 读取已通用 |
-| `modules/streaming.js` | conversation-agnostic，直接复用 |
-| `modules/handlers/claude-output-handler.js` | conversationId 路由已通用 |
-| `modules/connection.js` | 已有 `recap` getter 在 handlerDeps |
-
----
-
-## 风险评估
-
-| 风险 | 影响 | 缓解措施 |
-|------|------|---------|
-| ChatView 提取 MessageList 可能引入回归 | 中 | 提取后立即跑 unit + functional tests；MessageList 完全保留原有渲染逻辑 |
-| switchConversation 在 recap detail 来回切换可能丢失主会话状态 | 中 | 进入前保存 `previousConvId`，退出时恢复；加 defensive check |
-| 首条消息上下文过长超预期 | 低 | context builder 做字数限制，omit 过长 section |
-| recap chat conversationId 格式冲突 | 低 | 使用 `recap-chat-` 前缀，与 UUID 格式的普通 conversation 不冲突 |
-| 多 tab 同时打开同一 recap 的 chat | 低 | 不做额外处理；各 tab 独立发消息，agent 按 conversationId 路由 |
+| File | Reason |
+|------|--------|
+| `server/src/` (server) | Transparent relay, no need to be aware of recap chat |
+| `agent/src/history.ts` | Session history reading is already generic |
+| `modules/streaming.js` | Conversation-agnostic, directly reusable |
+| `modules/handlers/claude-output-handler.js` | conversationId routing is already generic |
+| `modules/connection.js` | Already has `recap` getter in handlerDeps |
 
 ---
 
-## 实现顺序
+## Risk Assessment
 
-1. **Phase 1** — Session metadata 扩展（agent 端，最小改动）
-2. **Phase 6** — Agent 端 recapId 传递与持久化
-3. **Phase 3** — Context builder（纯函数，可独立测试）
-4. **Phase 4** — 提取 MessageList + 重构 ChatView
-5. **Phase 2** — recap.js 扩展聊天状态
-6. **Phase 5** — RecapDetail 集成聊天
-7. **Phase 7** — 会话恢复
-8. **Phase 8** — Feed sidebar history（后续迭代）
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| Extracting MessageList from ChatView may introduce regressions | Medium | Run unit + functional tests immediately after extraction; MessageList fully preserves original rendering logic |
+| switchConversation toggling in recap detail may lose main conversation state | Medium | Save `previousConvId` before entering, restore on exit; add defensive checks |
+| First message context too long | Low | Context builder applies length limits, omits overly long sections |
+| recap chat conversationId format conflicts | Low | Uses `recap-chat-` prefix, does not conflict with UUID-format regular conversations |
+| Multiple tabs opening the same recap's chat | Low | No special handling; each tab sends messages independently, agent routes by conversationId |
 
-每个 Phase 完成后跑测试，确保无回归。Phase 4（组件重构）是风险最高的步骤，需要 functional test 全部通过才继续。
+---
+
+## Implementation Order
+
+1. **Phase 1** — Session metadata extension (agent-side, minimal changes)
+2. **Phase 6** — Agent-side recapId passing and persistence
+3. **Phase 3** — Context builder (pure function, independently testable)
+4. **Phase 4** — Extract MessageList + refactor ChatView
+5. **Phase 2** — recap.js chat state extension
+6. **Phase 5** — RecapDetail chat integration
+7. **Phase 7** — Session restore
+8. **Phase 8** — Feed sidebar chat history list (new RecapChatHistory.vue + integrate Sidebar.vue)
+
+Run tests after each phase to ensure no regressions. Phase 4 (component refactor) carries the highest risk — all functional tests must pass before proceeding.
