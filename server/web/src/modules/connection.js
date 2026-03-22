@@ -281,7 +281,8 @@ export function createConnection(deps) {
       const wasConnected = status.value === 'Connected' || status.value === 'Connecting...';
       isProcessing.value = false;
       isCompacting.value = false;
-      queuedMessages.value = [];
+      // Do NOT clear queuedMessages here — they should survive reconnect and
+      // be drained once active_conversations confirms processing has stopped.
       loadingSessions.value = false;
       loadingHistory.value = false;
       if (deps.activeClaudeSessions) {
@@ -342,7 +343,7 @@ export function createConnection(deps) {
     error.value = t('error.agentDisconnected');
     isProcessing.value = false;
     isCompacting.value = false;
-    queuedMessages.value = [];
+    // Do NOT clear queuedMessages — they should survive agent disconnect/reconnect.
     loadingSessions.value = false;
     if (conversationCache) {
       for (const [convId, cached] of Object.entries(conversationCache.value)) {
@@ -383,7 +384,6 @@ export function createConnection(deps) {
       if (entry.conversationId) activeSet.add(entry.conversationId);
     }
 
-    const wasForegroundProcessing = isProcessing.value;
     if (!activeSet.has(currentConversationId && currentConversationId.value)) {
       isProcessing.value = false;
       isCompacting.value = false;
@@ -446,7 +446,12 @@ export function createConnection(deps) {
       team.handleActiveTeamRestore(msg.activeTeam, workDir.value);
     }
     resetIdleCheck();
-    if (wasForegroundProcessing && !isProcessing.value) _dequeueNext();
+    // Dequeue if the foreground conversation is now idle and there are queued
+    // messages.  Previous code only dequeued on a true→false isProcessing
+    // transition, but after reconnect isProcessing is already false (reset by
+    // onclose), so queued messages would get stuck.  Checking the queue length
+    // ensures we drain it once active_conversations confirms the turn is done.
+    if (!isProcessing.value && queuedMessages.value.length > 0) _dequeueNext();
   }
 
   function handleError(msg, scheduleHighlight) {
