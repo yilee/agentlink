@@ -70,18 +70,73 @@ export function getSectionIcon(sectionType) {
   return SECTION_ICONS[sectionType] || '\u{1F4CB}';
 }
 
-export function createRecap({ wsSend }) {
+/**
+ * Build meeting context string from recap detail for injecting into first chat message.
+ * Pure function — easily testable.
+ */
+export function buildMeetingContext(sidecarDetail) {
+  if (!sidecarDetail) return '';
+  const { meta, detail } = sidecarDetail;
+  const lines = [];
+
+  lines.push('[Meeting Context — You are answering questions about this meeting recap]');
+  lines.push('');
+  lines.push(`Meeting: ${meta?.meeting_name || 'Unknown'}`);
+  if (meta?.occurred_at_local) lines.push(`Date: ${meta.occurred_at_local}`);
+  if (meta?.duration) lines.push(`Duration: ${meta.duration}`);
+  if (meta?.meeting_type) lines.push(`Type: ${meta.meeting_type}`);
+  if (meta?.project) lines.push(`Project: ${meta.project}`);
+  if (meta?.participants?.length) {
+    lines.push(`Participants: ${meta.participants.join(', ')}`);
+  }
+
+  if (detail?.tldr) {
+    lines.push('');
+    lines.push('## TL;DR');
+    lines.push(detail.tldr);
+  }
+
+  if (detail?.for_you?.length) {
+    lines.push('');
+    lines.push('## Key Takeaways for You');
+    for (const item of detail.for_you) {
+      lines.push(`- ${item.text} (${item.reason})`);
+    }
+  }
+
+  if (detail?.hook_sections?.length) {
+    for (const section of detail.hook_sections) {
+      lines.push('');
+      lines.push(`## ${section.title}`);
+      for (const item of section.items) {
+        lines.push(`- ${item.text}`);
+      }
+      if (section.omitted_count > 0) {
+        lines.push(`  (${section.omitted_count} more items omitted)`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+export function createRecap({ wsSend, switchConversation, conversationCache, messages,
+                              isProcessing, currentConversationId }) {
   const feedEntries = ref([]);
   const selectedRecapId = ref(null);
   const selectedDetail = ref(null);
   const loading = ref(false);
   const detailLoading = ref(false);
-  const chatMessages = ref([]);
   const detailExpanded = ref(true);
+
+  // ── Recap Chat State ──
+  const recapChatSessionMap = ref({});   // { [recapId]: claudeSessionId } — built from sessions_list
+  const recapChatActive = ref(false);    // whether current view is in recap chat mode
 
   const groupedEntries = computed(() => groupByDate(feedEntries.value));
 
   let refreshInterval = null;
+  let _previousConvId = null;   // saved conversation ID before entering recap chat
 
   function loadFeed() {
     loading.value = true;
@@ -92,11 +147,13 @@ export function createRecap({ wsSend }) {
     selectedRecapId.value = recapId;
     detailLoading.value = true;
     detailExpanded.value = true;
-    chatMessages.value = [];
     wsSend({ type: 'get_recap_detail', recapId, sidecarPath });
   }
 
   function goBackToFeed() {
+    if (recapChatActive.value) {
+      exitRecapChat();
+    }
     selectedRecapId.value = null;
     selectedDetail.value = null;
   }
@@ -115,6 +172,58 @@ export function createRecap({ wsSend }) {
     }
   }
 
+  // ── Recap Chat Functions ──
+
+  /** Switch to recap chat conversation, saving current conversation ID. */
+  function enterRecapChat(recapId) {
+    const convId = `recap-chat-${recapId}`;
+    _previousConvId = currentConversationId.value;
+    switchConversation(convId);
+    recapChatActive.value = true;
+  }
+
+  /** Exit recap chat, restoring previous conversation. */
+  function exitRecapChat() {
+    if (_previousConvId) {
+      switchConversation(_previousConvId);
+    }
+    recapChatActive.value = false;
+    _previousConvId = null;
+  }
+
+  /** Send a recap chat message. On first message, prepends meeting context. */
+  function sendRecapChat(text, recapId, detail) {
+    const convId = `recap-chat-${recapId}`;
+    const cached = conversationCache.value[convId];
+    const isFirstMessage = !cached || !cached.messages || cached.messages.length === 0;
+    // Also check live messages if already switched to this conversation
+    const liveEmpty = currentConversationId.value === convId && messages.value.length === 0;
+
+    let prompt = text;
+    if (isFirstMessage || liveEmpty) {
+      prompt = buildMeetingContext(detail) + '\n---\n' + text;
+    }
+
+    wsSend({
+      type: 'chat',
+      conversationId: convId,
+      prompt,
+      brainMode: true,
+      recapId,
+    });
+  }
+
+  /** Build recapChatSessionMap from sessions_list data (sessions with recapId). */
+  function updateRecapChatSessions(sessions) {
+    const map = {};
+    for (const s of sessions) {
+      if (s.recapId) {
+        map[s.recapId] = s.sessionId;
+      }
+    }
+    recapChatSessionMap.value = map;
+  }
+
   // --- Message handlers (called by recap-handler.js) ---
   function handleRecapsList(data) {
     feedEntries.value = data.recaps || [];
@@ -128,9 +237,13 @@ export function createRecap({ wsSend }) {
 
   return {
     feedEntries, selectedRecapId, selectedDetail, loading, detailLoading,
-    groupedEntries, chatMessages, detailExpanded,
+    groupedEntries, detailExpanded,
     loadFeed, selectRecap, goBackToFeed,
     startAutoRefresh, stopAutoRefresh,
     handleRecapsList, handleRecapDetail,
+    // Recap chat
+    recapChatActive, recapChatSessionMap,
+    enterRecapChat, exitRecapChat, sendRecapChat,
+    updateRecapChatSessions,
   };
 }

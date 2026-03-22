@@ -411,7 +411,14 @@ export function createStore() {
 
   // Recap module (only in brain/ms mode)
   const isMsRoute = window.location.pathname.startsWith('/ms/');
-  const recap = isMsRoute ? createRecap({ wsSend }) : null;
+  const recap = isMsRoute ? createRecap({
+    wsSend,
+    switchConversation,
+    conversationCache,
+    messages,
+    isProcessing,
+    currentConversationId,
+  }) : null;
   if (recap) setRecap(recap);
 
   const isMemoryPreview = computed(() => {

@@ -12,6 +12,10 @@ export function createSessionHandlers(deps) {
     sessions_list(msg) {
       historySessions.value = msg.sessions || [];
       loadingSessions.value = false;
+      // Update recap chat session map (if recap module is active)
+      if (deps.recap) {
+        deps.recap.updateRecapChatSessions(msg.sessions || []);
+      }
     },
     session_deleted(msg) {
       historySessions.value = historySessions.value.filter(s => s.sessionId !== msg.sessionId);

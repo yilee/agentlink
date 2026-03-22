@@ -80,6 +80,8 @@ export interface ConversationState {
   planModeJustChanged: boolean;
   // Brain mode: when true, session metadata is persisted with brainMode flag
   brainMode: boolean;
+  // Recap ID: when set, session metadata is persisted with recapId for recap chat association
+  recapId: string | null;
 }
 
 export type SendFn = (msg: Record<string, unknown>) => void;
@@ -276,6 +278,7 @@ export function clearSessionId(conversationId?: string): void {
 export interface HandleChatOptions {
   resumeSessionId?: string;
   brainMode?: boolean;
+  recapId?: string;
 }
 
 /**
@@ -303,6 +306,7 @@ export function handleChat(
   state.turnActive = true;
   state.turnResultReceived = false;
   if (options?.brainMode) state.brainMode = true;
+  if (options?.recapId) state.recapId = options.recapId;
 
   // When plan mode was just toggled, prepend a notice to the user's message
   // so Claude knows the mode changed (its old conversation history may say
@@ -619,6 +623,7 @@ export function restartConversation(
     planMode: newPlanMode,
     planModeJustChanged: planModeChanged,
     brainMode: existing.brainMode,
+    recapId: existing.recapId,
   };
   conversations.set(convId, newState);
 
@@ -658,6 +663,7 @@ export function createPlaceholderConversation(
     planMode: options.planMode ?? false,
     planModeJustChanged: false,
     brainMode: false,
+    recapId: null,
   };
   conversations.set(convId, placeholder);
 }
@@ -739,6 +745,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     planMode: existing?.planMode || false,
     planModeJustChanged: existing?.planModeJustChanged || false,
     brainMode: brainMode || existing?.brainMode || false,
+    recapId: existing?.recapId || null,
   };
 
   conversations.set(conversationId, state);
@@ -887,6 +894,10 @@ async function processOutput(
             // Persist brain mode metadata to disk
             if (state.brainMode) {
               saveSessionMetadata(state.claudeSessionId, { brainMode: true });
+            }
+            // Persist recap ID metadata to disk
+            if (state.recapId) {
+              saveSessionMetadata(state.claudeSessionId, { recapId: state.recapId });
             }
           }
 

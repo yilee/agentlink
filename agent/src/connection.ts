@@ -265,14 +265,18 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const chatConvId = (msg as unknown as { conversationId?: string }).conversationId;
       const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
       const isBrainMode = (msg as unknown as { brainMode?: boolean }).brainMode;
+      const recapId = (msg as unknown as { recapId?: string }).recapId;
       const chatWorkDir = existingConv?.workDir || state.workDir;
       const effectiveBrainMode = isBrainMode || isBrainHomeDir(chatWorkDir);
       console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${effectiveBrainMode} (explicit=${isBrainMode}, workDir=${isBrainHomeDir(chatWorkDir)})`);
-      const chatOptions: { resumeSessionId?: string; brainMode?: boolean } = {
+      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string } = {
         resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       };
       if (effectiveBrainMode) {
         chatOptions.brainMode = true;
+      }
+      if (recapId) {
+        chatOptions.recapId = recapId;
       }
       claudeHandleChat(
         chatConvId,

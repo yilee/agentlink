@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getDateGroup, getMeetingTypeBadge, getSectionIcon } from '../../server/web/src/modules/recap.js';
+import { getDateGroup, getMeetingTypeBadge, getSectionIcon, buildMeetingContext } from '../../server/web/src/modules/recap.js';
 
 describe('getMeetingTypeBadge', () => {
   it('returns correct badge for general_sync', () => {
@@ -123,5 +123,139 @@ describe('getDateGroup', () => {
 
   it('returns "Older" for dates far in the past', () => {
     expect(getDateGroup('2025-01-01T00:00:00')).toBe('Older');
+  });
+});
+
+describe('buildMeetingContext', () => {
+  it('returns empty string for null/undefined input', () => {
+    expect(buildMeetingContext(null)).toBe('');
+    expect(buildMeetingContext(undefined)).toBe('');
+  });
+
+  it('builds basic context with meta only', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Sprint Planning' },
+      detail: {},
+    });
+    expect(result).toContain('[Meeting Context');
+    expect(result).toContain('Meeting: Sprint Planning');
+  });
+
+  it('includes all meta fields when present', () => {
+    const result = buildMeetingContext({
+      meta: {
+        meeting_name: 'Design Review',
+        occurred_at_local: '2026-03-22T10:00:00',
+        duration: '45m',
+        meeting_type: 'strategy',
+        project: 'AgentLink',
+        participants: ['Alice', 'Bob', 'Charlie'],
+      },
+      detail: {},
+    });
+    expect(result).toContain('Meeting: Design Review');
+    expect(result).toContain('Date: 2026-03-22T10:00:00');
+    expect(result).toContain('Duration: 45m');
+    expect(result).toContain('Type: strategy');
+    expect(result).toContain('Project: AgentLink');
+    expect(result).toContain('Participants: Alice, Bob, Charlie');
+  });
+
+  it('includes TL;DR section', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Test' },
+      detail: { tldr: 'We decided to ship next week.' },
+    });
+    expect(result).toContain('## TL;DR');
+    expect(result).toContain('We decided to ship next week.');
+  });
+
+  it('includes for_you section', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Test' },
+      detail: {
+        for_you: [
+          { text: 'Review the PR', reason: 'You are the reviewer' },
+          { text: 'Update docs', reason: 'Owner of the docs' },
+        ],
+      },
+    });
+    expect(result).toContain('## Key Takeaways for You');
+    expect(result).toContain('- Review the PR (You are the reviewer)');
+    expect(result).toContain('- Update docs (Owner of the docs)');
+  });
+
+  it('includes hook_sections', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Test' },
+      detail: {
+        hook_sections: [
+          {
+            title: 'Decisions',
+            items: [{ text: 'Use TypeScript' }, { text: 'Deploy to prod Friday' }],
+            omitted_count: 0,
+          },
+          {
+            title: 'Action Items',
+            items: [{ text: 'Write tests' }],
+            omitted_count: 3,
+          },
+        ],
+      },
+    });
+    expect(result).toContain('## Decisions');
+    expect(result).toContain('- Use TypeScript');
+    expect(result).toContain('- Deploy to prod Friday');
+    expect(result).toContain('## Action Items');
+    expect(result).toContain('- Write tests');
+    expect(result).toContain('(3 more items omitted)');
+  });
+
+  it('omits missing optional sections gracefully', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Minimal' },
+      detail: {},
+    });
+    expect(result).toContain('Meeting: Minimal');
+    expect(result).not.toContain('## TL;DR');
+    expect(result).not.toContain('## Key Takeaways');
+    expect(result).not.toContain('Date:');
+    expect(result).not.toContain('Duration:');
+  });
+
+  it('handles empty participants array', () => {
+    const result = buildMeetingContext({
+      meta: { meeting_name: 'Test', participants: [] },
+      detail: {},
+    });
+    expect(result).not.toContain('Participants:');
+  });
+
+  it('handles full context with all sections', () => {
+    const result = buildMeetingContext({
+      meta: {
+        meeting_name: 'Full Meeting',
+        occurred_at_local: '2026-03-22T14:00:00',
+        duration: '1h',
+        meeting_type: 'general_sync',
+        project: 'MyProject',
+        participants: ['Alice', 'Bob'],
+      },
+      detail: {
+        tldr: 'Summary here.',
+        for_you: [{ text: 'Do task', reason: 'assigned' }],
+        hook_sections: [
+          { title: 'Blockers', items: [{ text: 'Blocked on API' }], omitted_count: 0 },
+        ],
+      },
+    });
+    // Verify ordering: meta → tldr → for_you → hook_sections
+    const metaIdx = result.indexOf('Meeting: Full Meeting');
+    const tldrIdx = result.indexOf('## TL;DR');
+    const forYouIdx = result.indexOf('## Key Takeaways for You');
+    const blockersIdx = result.indexOf('## Blockers');
+    expect(metaIdx).toBeLessThan(tldrIdx);
+    expect(tldrIdx).toBeLessThan(forYouIdx);
+    expect(forYouIdx).toBeLessThan(blockersIdx);
   });
 });
