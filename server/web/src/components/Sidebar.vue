@@ -4,7 +4,6 @@ import { inject } from 'vue';
 import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
-import FeedNav from './FeedNav.vue';
 
 const vFocus = { mounted: (el) => el.focus() };
 
@@ -22,6 +21,8 @@ const {
   workDir,
   hostname,
   currentView,
+  viewMode,
+  isMsRoute,
 } = store;
 
 const {
@@ -37,8 +38,6 @@ const {
   workdirMenuCopyPath,
   workdirMenuGit,
 } = sidebarStore;
-
-const isMsRoute = window.location.pathname.startsWith('/ms/');
 
 function goToBrainHome() {
   if (!store.requireVersion('0.1.112', 'Brain Home')) return;
@@ -440,13 +439,17 @@ const {
 
           <!-- Normal sidebar content (sessions view) -->
           <template v-else>
-          <FeedNav v-if="isMsRoute" />
           <div class="sidebar-section">
             <div class="sidebar-workdir">
               <div v-if="hostname" class="sidebar-hostname">
                 <svg class="sidebar-hostname-icon" viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3.5 2A1.5 1.5 0 0 0 2 3.5v5A1.5 1.5 0 0 0 3.5 10h9A1.5 1.5 0 0 0 14 8.5v-5A1.5 1.5 0 0 0 12.5 2h-9zM.5 3.5A3 3 0 0 1 3.5.5h9A3 3 0 0 1 15.5 3.5v5a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-5zM5 13.25a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75zM3.25 15a.75.75 0 0 0 0 1.5h9.5a.75.75 0 0 0 0-1.5h-9.5z"/></svg>
                 <span>{{ hostname }}</span>
               </div>
+              <div v-if="isMsRoute" class="sidebar-segmented-control">
+                <button :class="['seg-btn', { active: viewMode !== 'feed' }]" @click="viewMode = 'chat'">Chat</button>
+                <button :class="['seg-btn', { active: viewMode === 'feed' }]" @click="viewMode = 'feed'">Feed</button>
+              </div>
+              <template v-if="viewMode !== 'feed'">
               <div class="sidebar-workdir-header">
                 <div class="sidebar-workdir-label">{{ t('sidebar.workingDirectory') }}</div>
               </div>
@@ -498,12 +501,23 @@ const {
                   </div>
                 </div>
               </div>
+              </template>
+              <div v-if="viewMode === 'feed'" class="feed-sidebar">
+                <button class="feed-sidebar-btn" :class="{ active: currentView === 'recap-feed' || currentView === 'recap-detail' }">
+                  <span class="feed-sidebar-icon">&#x1F4CB;</span>
+                  Recaps
+                </button>
+                <button class="feed-sidebar-btn disabled" disabled title="Coming soon">
+                  <span class="feed-sidebar-icon">&#x1F4CA;</span>
+                  Briefings
+                </button>
+              </div>
             </div>
           </div>
 
-          <SessionList v-if="!isMsRoute || currentView === 'chat'" />
-          <TeamList />
-          <LoopList />
+          <SessionList v-if="viewMode !== 'feed'" />
+          <TeamList v-if="viewMode !== 'feed'" />
+          <LoopList v-if="viewMode !== 'feed'" />
 
           <div v-if="serverVersion || agentVersion" class="sidebar-version-footer">
             <span v-if="serverVersion">{{ t('sidebar.server') }} {{ serverVersion }}</span>

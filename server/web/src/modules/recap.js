@@ -20,13 +20,13 @@ function isSameDay(d1, d2) {
     && d1.getDate() === d2.getDate();
 }
 
-function isSameWeek(d1, d2) {
-  const startOfWeek = new Date(d2);
-  startOfWeek.setDate(d2.getDate() - d2.getDay());
-  startOfWeek.setHours(0, 0, 0, 0);
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 7);
-  return d1 >= startOfWeek && d1 < endOfWeek;
+function startOfWeekMonday(d) {
+  const s = new Date(d);
+  const day = s.getDay();
+  // Monday = 1, Sunday = 0 → offset: (day + 6) % 7 gives days since Monday
+  s.setDate(s.getDate() - ((day + 6) % 7));
+  s.setHours(0, 0, 0, 0);
+  return s;
 }
 
 export function getDateGroup(dateLocal) {
@@ -36,12 +36,16 @@ export function getDateGroup(dateLocal) {
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (isSameDay(date, yesterday)) return 'Yesterday';
-  if (isSameWeek(date, now)) return 'This Week';
+  const thisWeekStart = startOfWeekMonday(now);
+  if (date >= thisWeekStart) return 'This Week';
+  const lastWeekStart = new Date(thisWeekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  if (date >= lastWeekStart) return 'Last Week';
   return 'Older';
 }
 
 function groupByDate(entries) {
-  const order = ['Today', 'Yesterday', 'This Week', 'Older'];
+  const order = ['Today', 'Yesterday', 'This Week', 'Last Week', 'Older'];
   const groups = {};
   for (const entry of entries) {
     const group = getDateGroup(entry.date_local);

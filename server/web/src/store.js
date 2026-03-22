@@ -683,6 +683,20 @@ export function createStore() {
   watch(teamsCollapsed, _saveSidebarCollapsed);
   watch(loopsCollapsed, _saveSidebarCollapsed);
 
+  // Sync feed mode lifecycle: enter/exit feed triggers recap load/autorefresh
+  if (recap) {
+    watch(team.viewMode, (newMode, oldMode) => {
+      if (newMode === 'feed') {
+        currentView.value = 'recap-feed';
+        recap.loadFeed();
+        recap.startAutoRefresh();
+      } else if (oldMode === 'feed') {
+        currentView.value = 'chat';
+        recap.stopAutoRefresh();
+      }
+    });
+  }
+
   // loadingTeams/loadingLoops are cleared in their respective message handlers
   // (teams_list / loops_list), not via watch, to avoid false resets when
   // clearing lists during workdir change.
@@ -834,6 +848,7 @@ export function createStore() {
     formatDuration: loop.formatDuration,
     // UI state
     viewMode: team.viewMode,
+    isMsRoute,
     sidebarView, isMobile, loadingHistory,
     // Team feed helpers (depend on both store + team)
     feedAgentName, feedContentRest,

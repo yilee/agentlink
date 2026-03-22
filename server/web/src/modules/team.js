@@ -25,7 +25,7 @@ export function createTeam(deps) {
   /** @type {import('vue').Ref<object|null>} Current team state (TeamStateSerialized or null) */
   const teamState = ref(null);
 
-  /** @type {import('vue').Ref<string>} 'chat' | 'team' | 'loop' — current view mode */
+  /** @type {import('vue').Ref<string>} 'chat' | 'feed' | 'team' | 'loop' — current view mode */
   const viewMode = ref('chat');
 
   /** @type {import('vue').Ref<string|null>} Currently viewed agent ID, null = dashboard */

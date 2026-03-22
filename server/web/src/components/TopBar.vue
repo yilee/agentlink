@@ -8,6 +8,7 @@ const {
   status,
   theme,
   viewMode,
+  isMsRoute,
   agentName,
   latency,
   displayStatus,
@@ -42,11 +43,13 @@ onUnmounted(() => window.removeEventListener('entra-photo-ready', onPhotoReady))
           </span>
           <div class="team-mode-toggle">
             <button :class="['team-mode-btn', { active: viewMode === 'chat' }]" @click="viewMode = 'chat'">{{ t('header.chat') }}</button>
+            <button v-if="isMsRoute" :class="['team-mode-btn', { active: viewMode === 'feed' }]" @click="viewMode = 'feed'">Feed</button>
             <button :class="['team-mode-btn', { active: viewMode === 'team' }]" @click="viewMode = 'team'">{{ t('header.team') }}</button>
             <button :class="['team-mode-btn', { active: viewMode === 'loop' }]" @click="viewMode = 'loop'">{{ t('header.loop') }}</button>
           </div>
           <select class="team-mode-select" :value="viewMode" @change="viewMode = $event.target.value">
             <option value="chat">{{ t('header.chat') }}</option>
+            <option v-if="isMsRoute" value="feed">Feed</option>
             <option value="team">{{ t('header.team') }}</option>
             <option value="loop">{{ t('header.loop') }}</option>
           </select>

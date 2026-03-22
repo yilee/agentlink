@@ -37,20 +37,24 @@ Brain features are only available when the URL matches `/ms/:sessionId`. The fea
 ```
 URL /ms/:sessionId
   → store.brainMode = true   (set once at init)
-  → Sidebar renders <FeedNav> component (only exists in Brain mode)
-  → Right panel uses <component :is="currentView"> dynamic switching
+  → store.isMsRoute = true   (reactive ref used for conditional rendering)
+  → viewMode extended: 'chat' | 'feed' | 'team' | 'loop' (Feed only available when isMsRoute)
+  → Sidebar renders Chat/Feed segmented control (only when isMsRoute)
+  → TopBar renders Feed button (only when isMsRoute)
+  → Right panel uses viewMode + currentView for dynamic switching
   → recap module only created when brainMode=true
   → recap WS handlers only registered when brainMode=true
 ```
 
-**Where `brainMode` appears in code (exhaustive list):**
+**Where `brainMode` / `isMsRoute` appears in code (exhaustive list):**
 
 | Location | Purpose |
 |----------|---------|
-| `store.js` — init | Set `brainMode` from URL pattern |
+| `store.js` — init | Set `brainMode` and `isMsRoute` from URL pattern |
 | `store.js` — module creation | Conditionally create recap module |
 | `connection.js` — handler registration | Conditionally register recap handlers |
-| `Sidebar.vue` — template | Conditionally render `<FeedNav>` slot |
+| `Sidebar.vue` — template | Show Chat/Feed segmented control; switch sidebar content |
+| `TopBar.vue` — template | Conditionally render Feed button in tab bar |
 
 Everywhere else, components exist or don't exist — they never check `brainMode` internally.
 
@@ -61,7 +65,6 @@ New feature = new files. Existing files only get minimal wiring (imports + regis
 ```
 server/web/src/
 ├── components/
-│   ├── FeedNav.vue              # Feed switch buttons (Recaps / future Briefings)
 │   ├── RecapFeed.vue            # Feed grid container with date grouping
 │   ├── RecapCard.vue            # Single feed card
 │   ├── RecapDetail.vue          # Detail view container
@@ -77,6 +80,8 @@ server/web/src/
 │   └── recap-detail.css         # Detail view styles
 ```
 
+> **Note:** `FeedNav.vue` was used in the initial prototype but has been **removed**. Its functionality (Recaps/Briefings buttons, Chats link) is now integrated directly into `Sidebar.vue` as part of the Feed sidebar mode.
+
 **Agent side:**
 
 ```
@@ -90,7 +95,9 @@ agent/src/
 |------|--------|
 | `store.js` | Add `brainMode` ref, conditionally create recap module |
 | `connection.js` | Conditionally register recap handler |
-| `Sidebar.vue` | Add `<FeedNav>` slot above chat history |
+| `Sidebar.vue` | Add Chat/Feed segmented control; render two sidebar modes (Chat / Feed) |
+| `TopBar.vue` | Add Feed button to tab bar (only when `isMsRoute`) |
+| `team.js` | Extend `viewMode` to include `'feed'` as fourth value |
 | `App.vue` | Add recap module to provide/inject |
 | `agent/src/connection.ts` | Route `list_recaps` / `get_recap_detail` to recap module |
 
@@ -200,53 +207,146 @@ case 'get_recap_detail':
 
 ### 5.1 Navigation State
 
-The right panel shows one of these views, tracked by `store.currentView`:
+The UI uses **two levels** of navigation state:
+
+**Level 1: `viewMode`** (top-level mode, controls TopBar + sidebar rendering)
+
+```
+viewMode: 'chat' | 'feed' | 'team' | 'loop'
+```
+
+- Defined in `modules/team.js` — existing ref, extended with `'feed'`
+- Controlled by: TopBar buttons (Chat / Feed / TEAM / LOOP) + Sidebar segmented control (Chat / Feed)
+- `'feed'` is only available when `isMsRoute=true`
+- When `viewMode` changes, the sidebar mode and right panel both switch
+
+**Level 2: `currentView`** (sub-view within Feed mode, controls right panel content)
 
 ```
 currentView: 'chat' | 'recap-feed' | 'recap-detail'
 ```
 
-State transitions:
+- Defined in `store.js`
+- Only meaningful when `viewMode === 'feed'`
+- Controls which component renders in the right panel
+
+**State transitions:**
 
 ```
-'chat' (default)
-   │
-   ├── click 📋 Recaps button ──► 'recap-feed'
-   │                                    │
-   │                                    ├── click a card ──► 'recap-detail'
-   │                                    │                         │
-   │                                    │                         ├── click ← Back ──► 'recap-feed'
-   │                                    │                         │
-   │                                    │                         └── start chatting ──► (stay in 'recap-detail',
-   │                                    │                              detail collapses to summary bar,
-   │                                    │                              chat appears below)
-   │                                    │
-   │                                    └── click 💬 Chats or a chat entry ──► 'chat'
-   │
-   └── click any chat entry ──► 'chat'
+viewMode = 'chat' (default)
+  → Sidebar: hostname, working dir, brain home, recent dirs, session list
+  → Right panel: ChatView (normal chat)
+  → TopBar: Chat button active
+
+viewMode = 'feed'
+  → Sidebar: hostname, segmented control, Recaps/Briefings buttons, (future: contextual chat history)
+  → Right panel: depends on currentView
+  → TopBar: Feed button active
+
+  currentView = 'recap-feed' (default when entering feed mode)
+     │
+     ├── click a card ──► currentView = 'recap-detail'
+     │                         │
+     │                         ├── click ← Back ──► currentView = 'recap-feed'
+     │                         │
+     │                         └── start chatting ──► (stay in 'recap-detail',
+     │                              detail collapses to summary bar,
+     │                              chat appears below)
+     │
+     └── switch sidebar segmented control to Chat ──► viewMode = 'chat'
+
+viewMode = 'team'
+  → (existing behavior, unchanged)
+
+viewMode = 'loop'
+  → (existing behavior, unchanged)
 ```
 
-### 5.2 Sidebar: `FeedNav.vue`
+**Switching to Feed mode:**
 
-Rendered above chat history list, only when `brainMode=true`.
+When `viewMode` changes to `'feed'`:
+1. Set `currentView = 'recap-feed'`
+2. Call `recap.loadFeed()` (send `list_recaps`)
+3. Call `recap.startAutoRefresh()`
+
+When `viewMode` changes away from `'feed'`:
+1. Call `recap.stopAutoRefresh()`
+
+### 5.2 Sidebar: Two-Mode Architecture
+
+When `isMsRoute=true`, the sidebar has two completely independent modes controlled by a **segmented control** under the hostname. Switching modes replaces the entire sidebar content below the segmented control.
+
+**Sidebar segmented control:**
 
 ```
 ┌─────────────────────┐
-│  ┌────────┐         │
-│  │📋Recaps│         │   ◄── active state: highlighted background
-│  └────────┘         │
-│  ┌────────┐         │
-│  │📊Brief │         │   ◄── disabled/grayed (Phase 1: not available yet)
-│  └────────┘         │
+│  hostname            │
+│  ┌──────┬──────┐    │
+│  │ Chat │ Feed │    │   ◄── segmented control (pill-style toggle)
+│  └──────┴──────┘    │       sets viewMode = 'chat' | 'feed'
 │                     │
-│  ─── 💬 Chats ───  │
-│  session list ...   │
+│  ... mode content   │
 └─────────────────────┘
 ```
 
-- Click "Recaps" → `store.currentView = 'recap-feed'`, triggers `list_recaps` message
+**Chat mode** (`viewMode === 'chat'`): Original sidebar, unchanged.
+
+```
+┌─────────────────────┐
+│  hostname            │
+│  [Chat] [Feed]       │
+│─────────────────────│
+│  Working Directory   │
+│  Brain Home          │
+│  Recent Directories  │
+│  ─── Sessions ───   │
+│  session list ...    │
+└─────────────────────┘
+```
+
+**Feed mode** (`viewMode === 'feed'`): New sidebar content for Brain feeds.
+
+```
+┌─────────────────────┐
+│  hostname            │
+│  [Chat] [Feed]       │
+│─────────────────────│
+│  ┌────────────────┐ │
+│  │ 📋 Recaps      │ │   ◄── active: highlighted background
+│  └────────────────┘ │
+│  ┌────────────────┐ │
+│  │ 📊 Briefings   │ │   ◄── disabled/grayed (Phase 1: "Coming soon")
+│  └────────────────┘ │
+│                     │
+│  ─── Chat History ──│   ◄── Phase 2+: contextual chat sessions (see §5.8)
+│  (empty in Phase 1) │       stored under BrainHome/chat/meeting-recap/
+│                     │
+└─────────────────────┘
+```
+
+- Click "Recaps" → `currentView = 'recap-feed'`, triggers `list_recaps`
 - Click "Briefings" → no-op in Phase 1 (grayed out with tooltip "Coming soon")
-- Click any chat session → `store.currentView = 'chat'`, normal conversation switch
+- "Chat History" section (Phase 2+): lists contextual chat sessions about recaps/briefings — **not** the same as workdir-based sessions in Chat mode
+
+**TopBar Feed button:**
+
+In addition to the sidebar segmented control, a **Feed button** is added to the TopBar's existing tab bar (Chat / TEAM / LOOP), visible only when `isMsRoute`:
+
+```
+┌──────────────────────────────────────────────┐
+│  [ Chat ]  [ Feed ]  [ TEAM ]  [ LOOP ]     │
+└──────────────────────────────────────────────┘
+```
+
+Both the TopBar Feed button and the sidebar segmented control are **synchronized** — clicking either one sets `viewMode = 'feed'` and updates both UI elements. This is achieved by both reading/writing the same `viewMode` ref.
+
+**Implementation approach (Scheme A — Feed as 4th viewMode value):**
+
+`viewMode` in `team.js` is extended from `'chat' | 'team' | 'loop'` to `'chat' | 'feed' | 'team' | 'loop'`. This is the simplest approach because:
+- `viewMode` already controls TopBar highlighting and main content area switching
+- Sidebar already reacts to `viewMode` for team/loop mode
+- Adding `'feed'` as a peer value naturally extends both TopBar and sidebar behavior
+- No new ref needed — just extend the existing one
 
 ### 5.3 Feed View: `RecapFeed.vue`
 
@@ -553,6 +653,55 @@ When the user types in the chat input on the detail view:
 - Chat scoped to the selected recap — switching recaps clears chat
 - `RecapSummaryBar.vue` shows collapsed counts, clickable to expand back to detail
 
+### 5.9 Contextual Chat Session Persistence (Phase 2+)
+
+Contextual chat sessions (conversations about specific recaps or briefings) are stored **separately** from existing workdir-based Claude sessions. This is a key architectural distinction:
+
+| | Workdir-based sessions (existing) | Contextual chat sessions (new) |
+|---|---|---|
+| **Storage** | `~/.claude/projects/<folder>/<sessionId>.jsonl` | `~/BrainHome/chat/meeting-recap/<sessionId>.jsonl` |
+| **Shown in** | Sidebar Chat mode → session list | Sidebar Feed mode → "Chat History" section |
+| **Scoped to** | Working directory | A specific recap or briefing |
+| **Initial context** | User's first message | Recap summary + user's first question |
+| **Claude session** | Standalone | May share Claude session with recap context prepended |
+
+**Directory structure:**
+
+```
+~/BrainHome/
+├── chat/
+│   ├── meeting-recap/        # Contextual chats about meeting recaps
+│   │   ├── <sessionId>.jsonl
+│   │   └── ...
+│   └── briefing/             # Contextual chats about briefings (Phase 3)
+│       ├── <sessionId>.jsonl
+│       └── ...
+├── reports/
+│   └── meeting-recap/        # Existing recap data (index + sidecars)
+│       ├── recap_index.yaml
+│       └── <meeting_folder>/
+│           └── recap-<date>-<id>.json
+```
+
+**Flow:**
+
+1. User opens a recap detail view and types a question
+2. Agent creates a new session file under `~/BrainHome/chat/meeting-recap/`
+3. Session initial content = recap summary (from sidecar `detail.tldr` + `detail.for_you`) + user's question
+4. Agent forwards to Claude with recap + transcript as system context
+5. Subsequent messages in the same session continue the conversation about that recap
+6. Session persists — user can return to it from the Feed sidebar's "Chat History" list
+7. Briefing contextual chats follow the same pattern under `~/BrainHome/chat/briefing/`
+
+**Feed sidebar "Chat History" display:**
+
+In Feed mode, the sidebar shows contextual chat sessions below the Recaps/Briefings buttons. Sessions are listed with:
+- Recap/briefing title (from the session metadata)
+- First user question (truncated)
+- Last modified timestamp
+
+Clicking a session reopens it with full conversation history, similar to how workdir sessions work in Chat mode.
+
 ## 6. Module: `modules/recap.js`
 
 ```javascript
@@ -708,31 +857,46 @@ function stopAutoRefresh() {
 
 ## 10. Phasing
 
-### Phase 1 — Read-only Feed + Detail (Target: this sprint)
+### Phase 1a — Read-only Feed + Detail (Target: this sprint) ✅ In progress
 
 - Agent: `recap.ts` — read YAML index + JSON sidecar
-- Web: `FeedNav`, `RecapFeed`, `RecapCard`, `RecapDetail`, `RecapForYou`, `RecapHookSection`
+- Web: `RecapFeed`, `RecapCard`, `RecapDetail`, `RecapForYou`, `RecapHookSection`
 - Web: `modules/recap.js`, `handlers/recap-handler.js`
 - Web: `css/recap-feed.css`, `css/recap-detail.css`
-- Sidebar modification for feed nav
 - Store + connection wiring with brain mode gate
 
 **Deliverables:** User can open Recaps feed, see cards grouped by date, click into detail view with type-adaptive hook sections, click through to SharePoint.
 
-### Phase 2 — Contextual Chat
+### Phase 1b — Sidebar Refactor (Immediate next)
+
+- Remove `FeedNav.vue` — merge functionality into `Sidebar.vue`
+- Add Chat/Feed segmented control to sidebar (under hostname, only when `isMsRoute`)
+- Implement two sidebar modes: Chat mode (existing content) / Feed mode (Recaps, Briefings buttons)
+- Extend `viewMode` in `team.js` to include `'feed'` as 4th value
+- Add Feed button to `TopBar.vue` tab bar (synchronized with sidebar segmented control)
+- Ensure switching between Chat/Feed modes preserves each mode's state
+
+**Deliverables:** Clean navigation separation between Chat and Feed. Sidebar and TopBar synchronized. No interference between existing Claude chat sessions and Brain feed features.
+
+### Phase 2 — Contextual Chat + Session Persistence
 
 - Chat input on detail view sends messages scoped to the selected recap
 - Agent prepends recap + transcript as context to Claude
 - Detail collapses to `RecapSummaryBar` when chatting
 - `RecapSummaryBar.vue` component
+- **Session persistence:** Create contextual chat sessions under `~/BrainHome/chat/meeting-recap/`
+- Store session metadata (recap title, first question, timestamps)
+- Display contextual chat history in Feed sidebar's "Chat History" section
+- Allow resuming previous contextual chat sessions
 
-**Deliverables:** User can ask questions about a specific meeting and get contextual answers.
+**Deliverables:** User can ask questions about a specific meeting and get contextual answers. Conversations persist and can be resumed from the Feed sidebar.
 
 ### Phase 3 — Briefings Feed + Polish
 
 - Briefings schema (from Brain team)
 - `BriefingFeed.vue`, `BriefingCard.vue`, `BriefingDetail.vue`
-- FeedNav tab switching between Recaps and Briefings
+- Enable Briefings button in Feed sidebar mode
+- Briefing contextual chats under `~/BrainHome/chat/briefing/`
 - Polish: animations, loading skeletons, empty states
 
 ## 11. Dependencies
@@ -788,7 +952,8 @@ Key observations from real data:
 | Brain Home path unknown | Low | Brain Home is `~/BrainData`; reuse existing sidebar button resolution |
 | Large index file (hundreds of recaps) | Low | Unlikely near-term; add pagination if needed later |
 | Contextual chat scope (Phase 2) | High | Defer to Phase 2; Phase 1 is static read-only |
-| Sidebar refactor breaks existing functionality | Med | Minimal changes (add slot for FeedNav), thorough functional test coverage |
+| Sidebar refactor breaks existing functionality | Med | Two independent modes (Chat/Feed) — Chat mode is untouched, Feed mode is new code. Segmented control + viewMode keep them isolated. Thorough functional test coverage |
+| Contextual chat session storage location | Low | `~/BrainHome/chat/` mirrors Brain's existing `~/BrainData/reports/` convention |
 
 ## 14. Testing Plan
 

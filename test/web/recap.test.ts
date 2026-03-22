@@ -101,16 +101,20 @@ describe('getDateGroup', () => {
   });
 
   it('returns "This Week" for earlier this week', () => {
-    // March 22, 2026 is a Sunday. Week starts on Sunday.
-    // March 22 (Sun) is today. March 21 (Sat) → previous week.
-    // Let's adjust: set "now" to a Wednesday so we have earlier-in-week days.
-    vi.setSystemTime(new Date(2026, 2, 25, 10, 0, 0)); // Wednesday March 25
-    // Monday March 23 is same week (Sun Mar 22 start)
-    expect(getDateGroup('2026-03-23T10:00:00')).toBe('This Week');
+    // March 22, 2026 is a Sunday. Week starts on Monday.
+    // Current week = Mon Mar 16 – Sun Mar 22.
+    // March 20 (Fri) is same week.
+    expect(getDateGroup('2026-03-20T10:00:00')).toBe('This Week');
   });
 
-  it('returns "Older" for last week', () => {
-    expect(getDateGroup('2026-03-15T10:00:00')).toBe('Older');
+  it('returns "Last Week" for last week', () => {
+    // "now" is Mar 22, current week starts Mon Mar 16.
+    // Last week = Mon Mar 9 – Sun Mar 15.
+    expect(getDateGroup('2026-03-15T10:00:00')).toBe('Last Week');
+  });
+
+  it('returns "Older" for two weeks ago', () => {
+    expect(getDateGroup('2026-03-08T10:00:00')).toBe('Older');
   });
 
   it('returns "Older" for last month', () => {
