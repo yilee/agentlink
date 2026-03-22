@@ -304,6 +304,13 @@
   margin: 0.75rem 0;
 }
 
+/* ── Meeting context (collapsible recap context injection) ── */
+.meeting-context-bar {
+  border-color: var(--accent);
+  border-style: solid;
+  opacity: 0.85;
+}
+
 /* ── Plan mode divider ── */
 .plan-mode-divider {
   display: flex;

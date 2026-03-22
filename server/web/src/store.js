@@ -22,6 +22,7 @@ import { createTeam } from './modules/team.js';
 import { createMemory } from './modules/memory.js';
 import { createGit } from './modules/git.js';
 import { createLoop } from './modules/loop.js';
+import { createRecap } from './modules/recap.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
 import { useTheme } from './composables/useTheme.js';
@@ -122,6 +123,7 @@ export function createStore() {
   // Brain mode state (per-conversation, locks after first message)
   const brainMode = ref(false);
   const brainModeLocked = ref(false);
+  const currentView = ref('chat'); // 'chat' | 'recap-feed' | 'recap-detail'
 
   // File browser state
   const filePanelOpen = ref(false);
@@ -317,7 +319,7 @@ export function createStore() {
     // i18n
     t,
   });
-  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -407,6 +409,27 @@ export function createStore() {
   setGit(git);
   sidebar.setGit(git);
 
+  // Recap module (only in brain/ms mode)
+  const isMsRoute = window.location.pathname.startsWith('/ms/');
+  const recap = isMsRoute ? createRecap({
+    wsSend,
+    switchConversation,
+    conversationCache,
+    messages,
+    isProcessing,
+    currentConversationId,
+    currentClaudeSessionId,
+    needsResume,
+    loadingHistory,
+    setBrainMode,
+    scrollToBottom,
+    historySessions,
+    loadingSessions,
+    currentView,
+  }) : null;
+  if (recap) setRecap(recap);
+  if (recap) recap.setRequestSessionList(sidebar.requestSessionList);
+
   const isMemoryPreview = computed(() => {
     if (!previewFile.value?.filePath || !memoryDir.value) return false;
     const fp = previewFile.value.filePath.replace(/\\/g, '/');
@@ -479,6 +502,26 @@ export function createStore() {
     }
 
     if (!canSend.value) return;
+
+    // Recap chat — route through recap module when in recap detail view
+    if (recap && recap.recapChatActive.value && currentView.value === 'recap-detail') {
+      const recapId = recap.selectedRecapId.value;
+      const detail = recap.selectedDetail.value;
+      inputText.value = '';
+      if (inputRef.value) inputRef.value.style.height = 'auto';
+      const userMsg = {
+        id: streaming.nextId(), role: 'user',
+        content: text, timestamp: new Date(), status: 'sent',
+      };
+      messages.value.push(userMsg);
+      isProcessing.value = true;
+      if (currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
+      recap.sendRecapChat(text, recapId, detail);
+      scrollToBottom(true);
+      return;
+    }
 
     const files = attachments.value.slice();
     inputText.value = '';
@@ -597,7 +640,6 @@ export function createStore() {
   }
 
   // Hide brain button for resumed non-brain sessions, and only show on /ms/ routes
-  const isMsRoute = window.location.pathname.startsWith('/ms/');
   const showBrainButton = computed(() => isMsRoute && (brainMode.value || !currentClaudeSessionId.value));
 
   function handleKeydown(e) {
@@ -676,6 +718,20 @@ export function createStore() {
   watch(chatsCollapsed, _saveSidebarCollapsed);
   watch(teamsCollapsed, _saveSidebarCollapsed);
   watch(loopsCollapsed, _saveSidebarCollapsed);
+
+  // Sync feed mode lifecycle: enter/exit feed triggers recap load/autorefresh
+  if (recap) {
+    watch(team.viewMode, (newMode, oldMode) => {
+      if (newMode === 'feed') {
+        currentView.value = 'recap-feed';
+        recap.loadFeed();
+        recap.startAutoRefresh();
+      } else if (oldMode === 'feed') {
+        currentView.value = 'chat';
+        recap.stopAutoRefresh();
+      }
+    });
+  }
 
   // loadingTeams/loadingLoops are cleared in their respective message handlers
   // (teams_list / loops_list), not via watch, to avoid false resets when
@@ -788,6 +844,7 @@ export function createStore() {
     planMode, pendingPlanMode, togglePlanMode,
     // Brain mode
     brainMode, brainModeLocked, toggleBrainMode, showBrainButton,
+    currentView,
     // Side question (/btw)
     btwState, btwPending, dismissBtw,
     // Message rendering helpers
@@ -827,10 +884,11 @@ export function createStore() {
     formatDuration: loop.formatDuration,
     // UI state
     viewMode: team.viewMode,
+    isMsRoute,
     sidebarView, isMobile, loadingHistory,
     // Team feed helpers (depend on both store + team)
     feedAgentName, feedContentRest,
     // Domain modules (for App.vue to provide separately)
-    _team, _loop, _sidebar, _files,
+    _team, _loop, _sidebar, _files, _recap: recap,
   };
 }

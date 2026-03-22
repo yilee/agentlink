@@ -9,6 +9,7 @@ import { handleGitStatus, handleGitDiff, handleGitStage, handleGitUnstage, handl
 import { handleCreateTeam, handleDissolveTeam, handleListTeams, handleGetTeam, handleGetTeamAgentHistory, handleDeleteTeam, handleRenameTeam } from './team-handlers.js';
 import { handleCreateLoop, handleUpdateLoop, handleDeleteLoop, handleListLoops, handleGetLoop, handleRunLoop, handleCancelLoopExecution, handleListLoopExecutions, handleGetLoopExecutionMessages, handleQueryLoopStatus } from './loop-handlers.js';
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
+import { listRecaps, getRecapDetail } from './recap.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -251,6 +252,7 @@ function scheduleReconnect(config: AgentConfig): void {
 }
 
 const BRAIN_HOME_DIR = path.resolve(os.homedir(), '.brain', 'BrainCore');
+const BRAIN_DATA_DIR = path.resolve(os.homedir(), 'BrainData');
 
 function isBrainHomeDir(dir: string): boolean {
   return path.resolve(dir) === BRAIN_HOME_DIR;
@@ -263,19 +265,24 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const chatConvId = (msg as unknown as { conversationId?: string }).conversationId;
       const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
       const isBrainMode = (msg as unknown as { brainMode?: boolean }).brainMode;
+      const recapId = (msg as unknown as { recapId?: string }).recapId;
       const chatWorkDir = existingConv?.workDir || state.workDir;
       const effectiveBrainMode = isBrainMode || isBrainHomeDir(chatWorkDir);
       console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${effectiveBrainMode} (explicit=${isBrainMode}, workDir=${isBrainHomeDir(chatWorkDir)})`);
-      const chatOptions: { resumeSessionId?: string; brainMode?: boolean } = {
+      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string } = {
         resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       };
       if (effectiveBrainMode) {
         chatOptions.brainMode = true;
       }
+      if (recapId) {
+        chatOptions.recapId = recapId;
+      }
+      const chatDir = recapId ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
       claudeHandleChat(
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
-        existingConv?.workDir || state.workDir,
+        chatDir,
         chatOptions,
         (msg as unknown as { files?: ChatFile[] }).files,
       );
@@ -330,7 +337,14 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         rebindConversation(m.claudeSessionId, convId);
       }
 
-      const history = readSessionMessages(state.workDir, m.claudeSessionId);
+      // Try current workDir first; fall back to BRAIN_DATA_DIR for recap chat sessions
+      let history = readSessionMessages(state.workDir, m.claudeSessionId);
+      if (history.length === 0) {
+        const sessionMeta_ = loadSessionMetadata(m.claudeSessionId);
+        if (sessionMeta_.recapId) {
+          history = readSessionMessages(BRAIN_DATA_DIR, m.claudeSessionId);
+        }
+      }
       console.log(`[AgentLink] → conversation_resumed (${history.length} messages, session ${m.claudeSessionId.slice(0, 8)})`);
 
       // Include live status so the web client can restore compacting/processing state
@@ -524,9 +538,37 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'git_commit':
       handleGitCommit(msg as unknown as { message: string; type: string }, state.workDir, send);
       break;
+    case 'list_recaps':
+      handleListRecaps();
+      break;
+    case 'get_recap_detail':
+      handleGetRecapDetailMsg(msg as unknown as { recapId: string; sidecarPath: string });
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
+  }
+}
+
+async function handleListRecaps(): Promise<void> {
+  try {
+    const recaps = await listRecaps(BRAIN_DATA_DIR);
+    console.log(`[AgentLink] → recaps_list (${recaps.length} recaps)`);
+    send({ type: 'recaps_list', recaps });
+  } catch (err) {
+    console.error('[AgentLink] listRecaps failed:', err);
+    send({ type: 'recaps_list', recaps: [], error: String(err) });
+  }
+}
+
+async function handleGetRecapDetailMsg(msg: { recapId: string; sidecarPath: string }): Promise<void> {
+  try {
+    const detail = await getRecapDetail(BRAIN_DATA_DIR, msg.sidecarPath);
+    console.log(`[AgentLink] → recap_detail (${msg.recapId})`);
+    send({ type: 'recap_detail', recapId: msg.recapId, detail });
+  } catch (err) {
+    console.error(`[AgentLink] getRecapDetail failed for ${msg.recapId}:`, err);
+    send({ type: 'recap_detail', recapId: msg.recapId, detail: null, error: String(err) });
   }
 }
 
@@ -541,7 +583,22 @@ function handleListSessions(): void {
       // All sessions under Brain Home are brain sessions
       ...(isBrainHome ? { brainMode: true } : {}),
     }));
-    console.log(`[AgentLink] → sessions_list (${sessions.length} sessions for ${state.workDir}, brainHome=${isBrainHome})`);
+
+    // Merge in recap chat sessions from BrainData directory (they live under a
+    // different Claude project folder, so listSessions(state.workDir) misses them).
+    if (!isBrainHome) {
+      const brainSessions = listSessions(BRAIN_DATA_DIR);
+      const existingIds = new Set(enriched.map(s => s.sessionId));
+      for (const bs of brainSessions) {
+        if (existingIds.has(bs.sessionId)) continue;
+        const meta = metaMap.get(bs.sessionId);
+        if (meta?.recapId) {
+          enriched.push({ ...bs, ...meta });
+        }
+      }
+    }
+
+    console.log(`[AgentLink] → sessions_list (${enriched.length} sessions for ${state.workDir}, brainHome=${isBrainHome})`);
     send({ type: 'sessions_list', sessions: enriched, workDir: state.workDir });
   } catch (err) {
     console.error(`[AgentLink] listSessions failed:`, err);
@@ -555,7 +612,14 @@ function handleDeleteSession(sessionId: string): void {
     send({ type: 'error', message: 'Cannot delete a session while it is processing.' });
     return;
   }
-  const deleted = deleteSession(state.workDir, sessionId);
+  // Try current workDir first; if not found, check if it's a recap session in BrainData
+  let deleted = deleteSession(state.workDir, sessionId);
+  if (!deleted) {
+    const meta = loadSessionMetadata(sessionId);
+    if (meta.recapId) {
+      deleted = deleteSession(BRAIN_DATA_DIR, sessionId);
+    }
+  }
   if (deleted) {
     deleteSessionMetadata(sessionId);
     send({ type: 'session_deleted', sessionId });
@@ -565,7 +629,14 @@ function handleDeleteSession(sessionId: string): void {
 }
 
 function handleRenameSession(sessionId: string, newTitle: string): void {
-  const renamed = renameSession(state.workDir, sessionId, newTitle);
+  // Try current workDir first; if not found, check if it's a recap session in BrainData
+  let renamed = renameSession(state.workDir, sessionId, newTitle);
+  if (!renamed) {
+    const meta = loadSessionMetadata(sessionId);
+    if (meta.recapId) {
+      renamed = renameSession(BRAIN_DATA_DIR, sessionId, newTitle);
+    }
+  }
   if (renamed) {
     send({ type: 'session_renamed', sessionId, newTitle });
   } else {

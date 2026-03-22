@@ -18,7 +18,10 @@ export function createSessionHandlers(deps) {
     },
     session_renamed(msg) {
       const session = historySessions.value.find(s => s.sessionId === msg.sessionId);
-      if (session) session.title = msg.newTitle;
+      if (session) {
+        session.title = msg.newTitle;
+        session.customTitle = msg.newTitle;
+      }
     },
     conversation_resumed(msg) {
       currentClaudeSessionId.value = msg.claudeSessionId;
@@ -58,7 +61,7 @@ export function createSessionHandlers(deps) {
           timestamp: new Date(),
         });
       }
-      scrollToBottom();
+      scrollToBottom(true);
     },
   };
 }

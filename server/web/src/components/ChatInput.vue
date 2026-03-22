@@ -5,6 +5,7 @@ const store = inject('store');
 const {
   status,
   viewMode,
+  currentView,
   inputText,
   planMode,
   brainMode,
@@ -57,7 +58,7 @@ function selectableIndex(cmd, i) {
 </script>
 
 <template>
-          <div class="input-area" v-if="viewMode === 'chat'">
+          <div class="input-area" v-if="(viewMode === 'chat' && currentView === 'chat') || currentView === 'recap-detail'">
             <input
               type="file"
               ref="fileInputRef"
@@ -91,7 +92,7 @@ function selectableIndex(cmd, i) {
               </template>
             </div>
             <div
-              :class="['input-card', { 'drag-over': dragOver, 'plan-mode': planMode, 'brain-mode': brainMode }]"
+              :class="['input-card', { 'drag-over': dragOver, 'plan-mode': planMode, 'brain-mode': brainMode && currentView !== 'recap-detail' }]"
               @dragover="handleDragOver"
               @dragleave="handleDragLeave"
               @drop="handleDrop"
@@ -127,11 +128,11 @@ function selectableIndex(cmd, i) {
                   <button class="slash-btn" @click="openSlashMenu" :disabled="status !== 'Connected'" :title="t('input.slashCommands')">
                     <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 21 11 3h2L9 21H7Z"/></svg>
                   </button>
-                  <button :class="['plan-mode-btn', { active: planMode }]" @click="togglePlanMode" :disabled="isProcessing" :title="planMode ? 'Switch to Normal Mode' : 'Switch to Plan Mode'">
+                  <button :class="['plan-mode-btn', { active: planMode }]" @click="togglePlanMode" :disabled="isProcessing" :title="planMode ? 'Switch to Normal Mode' : 'Switch to Plan Mode'" v-if="currentView !== 'recap-detail'">
                     <svg viewBox="0 0 24 24" width="12" height="12"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></svg>
                     Plan
                   </button>
-                  <button v-if="showBrainButton" :class="['brain-mode-btn', { active: brainMode, locked: brainModeLocked }]" @click="toggleBrainMode" :disabled="brainModeLocked || isProcessing || !!currentClaudeSessionId" :title="brainMode ? 'Brain Mode (active)' : 'Enable Brain Mode'">
+                  <button v-if="showBrainButton && currentView !== 'recap-detail'" :class="['brain-mode-btn', { active: brainMode, locked: brainModeLocked }]" @click="toggleBrainMode" :disabled="brainModeLocked || isProcessing || !!currentClaudeSessionId" :title="brainMode ? 'Brain Mode (active)' : 'Enable Brain Mode'">
                     <span class="brain-emoji">🧠</span>
                     Brain
                   </button>

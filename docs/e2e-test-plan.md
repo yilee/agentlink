@@ -2,7 +2,7 @@
 
 This document defines the full E2E test suite for AgentLink. It covers:
 
-- **Manual tests (TC-1 to TC-41):** Multi-session parallel, team mode, and plan mode flows requiring a live Claude CLI.
+- **Manual tests (TC-1 to TC-51):** Multi-session parallel, team mode, plan mode, and meeting recap feed flows requiring a live Claude CLI.
 - **Automated tests (P0/P1):** Playwright + mock agent tests in `test/functional/`, run with `npm run test:e2e`.
 
 ## Prerequisites
@@ -820,6 +820,194 @@ Same as above (ephemeral server + agent running, browser open to session URL), p
 
 ---
 
+## Meeting Recap Feed Tests
+
+> **Prerequisites:** These tests require Entra authentication. The session URL must use the `/ms/` path prefix (e.g., `http://localhost:3456/ms/<SESSION_ID>`). The agent must have access to meeting recap data (sidecar files or recap API).
+
+### TC-42: Feed view navigation and card display
+
+**Steps:**
+1. Open the session URL with the `/ms/` path prefix.
+2. In the sidebar header, observe the segmented toggle showing "Chat" and "Feed".
+3. Click "Feed" to switch to the recap feed view.
+4. Observe the feed view content.
+
+**Expected:**
+- The sidebar shows a segmented "Chat" / "Feed" toggle (only visible on `/ms/` routes).
+- Clicking "Feed" switches the main area to the recap feed grid.
+- Meeting recap cards are displayed, grouped by date (Today, Yesterday, This Week, Last Week, Older).
+- Each card shows: meeting name, time, meeting type badge, TL;DR snippet.
+- Cards with "For You" items show a pushpin icon with count.
+- A refresh button is available in the feed header.
+
+---
+
+### TC-43: Recap detail view and meeting context
+
+**Steps:**
+1. From the feed view (TC-42), click on a meeting recap card.
+2. Observe the detail view layout.
+3. Click the header area to expand/collapse the meeting context.
+
+**Expected:**
+- The view switches to a two-pane layout: meeting context (top) + chat area (bottom).
+- A back button (arrow) is visible to return to the feed.
+- The header shows: meeting name, date, duration, meeting type badge.
+- Expanding the header reveals: project, participants, "For You" items, TL;DR summary, and hook sections (Decisions, Action Items, Open Items, etc.).
+- The chat area shows an empty state: "Ask anything about this meeting recap".
+- The chat input is visible at the bottom.
+- Plan Mode and Brain Mode toggle buttons are hidden in recap chat.
+
+---
+
+### TC-44: Recap contextual chat — first message
+
+**Steps:**
+1. From the recap detail view (TC-43), type a question about the meeting (e.g., `What were the key decisions made in this meeting?`) and press Enter.
+2. Wait for Claude's response.
+
+**Expected:**
+- The user message appears in the chat area.
+- Claude responds with context-aware information about the meeting (it has the full meeting context injected automatically).
+- Brain Mode is automatically enabled for recap chats (no user action needed).
+- The sidebar chat history updates to show a new session under this meeting's group.
+- The session title is auto-generated from the user's first question.
+
+**Key knowledge:**
+- `buildMeetingContext()` prepends the full meeting metadata, TL;DR, key takeaways, decisions, action items, etc. to the first message.
+- `brainMode: true` is set automatically when entering recap chat.
+- `_pendingRecapTitle` triggers auto-rename on `session_started`.
+
+---
+
+### TC-45: Recap chat follow-up messages
+
+**Steps:**
+1. Continue from TC-44. Send a follow-up message (e.g., `Who is responsible for the first action item?`).
+2. Wait for Claude's response.
+
+**Expected:**
+- Claude's response references the meeting context from the first message.
+- The conversation flows naturally, maintaining context about the specific meeting.
+- No additional meeting context is injected for follow-up messages (only the first message gets context).
+
+---
+
+### TC-46: Recap chat history — sidebar list
+
+**Steps:**
+1. After completing TC-44/TC-45, look at the sidebar.
+2. Observe the "Chat History" section below the feed toggle.
+3. Click the refresh button in the Chat History header.
+
+**Expected:**
+- The Chat History section shows recap chat sessions grouped by meeting name.
+- Each group has a collapse/expand chevron and a session count badge.
+- Each session entry shows: display title (auto-generated or custom), relative time (e.g., "a few seconds ago").
+- The currently active session is highlighted.
+- Hovering over a session reveals rename (pencil) and delete (trash) action buttons.
+- The delete button is hidden for the currently active session.
+
+---
+
+### TC-47: Recap chat history — rename session
+
+**Steps:**
+1. In the Chat History sidebar, hover over the session from TC-44.
+2. Click the rename (pencil) button.
+3. Change the title to "Key Decisions Discussion" and press Enter.
+
+**Expected:**
+- The session entry switches to inline edit mode with a text input.
+- The input is auto-focused and pre-filled with the current title.
+- Pressing Enter confirms the rename; the session title updates immediately.
+- The checkmark and X buttons are available for confirm/cancel.
+- Pressing Escape cancels the rename without changes.
+
+---
+
+### TC-48: Recap chat history — delete session
+
+**Steps:**
+1. Start a new recap chat from the feed (click a different meeting card, send a message, wait for response).
+2. Go back to the feed (click the back button).
+3. Click the same meeting card again to open its detail view.
+4. In the Chat History sidebar, hover over the session you just created.
+5. Click the delete (trash) button.
+
+**Expected:**
+- A confirmation dialog appears asking to confirm deletion.
+- Clicking "Delete" removes the session from the Chat History list.
+- The session is permanently deleted from the agent side.
+- The active chat area resets to the empty state for this recap.
+
+---
+
+### TC-49: Recap chat history — resume session
+
+**Steps:**
+1. From the feed view, click a meeting that has an existing chat session in the Chat History sidebar.
+2. Click the session entry in the Chat History (not a new card click).
+3. Wait for the session to load.
+4. Send a follow-up message.
+
+**Expected:**
+- The recap detail view opens for the correct meeting.
+- The chat area populates with the previous conversation history (user messages + assistant responses).
+- A "Session restored" system message may appear.
+- Sending a follow-up message works correctly with full conversation context.
+
+---
+
+### TC-50: Recap chat history — collapsible groups
+
+**Steps:**
+1. Ensure there are recap chat sessions under at least two different meetings.
+2. In the Chat History sidebar, click the header of one meeting group to collapse it.
+3. Click again to expand it.
+
+**Expected:**
+- Clicking a meeting group header toggles its collapsed/expanded state.
+- The chevron icon rotates to indicate collapsed state.
+- Collapsed groups hide their session entries.
+- Expanding shows the sessions again.
+- Other groups are not affected by collapsing one group.
+
+---
+
+### TC-51: Reset recap chat and start fresh
+
+**Steps:**
+1. Open a recap detail view that has an active chat with messages.
+2. Click the reset/trash button in the recap detail header (next to the meeting name).
+3. Observe the chat area.
+4. Send a new message.
+
+**Expected:**
+- The chat area clears completely to the empty state.
+- The previous session is deleted on the agent side.
+- Sending a new message starts a fresh conversation with meeting context re-injected.
+- A new session entry appears in the Chat History sidebar.
+
+---
+
+## Meeting Recap Feed Test Results Log
+
+| # | Test | Status |
+|---|------|--------|
+| 42 | Feed view navigation and card display | |
+| 43 | Recap detail view and meeting context | |
+| 44 | Recap contextual chat — first message | |
+| 45 | Recap chat follow-up messages | |
+| 46 | Recap chat history — sidebar list | |
+| 47 | Recap chat history — rename session | |
+| 48 | Recap chat history — delete session | |
+| 49 | Recap chat history — resume session | |
+| 50 | Recap chat history — collapsible groups | |
+| 51 | Reset recap chat and start fresh | |
+
+---
+
 ## Plan Mode Test Results Log
 
 | # | Test | Status |
@@ -869,15 +1057,16 @@ Shared helpers: `test/functional/e2e-helpers.ts` — encryption, `connectMockAge
 | `loop-crud.test.ts` | Loop CRUD | 4 | Create, list, toggle enabled, delete |
 | `btw-side-question.test.ts` | BTW side question | 20 | Slash command, overlay, dismissal, edge cases, markdown, concurrent, dark mode |
 | `btw-bugfix-verification.test.ts` | BTW bug fixes | 7 | Empty question guard, escape key priority |
+| `recap-feed.test.ts` | Recap feed relay | 11 | Agent→server protocol (recaps_list, recap_detail, recap_chat_sessions, session_started), agent→web relay (recaps_list, recap_detail, recap_chat_sessions, session_started, session_deleted, session_renamed, recap_chat_send) |
 
-**Subtotal: 52 TCs**
+**Subtotal: 63 TCs**
 
 ### Coverage Summary
 
 | Priority | Automated TCs | Coverage |
 |----------|--------------|----------|
 | P0 | 28 | Core messaging, registration, connection, resume, workdir, AskUserQuestion, compaction, disconnect |
-| P1 | 52 | Password auth, file browser, file attachment, plan mode, loops, BTW, delete session, dropdown |
-| **Total** | **80** | All automated functional tests |
+| P1 | 63 | Password auth, file browser, file attachment, plan mode, loops, BTW, delete session, dropdown, recap feed relay |
+| **Total** | **91** | All automated functional tests |
 
-Manual-only tests (TC-1 through TC-41 above) cover multi-session parallel, team mode, and plan mode flows that require live Claude CLI integration and cannot be mocked.
+Manual-only tests (TC-1 through TC-51 above) cover multi-session parallel, team mode, plan mode, and meeting recap feed flows that require live Claude CLI integration and cannot be mocked.

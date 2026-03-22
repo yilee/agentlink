@@ -6,6 +6,7 @@ import { createSessionHandlers } from './handlers/session-handler.js';
 import { createExecutionHandlers } from './handlers/execution-handler.js';
 import { createFileHandlers } from './handlers/file-handler.js';
 import { createFeatureHandlers } from './handlers/feature-handler.js';
+import { createRecapHandlers } from './handlers/recap-handler.js';
 
 const MAX_RECONNECT_ATTEMPTS = 50;
 const RECONNECT_BASE_DELAY = 1000;
@@ -46,6 +47,8 @@ export function createConnection(deps) {
   function setLoop(l) { loop = l; }
   let git = null;
   function setGit(g) { git = g; }
+  let recap = null;
+  function setRecap(r) { recap = r; }
 
   let ws = null;
   let sessionKey = null;
@@ -139,6 +142,7 @@ export function createConnection(deps) {
     get team() { return team; },                   // late-bound
     get loop() { return loop; },                   // late-bound
     get git() { return git; },                     // late-bound
+    get recap() { return recap; },                 // late-bound
   };
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
@@ -149,6 +153,7 @@ export function createConnection(deps) {
   const executionHandlers = createExecutionHandlers(handlerDeps);
   const fileHandlers = createFileHandlers(handlerDeps);
   const featureHandlers = createFeatureHandlers(handlerDeps);
+  const recapHandlers = createRecapHandlers(handlerDeps);
 
   // Dispatch map: message type → handler(msg, scheduleHighlight)
   const handlers = {
@@ -157,6 +162,7 @@ export function createConnection(deps) {
     ...executionHandlers,
     ...fileHandlers,
     ...featureHandlers,
+    ...recapHandlers,
   };
 
   function connect(scheduleHighlight) {
@@ -501,5 +507,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }
