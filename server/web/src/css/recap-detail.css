@@ -8,18 +8,19 @@
 }
 
 .recap-detail-back {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.75rem 1.25rem 0;
-  font-size: 0.85rem;
-  color: var(--accent);
+  padding: 0.6rem 1.25rem 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;
+  transition: color 0.15s;
 }
 
 .recap-detail-back:hover {
-  text-decoration: underline;
+  color: var(--accent);
 }
 
 .recap-detail-loading,
@@ -44,7 +45,7 @@
 
 /* Header */
 .recap-detail-header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .recap-detail-meeting-name {
@@ -58,7 +59,7 @@
 .recap-detail-series {
   font-weight: 400;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.8rem;
 }
 
 .recap-detail-meta-row {
@@ -80,11 +81,12 @@
 
 /* TL;DR */
 .recap-detail-tldr {
-  font-size: 0.87rem;
+  font-size: 0.83rem;
   color: var(--text-primary);
   line-height: 1.5;
-  margin-bottom: 1rem;
-  padding: 0.6rem 0;
+  margin-bottom: 0.6rem;
+  padding: 0.3rem 0;
+  opacity: 0.9;
 }
 
 /* Sharing link */
@@ -92,88 +94,90 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.83rem;
-  color: var(--accent);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
   text-decoration: none;
-  padding: 0.5rem 0;
-  margin-top: 0.5rem;
+  padding: 0.3rem 0;
+  margin-top: 0.25rem;
+  transition: color 0.15s;
 }
 
 .recap-detail-link:hover {
-  text-decoration: underline;
+  color: var(--accent);
 }
 
 /* ── For You ── */
 
 .recap-for-you {
-  background: var(--bg-secondary);
-  border: 1px solid var(--accent);
-  border-radius: 10px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
+  background: var(--bg-tertiary);
+  border: none;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.75rem;
 }
 
 .recap-for-you-header {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--accent);
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.4rem;
 }
 
 .recap-for-you-icon {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .recap-for-you-list {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.4rem;
 }
 
 .recap-for-you-item {
-  padding-left: 0.2rem;
+  padding-left: 0.1rem;
 }
 
 .recap-for-you-text {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-primary);
   line-height: 1.4;
 }
 
 .recap-for-you-reason {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   padding-left: 0.7rem;
-  margin-top: 0.15rem;
-  line-height: 1.4;
+  margin-top: 0.1rem;
+  line-height: 1.35;
 }
 
 /* ── Hook Section ── */
 
 .recap-hook-section {
-  margin-bottom: 0.8rem;
-  padding-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-top: 0.3rem;
 }
 
 .recap-hook-header {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--text-secondary);
-  padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: none;
+  margin-bottom: 0.35rem;
 }
 
 .recap-hook-icon {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .recap-hook-title {
@@ -183,18 +187,19 @@
 .recap-hook-count {
   color: var(--text-secondary);
   font-weight: 400;
+  font-size: 0.72rem;
 }
 
 .recap-hook-items {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 
 .recap-hook-item {
   display: flex;
-  gap: 0.4rem;
-  font-size: 0.83rem;
+  gap: 0.35rem;
+  font-size: 0.8rem;
   color: var(--text-primary);
   line-height: 1.4;
 }
@@ -203,6 +208,7 @@
   color: var(--text-secondary);
   flex-shrink: 0;
   margin-top: 1px;
+  opacity: 0.5;
 }
 
 .recap-hook-item-content {
@@ -253,12 +259,13 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1.25rem;
+  padding: 0.55rem 1.25rem;
   cursor: pointer;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  background: transparent;
+  border-bottom: none;
   flex-shrink: 0;
   user-select: none;
+  transition: background 0.15s;
 }
 
 .recap-detail-collapse-header:hover {
@@ -268,30 +275,36 @@
 .recap-reset-chat-btn {
   margin-left: auto;
   background: none;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 4px;
-  padding: 3px 6px;
+  padding: 3px 5px;
   cursor: pointer;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
-  opacity: 0.6;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.recap-detail-collapse-header:hover .recap-reset-chat-btn {
+  opacity: 0.5;
 }
 
 .recap-reset-chat-btn:hover {
-  opacity: 1;
+  opacity: 1 !important;
   color: var(--error, #e74c3c);
-  border-color: var(--error, #e74c3c);
 }
 
 .recap-detail-collapse-icon {
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   color: var(--text-secondary);
+  opacity: 0.6;
+  transition: transform 0.2s;
 }
 
 .recap-detail-meeting-name-inline {
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -299,19 +312,34 @@
 }
 
 .recap-detail-meta-inline {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
   white-space: nowrap;
   margin-left: auto;
+  opacity: 0.8;
 }
 
 /* Collapsible detail content panel */
 .recap-detail-content {
   overflow-y: auto;
-  padding: 0.75rem 1.25rem 0.75rem;
-  max-height: calc(100vh - 380px);
+  padding: 0.5rem 1.25rem 0.5rem;
+  max-height: 40vh;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
+  position: relative;
+}
+
+/* Soft fade at bottom of scrollable detail content */
+.recap-detail-content::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  height: 16px;
+  background: linear-gradient(transparent, var(--bg-primary));
+  pointer-events: none;
 }
 
 /* Chat divider */
@@ -344,6 +372,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  border-top: 1px solid var(--border);
 }
 
 .recap-chat-area .message-list {
@@ -354,23 +383,24 @@
 /* Empty state */
 .recap-chat-empty {
   text-align: center;
-  padding: 2rem 1rem;
+  padding: 2.5rem 1.5rem;
 }
 
 .recap-chat-empty-icon {
-  font-size: 2rem;
-  opacity: 0.5;
-  margin-bottom: 0.5rem;
+  font-size: 1.6rem;
+  opacity: 0.35;
+  margin-bottom: 0.6rem;
 }
 
 .recap-chat-empty p {
-  font-size: 0.88rem;
-  color: var(--text-primary);
+  font-size: 0.84rem;
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .recap-chat-empty .muted {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
-  margin-top: 0.4rem;
+  margin-top: 0.3rem;
+  opacity: 0.7;
 }
