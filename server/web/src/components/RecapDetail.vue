@@ -66,8 +66,14 @@ function toggleDetail() {
   detailExpanded.value = !detailExpanded.value;
 }
 
-onMounted(() => {
+function resetChat() {
   if (selectedRecapId.value) {
+    recap.resetRecapChat(selectedRecapId.value);
+  }
+}
+
+onMounted(() => {
+  if (selectedRecapId.value && !recapChatActive.value) {
     recap.enterRecapChat(selectedRecapId.value);
   }
 });
@@ -106,20 +112,14 @@ onUnmounted(() => {
         <span class="recap-detail-meta-inline">
           {{ formattedDate }}<span v-if="duration"> &middot; {{ duration }}</span><span v-if="typeBadgeLabel"> &middot; {{ typeBadgeLabel }}</span>
         </span>
+        <button class="recap-reset-chat-btn" title="Reset chat (delete history and start fresh)" @click.stop="resetChat">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
       </div>
 
       <div v-if="detailExpanded" class="recap-detail-content">
-        <!-- Header -->
-        <div class="recap-detail-header">
-          <div class="recap-detail-meeting-name">
-            <span v-if="meta?.series_name" class="recap-detail-series">[{{ meta.series_name }}]</span>
-            {{ meta?.meeting_name || selectedEntry?.meeting_name }}
-          </div>
-          <div class="recap-detail-meta-row">
-            <span>{{ formattedDate }}</span>
-            <span v-if="duration"> &middot; {{ duration }}</span>
-            <span v-if="typeBadgeLabel"> &middot; {{ typeBadgeLabel }}</span>
-          </div>
+        <!-- Extra meta (project, participants) not shown in collapse header -->
+        <div v-if="meta?.project || participants" class="recap-detail-header">
           <div v-if="meta?.project" class="recap-detail-project">{{ meta.project }}</div>
           <div v-if="participants" class="recap-detail-participants">{{ participants }}</div>
         </div>
@@ -145,13 +145,6 @@ onUnmounted(() => {
         <a v-if="sharingLink" class="recap-detail-link" :href="sharingLink" target="_blank" rel="noopener">
           <span>&#x1F4CE;</span> Read full recap &rarr;
         </a>
-      </div>
-
-      <!-- Chat divider -->
-      <div class="recap-chat-divider">
-        <span class="recap-chat-divider-line"></span>
-        <span class="recap-chat-divider-label">Chat</span>
-        <span class="recap-chat-divider-line"></span>
       </div>
 
       <!-- Chat area -->

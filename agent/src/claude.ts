@@ -322,7 +322,8 @@ export function handleChat(
     console.log(`[Claude:${convId.slice(0, 8)}] Prepended plan mode change notice`);
   }
 
-  console.log(`[Claude:${convId.slice(0, 8)}] Sending: ${effectivePrompt.substring(0, 100)}${effectivePrompt.length > 100 ? '...' : ''}`);
+  const logLen = state.recapId ? 500 : 100;
+  console.log(`[Claude:${convId.slice(0, 8)}] Sending (recapId=${state.recapId}): ${effectivePrompt.substring(0, logLen)}${effectivePrompt.length > logLen ? '...' : ''}`);
 
   if (files && files.length > 0) {
     const content = processFilesForClaude(files, workDir, effectivePrompt);

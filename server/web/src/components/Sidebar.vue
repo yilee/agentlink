@@ -4,6 +4,7 @@ import { inject } from 'vue';
 import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
+import RecapChatHistory from './RecapChatHistory.vue';
 
 const vFocus = { mounted: (el) => el.focus() };
 
@@ -503,14 +504,17 @@ const {
               </div>
               </template>
               <div v-if="viewMode === 'feed'" class="feed-sidebar">
-                <button class="feed-sidebar-btn" :class="{ active: currentView === 'recap-feed' || currentView === 'recap-detail' }">
-                  <span class="feed-sidebar-icon">&#x1F4CB;</span>
-                  Recaps
-                </button>
-                <button class="feed-sidebar-btn disabled" disabled title="Coming soon">
-                  <span class="feed-sidebar-icon">&#x1F4CA;</span>
-                  Briefings
-                </button>
+                <div class="feed-sidebar-nav">
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'recap-feed' || currentView === 'recap-detail' }">
+                    <span class="feed-sidebar-icon">&#x1F4CB;</span>
+                    Recaps
+                  </button>
+                  <button class="feed-sidebar-btn disabled" disabled title="Coming soon">
+                    <span class="feed-sidebar-icon">&#x1F4CA;</span>
+                    Briefings
+                  </button>
+                </div>
+                <RecapChatHistory />
               </div>
             </div>
           </div>

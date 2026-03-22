@@ -1,4 +1,5 @@
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
+import { useConfirmDialog } from '../composables/useConfirmDialog.js';
 
 const MEETING_TYPE_BADGES = {
   general_sync: { label: 'General Sync', color: 'blue' },
@@ -76,7 +77,7 @@ export function getSectionIcon(sectionType) {
  */
 export function buildMeetingContext(sidecarDetail) {
   if (!sidecarDetail) return '';
-  const { meta, detail } = sidecarDetail;
+  const { meta, detail, decisions, action_items, open_items } = sidecarDetail;
   const lines = [];
 
   lines.push('[Meeting Context — You are answering questions about this meeting recap]');
@@ -104,6 +105,32 @@ export function buildMeetingContext(sidecarDetail) {
     }
   }
 
+  if (decisions?.length) {
+    lines.push('');
+    lines.push('## Decisions');
+    for (const d of decisions) {
+      lines.push(`- [${d.tag}] ${d.text}`);
+    }
+  }
+
+  if (action_items?.length) {
+    lines.push('');
+    lines.push('## Action Items');
+    for (const a of action_items) {
+      const due = a.due ? ` — ${a.due}` : '';
+      lines.push(`- [${a.owner}] ${a.action}${due}`);
+    }
+  }
+
+  if (open_items?.length) {
+    lines.push('');
+    lines.push('## Open Items');
+    for (const o of open_items) {
+      const owner = o.owner ? ` (${o.owner})` : '';
+      lines.push(`- ${o.text}${owner}`);
+    }
+  }
+
   if (detail?.hook_sections?.length) {
     for (const section of detail.hook_sections) {
       lines.push('');
@@ -117,18 +144,30 @@ export function buildMeetingContext(sidecarDetail) {
     }
   }
 
+  // Source file paths so Claude can Read the full transcript or detailed recap on demand
+  if (meta?.transcript_path || meta?.full_recap_path) {
+    lines.push('');
+    lines.push('## Source Files (relative to working directory ~/BrainData/)');
+    if (meta.transcript_path) lines.push(`- Full transcript: ${meta.transcript_path}`);
+    if (meta.full_recap_path) lines.push(`- Detailed recap: ${meta.full_recap_path}`);
+    lines.push('');
+    lines.push('You can Read these files for the full transcript or detailed recap if needed.');
+  }
+
   return lines.join('\n');
 }
 
 export function createRecap({ wsSend, switchConversation, conversationCache, messages,
                               isProcessing, currentConversationId,
-                              currentClaudeSessionId, needsResume, loadingHistory }) {
+                              currentClaudeSessionId, needsResume, loadingHistory,
+                              setBrainMode, scrollToBottom,
+                              historySessions, currentView }) {
   const feedEntries = ref([]);
   const selectedRecapId = ref(null);
   const selectedDetail = ref(null);
   const loading = ref(false);
   const detailLoading = ref(false);
-  const detailExpanded = ref(true);
+  const detailExpanded = ref(false);
 
   // ── Recap Chat State ──
   const recapChatSessionMap = ref({});   // { [recapId]: claudeSessionId } — built from sessions_list
@@ -182,6 +221,10 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     _previousConvId = currentConversationId.value;
     switchConversation(convId);
     recapChatActive.value = true;
+    setBrainMode(true);  // Recap chat always uses brain mode
+
+    // Always scroll to bottom when entering recap chat (override cached scrollTop)
+    nextTick(() => scrollToBottom(true));
 
     // Resume prior Claude session if one exists and conversation cache is empty
     const claudeSessionId = recapChatSessionMap.value[recapId];
@@ -221,7 +264,8 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
     let prompt = text;
     if (isFirstMessage || liveEmpty) {
-      prompt = buildMeetingContext(detail) + '\n---\n' + text;
+      const ctx = buildMeetingContext(detail);
+      prompt = ctx + '\n---\n' + text;
     }
 
     wsSend({
@@ -244,6 +288,131 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     recapChatSessionMap.value = map;
   }
 
+  /**
+   * Reset recap chat for a given recapId — clears local conversation cache
+   * and deletes the agent-side session (JSONL + metadata).
+   * After reset, the next message will re-inject the meeting context.
+   */
+  function resetRecapChat(recapId) {
+    const convId = `recap-chat-${recapId}`;
+    const claudeSessionId = recapChatSessionMap.value[recapId];
+
+    // 1. Clear local conversation cache
+    if (conversationCache.value[convId]) {
+      delete conversationCache.value[convId];
+    }
+    // If currently viewing this conversation, clear live messages
+    if (currentConversationId.value === convId) {
+      messages.value.length = 0;
+    }
+
+    // 2. Delete agent-side session if it exists
+    if (claudeSessionId) {
+      wsSend({ type: 'delete_session', sessionId: claudeSessionId });
+      delete recapChatSessionMap.value[recapId];
+    }
+
+    // 3. Reset Claude session tracking so next message starts fresh
+    currentClaudeSessionId.value = null;
+    needsResume.value = false;
+  }
+
+  // ── Feed Sidebar Chat History ──
+
+  const renamingChatSessionId = ref(null);
+  const renameChatText = ref('');
+
+  const { showConfirm } = useConfirmDialog();
+
+  /** Computed list of recap chat sessions, cross-referencing historySessions with feedEntries. */
+  const recapChatSessions = computed(() => {
+    const sessions = historySessions ? historySessions.value : [];
+    const entries = feedEntries.value;
+    const feedMap = {};
+    for (const entry of entries) {
+      feedMap[entry.recap_id] = entry;
+    }
+    return sessions
+      .filter(s => s.recapId)
+      .map(s => {
+        const feedEntry = feedMap[s.recapId];
+        return {
+          ...s,
+          displayTitle: s.customTitle || feedEntry?.meeting_name || s.title,
+          meetingDate: feedEntry?.date_local,
+          meetingType: feedEntry?.meeting_type,
+          sidecarPath: feedEntry?.sidecar_path,
+        };
+      })
+      .sort((a, b) => b.lastModified - a.lastModified);
+  });
+
+  /** Navigate from sidebar chat history item to the recap detail + restore chat. */
+  function navigateToRecapChat(session) {
+    if (!session.recapId || !session.sidecarPath) return;
+    // If already in a recap chat, exit it first
+    if (recapChatActive.value) {
+      exitRecapChat();
+    }
+    // Load the recap detail
+    selectRecap(session.recapId, session.sidecarPath);
+    // Switch main view to recap-detail
+    if (currentView) currentView.value = 'recap-detail';
+    // Enter recap chat directly — onMounted won't fire if RecapDetail is already shown
+    enterRecapChat(session.recapId);
+  }
+
+  /** Delete a recap chat session with confirmation dialog. */
+  function deleteRecapChatSession(session) {
+    // Guard: don't delete if currently processing
+    const convId = `recap-chat-${session.recapId}`;
+    const cached = conversationCache.value[convId];
+    if (cached && cached.isProcessing) return;
+
+    showConfirm({
+      title: 'Delete Chat History',
+      message: 'Delete chat history for this meeting?',
+      itemName: session.displayTitle,
+      warning: 'Chat history will be permanently deleted.',
+      confirmText: 'Delete',
+      onConfirm: () => {
+        // If currently viewing this recap chat, go back to feed
+        if (recapChatActive.value && selectedRecapId.value === session.recapId) {
+          goBackToFeed();
+          if (currentView) currentView.value = 'recap-feed';
+        }
+        // Delete agent-side session
+        wsSend({ type: 'delete_session', sessionId: session.sessionId });
+        // Clean up local state
+        delete recapChatSessionMap.value[session.recapId];
+        if (conversationCache.value[convId]) {
+          delete conversationCache.value[convId];
+        }
+      },
+    });
+  }
+
+  /** Rename a recap chat session. */
+  function renameRecapChatSession(sessionId, newTitle) {
+    if (!sessionId || !newTitle.trim()) {
+      cancelChatRename();
+      return;
+    }
+    wsSend({ type: 'rename_session', sessionId, newTitle: newTitle.trim() });
+    renamingChatSessionId.value = null;
+    renameChatText.value = '';
+  }
+
+  function startChatRename(session) {
+    renamingChatSessionId.value = session.sessionId;
+    renameChatText.value = session.displayTitle || '';
+  }
+
+  function cancelChatRename() {
+    renamingChatSessionId.value = null;
+    renameChatText.value = '';
+  }
+
   // --- Message handlers (called by recap-handler.js) ---
   function handleRecapsList(data) {
     feedEntries.value = data.recaps || [];
@@ -263,7 +432,12 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     handleRecapsList, handleRecapDetail,
     // Recap chat
     recapChatActive, recapChatSessionMap,
-    enterRecapChat, exitRecapChat, sendRecapChat,
+    enterRecapChat, exitRecapChat, sendRecapChat, resetRecapChat,
     updateRecapChatSessions,
+    // Feed sidebar chat history
+    recapChatSessions, navigateToRecapChat,
+    deleteRecapChatSession, renameRecapChatSession,
+    startChatRename, cancelChatRename,
+    renamingChatSessionId, renameChatText,
   };
 }

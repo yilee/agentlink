@@ -282,6 +282,157 @@
   font-size: 0.9rem;
 }
 
+.feed-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Recap Chat History ── */
+
+.recap-chat-history {
+  padding: 0 0 0.5rem;
+}
+
+.recap-chat-history-header {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  padding: 0.5rem 0 0.4rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.4rem;
+}
+
+.recap-chat-history-empty {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding: 0.75rem 0;
+  text-align: center;
+}
+
+.recap-chat-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.recap-chat-item {
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-left: 3px solid transparent;
+}
+
+.recap-chat-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.recap-chat-item.active {
+  background: var(--bg-tertiary);
+  border-left-color: var(--accent);
+}
+
+.recap-chat-item-title {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.recap-chat-brain-icon {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.recap-chat-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.recap-chat-item-actions {
+  display: flex;
+  gap: 2px;
+  visibility: hidden;
+}
+
+.recap-chat-item:hover .recap-chat-item-actions {
+  visibility: visible;
+}
+
+.recap-chat-rename-btn,
+.recap-chat-delete-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.recap-chat-rename-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+.recap-chat-delete-btn:hover {
+  color: #ef4444;
+  background: var(--bg-primary);
+}
+
+/* Rename row */
+.recap-chat-rename-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.recap-chat-rename-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.recap-chat-rename-ok,
+.recap-chat-rename-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+.recap-chat-rename-ok:hover {
+  color: var(--accent);
+  background: var(--bg-primary);
+}
+
+.recap-chat-rename-cancel:hover {
+  color: #ef4444;
+  background: var(--bg-primary);
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 640px) {

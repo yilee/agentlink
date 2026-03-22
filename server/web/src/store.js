@@ -421,6 +421,10 @@ export function createStore() {
     currentClaudeSessionId,
     needsResume,
     loadingHistory,
+    setBrainMode,
+    scrollToBottom,
+    historySessions,
+    currentView,
   }) : null;
   if (recap) setRecap(recap);
 

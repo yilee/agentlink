@@ -265,6 +265,25 @@
   background: var(--bg-tertiary);
 }
 
+.recap-reset-chat-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+}
+
+.recap-reset-chat-btn:hover {
+  opacity: 1;
+  color: var(--error, #e74c3c);
+  border-color: var(--error, #e74c3c);
+}
+
 .recap-detail-collapse-icon {
   font-size: 0.7rem;
   color: var(--text-secondary);
@@ -290,7 +309,7 @@
 .recap-detail-content {
   overflow-y: auto;
   padding: 0.75rem 1.25rem 0.75rem;
-  max-height: 40vh;
+  max-height: calc(100vh - 380px);
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
 }

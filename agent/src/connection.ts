@@ -278,10 +278,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       if (recapId) {
         chatOptions.recapId = recapId;
       }
+      const chatDir = recapId ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
       claudeHandleChat(
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
-        existingConv?.workDir || state.workDir,
+        chatDir,
         chatOptions,
         (msg as unknown as { files?: ChatFile[] }).files,
       );
