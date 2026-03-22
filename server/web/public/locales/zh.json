@@ -164,6 +164,7 @@
   "chat.copy": "复制",
   "chat.copied": "已复制！",
   "chat.contextContinued": "上下文从上一次对话中延续",
+  "chat.meetingContextInjected": "会议上下文已注入此对话",
   "chat.hide": "隐藏",
   "chat.show": "显示",
   "chat.connectedTo": "已连接到",

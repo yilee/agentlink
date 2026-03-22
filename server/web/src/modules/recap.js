@@ -168,6 +168,59 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
   const loading = ref(false);
   const detailLoading = ref(false);
   const detailExpanded = ref(false);
+  const detailHeight = ref(parseInt(localStorage.getItem('agentlink-recap-detail-height')) || 0); // 0 = auto (40vh)
+
+  // ── Detail / Chat resize handle ──
+  const MIN_DETAIL_HEIGHT = 60;
+  const MAX_DETAIL_RATIO = 0.7; // max 70% of container
+  let _resizing = false;
+  let _startY = 0;
+  let _startHeight = 0;
+  let _containerEl = null;
+
+  function onDetailResizeStart(e, containerEl) {
+    e.preventDefault();
+    _resizing = true;
+    _startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    // Get the current actual height of the detail content element
+    const contentEl = containerEl.querySelector('.recap-detail-content');
+    _startHeight = contentEl ? contentEl.offsetHeight : 200;
+    _containerEl = containerEl;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    if (e.type === 'touchstart') {
+      document.addEventListener('touchmove', onDetailResizeMove, { passive: false });
+      document.addEventListener('touchend', onDetailResizeEnd);
+    } else {
+      document.addEventListener('mousemove', onDetailResizeMove);
+      document.addEventListener('mouseup', onDetailResizeEnd);
+    }
+  }
+
+  function onDetailResizeMove(e) {
+    if (!_resizing || !_containerEl) return;
+    if (e.type === 'touchmove') e.preventDefault();
+    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+    const delta = clientY - _startY;
+    const maxHeight = _containerEl.offsetHeight * MAX_DETAIL_RATIO;
+    const newHeight = Math.max(MIN_DETAIL_HEIGHT, Math.min(maxHeight, _startHeight + delta));
+    detailHeight.value = Math.round(newHeight);
+  }
+
+  function onDetailResizeEnd() {
+    if (!_resizing) return;
+    _resizing = false;
+    _containerEl = null;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', onDetailResizeMove);
+    document.removeEventListener('mouseup', onDetailResizeEnd);
+    document.removeEventListener('touchmove', onDetailResizeMove);
+    document.removeEventListener('touchend', onDetailResizeEnd);
+    if (detailHeight.value > 0) {
+      localStorage.setItem('agentlink-recap-detail-height', String(detailHeight.value));
+    }
+  }
 
   // ── Recap Chat State ──
   const recapChatActive = ref(false);    // whether current view is in recap chat mode
@@ -496,10 +549,11 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
   return {
     feedEntries, selectedRecapId, selectedDetail, loading, detailLoading,
-    groupedEntries, detailExpanded,
+    groupedEntries, detailExpanded, detailHeight,
     loadFeed, selectRecap, goBackToFeed,
     startAutoRefresh, stopAutoRefresh,
     handleRecapsList, handleRecapDetail, handleRecapSessionStarted,
+    onDetailResizeStart,
     // Recap chat
     recapChatActive, activeRecapSessionId,
     enterRecapChat, enterRecapChatSession, exitRecapChat, sendRecapChat, resetRecapChat,

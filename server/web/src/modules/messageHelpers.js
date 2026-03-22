@@ -3,6 +3,7 @@ import { renderMarkdown } from './markdown.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CONTEXT_SUMMARY_PREFIX = 'This session is being continued from a previous conversation';
+const MEETING_CONTEXT_PREFIX = '[Meeting Context';
 
 function parseToolInput(msg) {
   if (msg._parsedInput !== undefined) return msg._parsedInput;
@@ -13,6 +14,23 @@ function parseToolInput(msg) {
 
 export function isContextSummary(text) {
   return typeof text === 'string' && text.trimStart().startsWith(CONTEXT_SUMMARY_PREFIX);
+}
+
+/**
+ * Detect meeting context injected into the first recap chat message.
+ * Returns { context, userText } if found, or null if not a meeting context message.
+ */
+export function parseMeetingContext(text) {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith(MEETING_CONTEXT_PREFIX)) return null;
+  // Split on the first '---' separator between context and user question
+  const sepIdx = trimmed.indexOf('\n---\n');
+  if (sepIdx === -1) return null;
+  return {
+    context: trimmed.substring(0, sepIdx).trim(),
+    userText: trimmed.substring(sepIdx + 5).trim(),   // skip '\n---\n'
+  };
 }
 
 export function formatRelativeTime(ts, t) {

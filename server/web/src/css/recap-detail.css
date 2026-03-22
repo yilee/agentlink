@@ -342,6 +342,32 @@
   pointer-events: none;
 }
 
+/* Resize handle between detail and chat */
+.recap-resize-handle {
+  flex-shrink: 0;
+  height: 8px;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.recap-resize-handle-bar {
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.recap-resize-handle:hover .recap-resize-handle-bar {
+  opacity: 1;
+  background: var(--text-secondary);
+}
+
 /* Chat divider */
 .recap-chat-divider {
   display: flex;

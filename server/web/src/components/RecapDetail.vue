@@ -1,5 +1,5 @@
 <script setup>
-import { inject, computed, onMounted, onUnmounted } from 'vue';
+import { inject, computed, onMounted, onUnmounted, ref } from 'vue';
 import RecapForYou from './RecapForYou.vue';
 import RecapHookSection from './RecapHookSection.vue';
 import MessageList from './MessageList.vue';
@@ -13,7 +13,7 @@ const {
   isProcessing, hasStreamingMessage, loadingHistory,
   onMessageListScroll, loadMoreMessages,
 } = store;
-const { selectedDetail, detailLoading, selectedRecapId, feedEntries, recapChatActive, detailExpanded } = recap;
+const { selectedDetail, detailLoading, selectedRecapId, feedEntries, recapChatActive, detailExpanded, detailHeight, onDetailResizeStart } = recap;
 
 const selectedEntry = computed(() =>
   feedEntries.value.find(e => e.recap_id === selectedRecapId.value)
@@ -56,6 +56,21 @@ const sharingLink = computed(() =>
 );
 
 const hookSections = computed(() => detail.value?.hook_sections || []);
+
+const detailBodyRef = ref(null);
+
+const detailContentStyle = computed(() => {
+  if (detailHeight.value > 0) {
+    return { height: detailHeight.value + 'px', maxHeight: 'none' };
+  }
+  return {};
+});
+
+function startResize(e) {
+  if (detailBodyRef.value) {
+    onDetailResizeStart(e, detailBodyRef.value);
+  }
+}
 
 function goBack() {
   currentView.value = 'recap-feed';
@@ -101,7 +116,7 @@ onUnmounted(() => {
       Failed to load recap details.
     </div>
 
-    <div v-else class="recap-detail-body">
+    <div v-else class="recap-detail-body" ref="detailBodyRef">
       <!-- Collapsible detail section -->
       <div class="recap-detail-collapse-header" @click="toggleDetail">
         <span class="recap-detail-collapse-icon">{{ detailExpanded ? '\u25B2' : '\u25BC' }}</span>
@@ -117,7 +132,7 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div v-if="detailExpanded" class="recap-detail-content">
+      <div v-if="detailExpanded" class="recap-detail-content" :style="detailContentStyle">
         <!-- Extra meta (project, participants) not shown in collapse header -->
         <div v-if="meta?.project || participants" class="recap-detail-header">
           <div v-if="meta?.project" class="recap-detail-project">{{ meta.project }}</div>
@@ -145,6 +160,11 @@ onUnmounted(() => {
         <a v-if="sharingLink" class="recap-detail-link" :href="sharingLink" target="_blank" rel="noopener">
           <span>&#x1F4CE;</span> Read full recap &rarr;
         </a>
+      </div>
+
+      <!-- Resize handle between detail and chat -->
+      <div v-if="detailExpanded" class="recap-resize-handle" @mousedown="startResize($event)" @touchstart="startResize($event)">
+        <div class="recap-resize-handle-bar"></div>
       </div>
 
       <!-- Chat area -->

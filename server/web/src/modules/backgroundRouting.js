@@ -1,5 +1,5 @@
 // ── History batch building & background conversation routing ──────────────────
-import { isContextSummary } from './messageHelpers.js';
+import { isContextSummary, parseMeetingContext } from './messageHelpers.js';
 
 function findLast(arr, predicate) {
   for (let i = arr.length - 1; i >= 0; i--) {
@@ -31,11 +31,26 @@ export function buildHistoryBatch(history, nextId) {
           timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
         });
       } else {
-        batch.push({
-          id: nextId(), role: 'user',
-          content: h.content,
-          timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
-        });
+        // Check for meeting context injection (recap chat first message)
+        const parsed = parseMeetingContext(h.content);
+        if (parsed) {
+          batch.push({
+            id: nextId(), role: 'meeting-context',
+            content: parsed.context, contextExpanded: false,
+            timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+          });
+          batch.push({
+            id: nextId(), role: 'user',
+            content: parsed.userText,
+            timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+          });
+        } else {
+          batch.push({
+            id: nextId(), role: 'user',
+            content: h.content,
+            timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+          });
+        }
       }
     } else if (h.role === 'assistant') {
       const last = batch[batch.length - 1];
