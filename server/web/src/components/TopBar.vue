@@ -20,6 +20,21 @@ const {
 
 const { toggleSidebar } = sidebar;
 
+function goToFeed() {
+  if (!store.requireVersion('0.1.121', 'Meeting Recap Feed')) return;
+  viewMode.value = 'feed';
+}
+
+function onViewModeSelect(e) {
+  const mode = e.target.value;
+  if (mode === 'feed') {
+    goToFeed();
+    if (viewMode.value !== 'feed') e.target.value = viewMode.value;
+  } else {
+    viewMode.value = mode;
+  }
+}
+
 const entraPhotoUrl = ref(window.__entraUser?.photoUrl || null);
 const onPhotoReady = (e) => { entraPhotoUrl.value = e.detail; };
 onMounted(() => window.addEventListener('entra-photo-ready', onPhotoReady));
@@ -43,11 +58,11 @@ onUnmounted(() => window.removeEventListener('entra-photo-ready', onPhotoReady))
           </span>
           <div class="team-mode-toggle">
             <button :class="['team-mode-btn', { active: viewMode === 'chat' }]" @click="viewMode = 'chat'">{{ t('header.chat') }}</button>
-            <button v-if="isMsRoute" :class="['team-mode-btn', { active: viewMode === 'feed' }]" @click="viewMode = 'feed'">Feed</button>
+            <button v-if="isMsRoute" :class="['team-mode-btn', { active: viewMode === 'feed' }]" @click="goToFeed">Feed</button>
             <button :class="['team-mode-btn', { active: viewMode === 'team' }]" @click="viewMode = 'team'">{{ t('header.team') }}</button>
             <button :class="['team-mode-btn', { active: viewMode === 'loop' }]" @click="viewMode = 'loop'">{{ t('header.loop') }}</button>
           </div>
-          <select class="team-mode-select" :value="viewMode" @change="viewMode = $event.target.value">
+          <select class="team-mode-select" :value="viewMode" @change="onViewModeSelect">
             <option value="chat">{{ t('header.chat') }}</option>
             <option v-if="isMsRoute" value="feed">Feed</option>
             <option value="team">{{ t('header.team') }}</option>

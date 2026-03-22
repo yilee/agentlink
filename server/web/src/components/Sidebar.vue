@@ -45,6 +45,11 @@ function goToBrainHome() {
   switchToWorkdir('~/.brain/BrainCore');
 }
 
+function goToFeed() {
+  if (!store.requireVersion('0.1.121', 'Meeting Recap Feed')) return;
+  viewMode.value = 'feed';
+}
+
 const {
   fileBrowser,
   filePreview,
@@ -448,7 +453,7 @@ const {
               </div>
               <div v-if="isMsRoute" class="sidebar-segmented-control">
                 <button :class="['seg-btn', { active: viewMode !== 'feed' }]" @click="viewMode = 'chat'">Chat</button>
-                <button :class="['seg-btn', { active: viewMode === 'feed' }]" @click="viewMode = 'feed'">Feed</button>
+                <button :class="['seg-btn', { active: viewMode === 'feed' }]" @click="goToFeed">Feed</button>
               </div>
               <template v-if="viewMode !== 'feed'">
               <div class="sidebar-workdir-header">
