@@ -337,7 +337,14 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         rebindConversation(m.claudeSessionId, convId);
       }
 
-      const history = readSessionMessages(state.workDir, m.claudeSessionId);
+      // Try current workDir first; fall back to BRAIN_DATA_DIR for recap chat sessions
+      let history = readSessionMessages(state.workDir, m.claudeSessionId);
+      if (history.length === 0) {
+        const sessionMeta_ = loadSessionMetadata(m.claudeSessionId);
+        if (sessionMeta_.recapId) {
+          history = readSessionMessages(BRAIN_DATA_DIR, m.claudeSessionId);
+        }
+      }
       console.log(`[AgentLink] → conversation_resumed (${history.length} messages, session ${m.claudeSessionId.slice(0, 8)})`);
 
       // Include live status so the web client can restore compacting/processing state
