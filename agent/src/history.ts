@@ -12,6 +12,7 @@ import { join } from 'path';
 export interface SessionInfo {
   sessionId: string;
   title: string;
+  customTitle?: string;
   preview: string;
   lastModified: number;
 }
@@ -219,6 +220,7 @@ export function listSessions(workDir: string): SessionInfo[] {
       sessions.push({
         sessionId,
         title: customTitle || summary || title || sessionId.slice(0, 8),
+        ...(customTitle ? { customTitle } : {}),
         preview,
         lastModified: stats.mtime.getTime(),
       });

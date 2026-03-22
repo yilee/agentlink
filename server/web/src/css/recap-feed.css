@@ -296,6 +296,9 @@
 }
 
 .recap-chat-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -304,6 +307,46 @@
   padding: 0.5rem 0 0.4rem;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0.4rem;
+}
+
+.recap-chat-refresh-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.recap-chat-refresh-btn:hover {
+  color: var(--text-primary);
+}
+
+.recap-chat-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.recap-chat-refresh-btn svg.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.recap-chat-history-loading {
+  display: flex;
+  justify-content: center;
+  padding: 1.2rem 0;
+}
+
+.recap-chat-history-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .recap-chat-history-empty {
@@ -316,7 +359,53 @@
 .recap-chat-history-list {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recap-chat-group {
+  border-radius: 6px;
+}
+
+.recap-chat-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 6px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+
+.recap-chat-group-icon {
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.recap-chat-group-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.recap-chat-group-date {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.recap-chat-group-items {
+  display: flex;
+  flex-direction: column;
   gap: 1px;
+  padding-left: 4px;
+  border-left: 2px solid var(--border);
+  margin-left: 8px;
 }
 
 .recap-chat-item {

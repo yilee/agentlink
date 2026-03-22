@@ -424,9 +424,11 @@ export function createStore() {
     setBrainMode,
     scrollToBottom,
     historySessions,
+    loadingSessions,
     currentView,
   }) : null;
   if (recap) setRecap(recap);
+  if (recap) recap.setRequestSessionList(sidebar.requestSessionList);
 
   const isMemoryPreview = computed(() => {
     if (!previewFile.value?.filePath || !memoryDir.value) return false;

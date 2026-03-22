@@ -161,7 +161,7 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
                               isProcessing, currentConversationId,
                               currentClaudeSessionId, needsResume, loadingHistory,
                               setBrainMode, scrollToBottom,
-                              historySessions, currentView }) {
+                              historySessions, loadingSessions, currentView }) {
   const feedEntries = ref([]);
   const selectedRecapId = ref(null);
   const selectedDetail = ref(null);
@@ -170,14 +170,15 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
   const detailExpanded = ref(false);
 
   // ── Recap Chat State ──
-  const recapChatSessionMap = ref({});   // { [recapId]: claudeSessionId } — built from sessions_list
   const recapChatActive = ref(false);    // whether current view is in recap chat mode
+  const activeRecapSessionId = ref(null); // claudeSessionId of the active recap chat (null = new chat)
 
   const groupedEntries = computed(() => groupByDate(feedEntries.value));
 
   let refreshInterval = null;
   let _previousConvId = null;   // saved conversation ID before entering recap chat
   let _pendingRecapTitle = null; // first question text to use as session title
+  let _requestSessionList = null; // late-bound sidebar.requestSessionList
 
   function loadFeed() {
     loading.value = true;
@@ -215,35 +216,55 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
   // ── Recap Chat Functions ──
 
-  /** Switch to recap chat conversation, saving current conversation ID.
-   *  If a prior Claude session exists for this recap, resume it. */
+  /**
+   * Enter recap chat from card click — always starts a new session.
+   * No history is loaded; the user sees an empty chat.
+   */
   function enterRecapChat(recapId) {
     const convId = `recap-chat-${recapId}`;
     _previousConvId = currentConversationId.value;
+    // Clear any cached messages for this recap's "new chat" slot so it's always fresh
+    if (conversationCache.value[convId]) {
+      delete conversationCache.value[convId];
+    }
     switchConversation(convId);
     recapChatActive.value = true;
+    activeRecapSessionId.value = null; // new chat, no session yet
     setBrainMode(true);  // Recap chat always uses brain mode
+    currentClaudeSessionId.value = null; // ensure fresh session on first message
 
     // Always scroll to bottom when entering recap chat (override cached scrollTop)
     // Use double nextTick to run AFTER switchConversation's nextTick scroll restoration
     nextTick(() => nextTick(() => scrollToBottom(true)));
+  }
 
-    // Resume prior Claude session if one exists and conversation cache is empty
-    const claudeSessionId = recapChatSessionMap.value[recapId];
-    if (claudeSessionId) {
-      const cached = conversationCache.value[convId];
-      const hasHistory = (cached && cached.messages && cached.messages.length > 0)
-                      || messages.value.length > 0;
-      if (!hasHistory) {
-        currentClaudeSessionId.value = claudeSessionId;
-        needsResume.value = true;
-        loadingHistory.value = true;
-        wsSend({
-          type: 'resume_conversation',
-          conversationId: convId,
-          claudeSessionId,
-        });
-      }
+  /**
+   * Enter recap chat from sidebar click — resumes a specific Claude session.
+   * Loads the session's chat history.
+   */
+  function enterRecapChatSession(recapId, claudeSessionId) {
+    const convId = `recap-chat-${claudeSessionId}`;
+    _previousConvId = currentConversationId.value;
+    switchConversation(convId);
+    recapChatActive.value = true;
+    activeRecapSessionId.value = claudeSessionId;
+    setBrainMode(true);
+
+    nextTick(() => nextTick(() => scrollToBottom(true)));
+
+    // Resume this specific session if conversation cache is empty
+    const cached = conversationCache.value[convId];
+    const hasHistory = (cached && cached.messages && cached.messages.length > 0)
+                    || messages.value.length > 0;
+    if (!hasHistory) {
+      currentClaudeSessionId.value = claudeSessionId;
+      needsResume.value = true;
+      loadingHistory.value = true;
+      wsSend({
+        type: 'resume_conversation',
+        conversationId: convId,
+        claudeSessionId,
+      });
     }
   }
 
@@ -253,12 +274,13 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
       switchConversation(_previousConvId);
     }
     recapChatActive.value = false;
+    activeRecapSessionId.value = null;
     _previousConvId = null;
   }
 
   /** Send a recap chat message. On first message, prepends meeting context. */
   function sendRecapChat(text, recapId, detail) {
-    const convId = `recap-chat-${recapId}`;
+    const convId = currentConversationId.value;
     const cached = conversationCache.value[convId];
     const isFirstMessage = !cached || !cached.messages || cached.messages.length === 0;
     // Also check live messages if already switched to this conversation
@@ -281,44 +303,34 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     });
   }
 
-  /** Build recapChatSessionMap from sessions_list data (sessions with recapId). */
-  function updateRecapChatSessions(sessions) {
-    const map = {};
-    for (const s of sessions) {
-      if (s.recapId) {
-        map[s.recapId] = s.sessionId;
-      }
-    }
-    recapChatSessionMap.value = map;
-  }
-
   /**
-   * Reset recap chat for a given recapId — clears local conversation cache
-   * and deletes the agent-side session (JSONL + metadata).
-   * After reset, the next message will re-inject the meeting context.
+   * Reset recap chat — clears current conversation and switches to a fresh "new chat" slot.
+   * If a Claude session was active, deletes it on the agent side.
    */
   function resetRecapChat(recapId) {
-    const convId = `recap-chat-${recapId}`;
-    const claudeSessionId = recapChatSessionMap.value[recapId];
+    const prevConvId = currentConversationId.value;
+    const claudeSessionId = currentClaudeSessionId.value;
 
-    // 1. Clear local conversation cache
-    if (conversationCache.value[convId]) {
-      delete conversationCache.value[convId];
-    }
-    // If currently viewing this conversation, clear live messages
-    if (currentConversationId.value === convId) {
-      messages.value.length = 0;
+    // 1. Clear current conversation cache
+    if (prevConvId && conversationCache.value[prevConvId]) {
+      delete conversationCache.value[prevConvId];
     }
 
     // 2. Delete agent-side session if it exists
     if (claudeSessionId) {
       wsSend({ type: 'delete_session', sessionId: claudeSessionId });
-      delete recapChatSessionMap.value[recapId];
     }
 
-    // 3. Reset Claude session tracking so next message starts fresh
+    // 3. Switch to fresh "new chat" slot for this recap
+    const newConvId = `recap-chat-${recapId}`;
+    if (conversationCache.value[newConvId]) {
+      delete conversationCache.value[newConvId];
+    }
+    switchConversation(newConvId);
+    activeRecapSessionId.value = null;
     currentClaudeSessionId.value = null;
     needsResume.value = false;
+    messages.value.length = 0;
   }
 
   // ── Feed Sidebar Chat History ──
@@ -351,7 +363,42 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
       .sort((a, b) => b.lastModified - a.lastModified);
   });
 
-  /** Navigate from sidebar chat history item to the recap detail + restore chat. */
+  /** Loading state: true while sessions or feed data are being fetched. */
+  const recapChatLoading = computed(() => {
+    return (loadingSessions ? loadingSessions.value : false) || loading.value;
+  });
+
+  /** Sessions grouped by recap (meeting), each group sorted by lastModified desc. */
+  const groupedRecapChatSessions = computed(() => {
+    const sessions = recapChatSessions.value;
+    if (!sessions.length) return [];
+    // Build groups keyed by recapId, preserving meeting metadata
+    const groupMap = {};
+    for (const s of sessions) {
+      if (!groupMap[s.recapId]) {
+        const entry = feedEntries.value.find(e => e.recap_id === s.recapId);
+        groupMap[s.recapId] = {
+          recapId: s.recapId,
+          meetingName: entry?.meeting_name || s.recapId,
+          meetingDate: entry?.date_local,
+          sessions: [],
+        };
+      }
+      groupMap[s.recapId].sessions.push(s);
+    }
+    // Sort groups by most recent session in each group
+    const groups = Object.values(groupMap);
+    groups.sort((a, b) => b.sessions[0].lastModified - a.sessions[0].lastModified);
+    return groups;
+  });
+
+  /** Refresh recap chat history by re-fetching both sessions list and feed entries. */
+  function refreshRecapChats() {
+    loadFeed();
+    if (_requestSessionList) _requestSessionList();
+  }
+
+  function setRequestSessionList(fn) { _requestSessionList = fn; }
   function navigateToRecapChat(session) {
     if (!session.recapId || !session.sidecarPath) return;
     // If already in a recap chat, exit it first
@@ -362,16 +409,18 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     selectRecap(session.recapId, session.sidecarPath);
     // Switch main view to recap-detail
     if (currentView) currentView.value = 'recap-detail';
-    // Enter recap chat directly — onMounted won't fire if RecapDetail is already shown
-    enterRecapChat(session.recapId);
+    // Enter recap chat with specific session — resume its history
+    enterRecapChatSession(session.recapId, session.sessionId);
   }
 
   /** Delete a recap chat session with confirmation dialog. */
   function deleteRecapChatSession(session) {
     // Guard: don't delete if currently processing
-    const convId = `recap-chat-${session.recapId}`;
-    const cached = conversationCache.value[convId];
-    if (cached && cached.isProcessing) return;
+    const convIdByRecap = `recap-chat-${session.recapId}`;
+    const convIdBySession = `recap-chat-${session.sessionId}`;
+    const cached1 = conversationCache.value[convIdByRecap];
+    const cached2 = conversationCache.value[convIdBySession];
+    if ((cached1 && cached1.isProcessing) || (cached2 && cached2.isProcessing)) return;
 
     showConfirm({
       title: 'Delete Chat History',
@@ -380,17 +429,16 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
       warning: 'Chat history will be permanently deleted.',
       confirmText: 'Delete',
       onConfirm: () => {
-        // If currently viewing this recap chat, go back to feed
-        if (recapChatActive.value && selectedRecapId.value === session.recapId) {
+        // If currently viewing this session, go back to feed
+        if (recapChatActive.value && activeRecapSessionId.value === session.sessionId) {
           goBackToFeed();
           if (currentView) currentView.value = 'recap-feed';
         }
         // Delete agent-side session
         wsSend({ type: 'delete_session', sessionId: session.sessionId });
-        // Clean up local state
-        delete recapChatSessionMap.value[session.recapId];
-        if (conversationCache.value[convId]) {
-          delete conversationCache.value[convId];
+        // Clean up local caches
+        if (conversationCache.value[convIdBySession]) {
+          delete conversationCache.value[convIdBySession];
         }
       },
     });
@@ -430,14 +478,19 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
   /**
    * Called by session_started handler when a new Claude session is created.
-   * If we have a pending recap title (from the first recap chat message),
-   * auto-rename the session so it shows the user's question instead of meeting name.
+   * Updates activeRecapSessionId and auto-renames the session with user's question.
    */
   function handleRecapSessionStarted(claudeSessionId) {
-    if (!_pendingRecapTitle || !recapChatActive.value) return;
-    const title = _pendingRecapTitle;
-    _pendingRecapTitle = null;
-    wsSend({ type: 'rename_session', sessionId: claudeSessionId, newTitle: title });
+    if (!recapChatActive.value) return;
+    // Track the new session so sidebar highlight works
+    activeRecapSessionId.value = claudeSessionId;
+
+    // Auto-rename with user's first question if available
+    if (_pendingRecapTitle) {
+      const title = _pendingRecapTitle;
+      _pendingRecapTitle = null;
+      wsSend({ type: 'rename_session', sessionId: claudeSessionId, newTitle: title });
+    }
   }
 
   return {
@@ -447,11 +500,11 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     startAutoRefresh, stopAutoRefresh,
     handleRecapsList, handleRecapDetail, handleRecapSessionStarted,
     // Recap chat
-    recapChatActive, recapChatSessionMap,
-    enterRecapChat, exitRecapChat, sendRecapChat, resetRecapChat,
-    updateRecapChatSessions,
+    recapChatActive, activeRecapSessionId,
+    enterRecapChat, enterRecapChatSession, exitRecapChat, sendRecapChat, resetRecapChat,
     // Feed sidebar chat history
-    recapChatSessions, navigateToRecapChat,
+    recapChatSessions, recapChatLoading, groupedRecapChatSessions,
+    navigateToRecapChat, refreshRecapChats, setRequestSessionList,
     deleteRecapChatSession, renameRecapChatSession,
     startChatRename, cancelChatRename,
     renamingChatSessionId, renameChatText,
