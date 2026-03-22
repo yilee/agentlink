@@ -1,14 +1,19 @@
 <script setup>
-import { inject, computed } from 'vue';
+import { inject, computed, onMounted, onUnmounted } from 'vue';
 import RecapForYou from './RecapForYou.vue';
 import RecapHookSection from './RecapHookSection.vue';
+import MessageList from './MessageList.vue';
 import { getMeetingTypeBadge } from '../modules/recap.js';
 
 const store = inject('store');
 const recap = inject('recap');
 
-const { currentView } = store;
-const { selectedDetail, detailLoading, selectedRecapId, feedEntries } = recap;
+const {
+  currentView, messages, visibleMessages, hasMoreMessages,
+  isProcessing, hasStreamingMessage, loadingHistory,
+  onMessageListScroll, loadMoreMessages,
+} = store;
+const { selectedDetail, detailLoading, selectedRecapId, feedEntries, recapChatActive, detailExpanded } = recap;
 
 const selectedEntry = computed(() =>
   feedEntries.value.find(e => e.recap_id === selectedRecapId.value)
@@ -56,6 +61,22 @@ function goBack() {
   currentView.value = 'recap-feed';
   recap.goBackToFeed();
 }
+
+function toggleDetail() {
+  detailExpanded.value = !detailExpanded.value;
+}
+
+onMounted(() => {
+  if (selectedRecapId.value) {
+    recap.enterRecapChat(selectedRecapId.value);
+  }
+});
+
+onUnmounted(() => {
+  if (recapChatActive.value) {
+    recap.exitRecapChat();
+  }
+});
 </script>
 
 <template>
@@ -75,42 +96,86 @@ function goBack() {
     </div>
 
     <div v-else class="recap-detail-body">
-      <!-- Header -->
-      <div class="recap-detail-header">
-        <div class="recap-detail-meeting-name">
+      <!-- Collapsible detail section -->
+      <div class="recap-detail-collapse-header" @click="toggleDetail">
+        <span class="recap-detail-collapse-icon">{{ detailExpanded ? '\u25B2' : '\u25BC' }}</span>
+        <span class="recap-detail-meeting-name-inline">
           <span v-if="meta?.series_name" class="recap-detail-series">[{{ meta.series_name }}]</span>
           {{ meta?.meeting_name || selectedEntry?.meeting_name }}
-        </div>
-        <div class="recap-detail-meta-row">
-          <span>{{ formattedDate }}</span>
-          <span v-if="duration"> &middot; {{ duration }}</span>
-          <span v-if="typeBadgeLabel"> &middot; {{ typeBadgeLabel }}</span>
-        </div>
-        <div v-if="meta?.project" class="recap-detail-project">{{ meta.project }}</div>
-        <div v-if="participants" class="recap-detail-participants">{{ participants }}</div>
+        </span>
+        <span class="recap-detail-meta-inline">
+          {{ formattedDate }}<span v-if="duration"> &middot; {{ duration }}</span><span v-if="typeBadgeLabel"> &middot; {{ typeBadgeLabel }}</span>
+        </span>
       </div>
 
-      <!-- For You -->
-      <RecapForYou v-if="detail?.for_you?.length" :items="detail.for_you" />
+      <div v-if="detailExpanded" class="recap-detail-content">
+        <!-- Header -->
+        <div class="recap-detail-header">
+          <div class="recap-detail-meeting-name">
+            <span v-if="meta?.series_name" class="recap-detail-series">[{{ meta.series_name }}]</span>
+            {{ meta?.meeting_name || selectedEntry?.meeting_name }}
+          </div>
+          <div class="recap-detail-meta-row">
+            <span>{{ formattedDate }}</span>
+            <span v-if="duration"> &middot; {{ duration }}</span>
+            <span v-if="typeBadgeLabel"> &middot; {{ typeBadgeLabel }}</span>
+          </div>
+          <div v-if="meta?.project" class="recap-detail-project">{{ meta.project }}</div>
+          <div v-if="participants" class="recap-detail-participants">{{ participants }}</div>
+        </div>
 
-      <!-- TL;DR -->
-      <div v-if="detail?.tldr" class="recap-detail-tldr">{{ detail.tldr }}</div>
+        <!-- For You -->
+        <RecapForYou v-if="detail?.for_you?.length" :items="detail.for_you" />
 
-      <!-- Hook Sections -->
-      <RecapHookSection
-        v-for="(section, i) in hookSections"
-        :key="i"
-        :title="section.title"
-        :section-type="section.section_type"
-        :items="section.items"
-        :omitted-count="section.omitted_count || 0"
-        :total-count="(section.items?.length || 0) + (section.omitted_count || 0)"
-      />
+        <!-- TL;DR -->
+        <div v-if="detail?.tldr" class="recap-detail-tldr">{{ detail.tldr }}</div>
 
-      <!-- Sharing link -->
-      <a v-if="sharingLink" class="recap-detail-link" :href="sharingLink" target="_blank" rel="noopener">
-        <span>&#x1F4CE;</span> Read full recap &rarr;
-      </a>
+        <!-- Hook Sections -->
+        <RecapHookSection
+          v-for="(section, i) in hookSections"
+          :key="i"
+          :title="section.title"
+          :section-type="section.section_type"
+          :items="section.items"
+          :omitted-count="section.omitted_count || 0"
+          :total-count="(section.items?.length || 0) + (section.omitted_count || 0)"
+        />
+
+        <!-- Sharing link -->
+        <a v-if="sharingLink" class="recap-detail-link" :href="sharingLink" target="_blank" rel="noopener">
+          <span>&#x1F4CE;</span> Read full recap &rarr;
+        </a>
+      </div>
+
+      <!-- Chat divider -->
+      <div class="recap-chat-divider">
+        <span class="recap-chat-divider-line"></span>
+        <span class="recap-chat-divider-label">Chat</span>
+        <span class="recap-chat-divider-line"></span>
+      </div>
+
+      <!-- Chat area -->
+      <div class="recap-chat-area">
+        <MessageList
+          :messages="messages"
+          :visible-messages="visibleMessages"
+          :has-more-messages="hasMoreMessages"
+          :is-processing="isProcessing"
+          :has-streaming-message="hasStreamingMessage"
+          :loading-history="loadingHistory"
+          :compact="true"
+          @scroll="onMessageListScroll"
+          @load-more="loadMoreMessages"
+        >
+          <template #empty>
+            <div class="recap-chat-empty">
+              <div class="recap-chat-empty-icon">&#x1F4AC;</div>
+              <p>Ask anything about this meeting recap</p>
+              <p class="muted">e.g. "What were the key decisions?" or "Summarize action items for me"</p>
+            </div>
+          </template>
+        </MessageList>
+      </div>
     </div>
   </div>
 </template>

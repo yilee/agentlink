@@ -121,7 +121,8 @@ export function buildMeetingContext(sidecarDetail) {
 }
 
 export function createRecap({ wsSend, switchConversation, conversationCache, messages,
-                              isProcessing, currentConversationId }) {
+                              isProcessing, currentConversationId,
+                              currentClaudeSessionId, needsResume, loadingHistory }) {
   const feedEntries = ref([]);
   const selectedRecapId = ref(null);
   const selectedDetail = ref(null);
@@ -174,12 +175,31 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
   // ── Recap Chat Functions ──
 
-  /** Switch to recap chat conversation, saving current conversation ID. */
+  /** Switch to recap chat conversation, saving current conversation ID.
+   *  If a prior Claude session exists for this recap, resume it. */
   function enterRecapChat(recapId) {
     const convId = `recap-chat-${recapId}`;
     _previousConvId = currentConversationId.value;
     switchConversation(convId);
     recapChatActive.value = true;
+
+    // Resume prior Claude session if one exists and conversation cache is empty
+    const claudeSessionId = recapChatSessionMap.value[recapId];
+    if (claudeSessionId) {
+      const cached = conversationCache.value[convId];
+      const hasHistory = (cached && cached.messages && cached.messages.length > 0)
+                      || messages.value.length > 0;
+      if (!hasHistory) {
+        currentClaudeSessionId.value = claudeSessionId;
+        needsResume.value = true;
+        loadingHistory.value = true;
+        wsSend({
+          type: 'resume_conversation',
+          conversationId: convId,
+          claudeSessionId,
+        });
+      }
+    }
   }
 
   /** Exit recap chat, restoring previous conversation. */

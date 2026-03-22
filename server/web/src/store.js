@@ -418,6 +418,9 @@ export function createStore() {
     messages,
     isProcessing,
     currentConversationId,
+    currentClaudeSessionId,
+    needsResume,
+    loadingHistory,
   }) : null;
   if (recap) setRecap(recap);
 
@@ -493,6 +496,26 @@ export function createStore() {
     }
 
     if (!canSend.value) return;
+
+    // Recap chat — route through recap module when in recap detail view
+    if (recap && recap.recapChatActive.value && currentView.value === 'recap-detail') {
+      const recapId = recap.selectedRecapId.value;
+      const detail = recap.selectedDetail.value;
+      inputText.value = '';
+      if (inputRef.value) inputRef.value.style.height = 'auto';
+      const userMsg = {
+        id: streaming.nextId(), role: 'user',
+        content: text, timestamp: new Date(), status: 'sent',
+      };
+      messages.value.push(userMsg);
+      isProcessing.value = true;
+      if (currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
+      recap.sendRecapChat(text, recapId, detail);
+      scrollToBottom(true);
+      return;
+    }
 
     const files = attachments.value.slice();
     inputText.value = '';
