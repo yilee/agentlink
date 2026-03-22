@@ -11,7 +11,7 @@ const badge = computed(() => getMeetingTypeBadge(props.entry.meeting_type));
 const formattedTime = computed(() => {
   try {
     const d = new Date(props.entry.date_local);
-    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   } catch {
     return '';
   }
