@@ -94,6 +94,7 @@ export function createStore() {
 
   // Working directory history
   const workdirHistory = ref([]);
+  const workdirCollapsed = ref(false);
 
   // Working directory switching loading state
   const workdirSwitching = ref(false);
@@ -308,7 +309,7 @@ export function createStore() {
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
     renamingSessionId, renameText,
-    hostname, workdirHistory, workdirSwitching,
+    hostname, workdirHistory, workdirCollapsed, workdirSwitching,
     workdirMenuOpen, memoryPanelOpen, filePanelOpen, gitPanelOpen,
     isMobile, sidebarView,
     // Multi-session parallel
@@ -700,6 +701,7 @@ export function createStore() {
         if (saved.chats !== undefined) chatsCollapsed.value = saved.chats;
         if (saved.teams !== undefined) teamsCollapsed.value = saved.teams;
         if (saved.loops !== undefined) loopsCollapsed.value = saved.loops;
+        if (saved.workdir !== undefined) workdirCollapsed.value = saved.workdir;
       } catch (_) { /* ignore */ }
     }
   });
@@ -712,12 +714,14 @@ export function createStore() {
         chats: chatsCollapsed.value,
         teams: teamsCollapsed.value,
         loops: loopsCollapsed.value,
+        workdir: workdirCollapsed.value,
       }));
     }
   };
   watch(chatsCollapsed, _saveSidebarCollapsed);
   watch(teamsCollapsed, _saveSidebarCollapsed);
   watch(loopsCollapsed, _saveSidebarCollapsed);
+  watch(workdirCollapsed, _saveSidebarCollapsed);
 
   // Sync feed mode lifecycle: enter/exit feed triggers recap load/autorefresh
   if (recap) {
@@ -792,7 +796,7 @@ export function createStore() {
     // Rename session state
     renamingSessionId, renameText,
     // Working directory
-    workdirHistory, workdirSwitching, workdirMenuOpen,
+    workdirHistory, workdirCollapsed, workdirSwitching, workdirMenuOpen,
     // Sidebar collapse states
     teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
     formatRelativeTime: (ts) => formatRelativeTime(ts, t),

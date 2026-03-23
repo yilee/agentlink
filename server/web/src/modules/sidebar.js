@@ -24,6 +24,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog.js';
  * @param {object} deps.streaming - streaming controller
  * @param {import('vue').Ref} deps.hostname
  * @param {import('vue').Ref} deps.workdirHistory
+ * @param {import('vue').Ref} deps.workdirCollapsed
  */
 export function createSidebar(deps) {
   const {
@@ -32,7 +33,7 @@ export function createSidebar(deps) {
     loadingSessions, loadingHistory, workDir, visibleLimit,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
-    hostname, workdirHistory, workdirSwitching,
+    hostname, workdirHistory, workdirCollapsed, workdirSwitching,
     workdirMenuOpen, memoryPanelOpen, filePanelOpen, gitPanelOpen,
     isMobile, sidebarView,
     // Multi-session parallel
@@ -453,7 +454,7 @@ export function createSidebar(deps) {
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
     groupedSessions, isSessionProcessing,
     loadWorkdirHistory, addToWorkdirHistory, removeFromWorkdirHistory,
-    switchToWorkdir, filteredWorkdirHistory,
+    switchToWorkdir, filteredWorkdirHistory, workdirCollapsed,
     toggleWorkdirMenu, workdirMenuBrowse, workdirMenuChangeDir, workdirMenuCopyPath, workdirMenuGit,
   };
 }

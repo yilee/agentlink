@@ -32,6 +32,7 @@ const {
   filteredWorkdirHistory,
   switchToWorkdir,
   removeFromWorkdirHistory,
+  workdirCollapsed,
   toggleWorkdirMenu,
   workdirMenuOpen,
   workdirMenuBrowse,
@@ -492,8 +493,11 @@ const {
                 </div>
               </div>
               <div v-if="filteredWorkdirHistory.length > 0" class="workdir-history">
-                <div class="workdir-history-label">{{ t('sidebar.recentDirectories') }}</div>
-                <div class="workdir-history-list">
+                <div class="workdir-history-label" @click="workdirCollapsed = !workdirCollapsed">
+                  <span>{{ t('sidebar.recentDirectories') }}</span>
+                  <svg :class="{ collapsed: workdirCollapsed }" class="workdir-history-chevron" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+                </div>
+                <div v-show="!workdirCollapsed" class="workdir-history-list">
                   <div
                     v-for="path in filteredWorkdirHistory" :key="path"
                     class="workdir-history-item"
