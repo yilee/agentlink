@@ -8,6 +8,14 @@ import { shutdownScheduler } from './scheduler.js';
 const require = createRequire(import.meta.url);
 const qrcode = require('qrcode-terminal');
 
+/**
+ * When true, the shutdown handler skips clearRuntimeState() so that
+ * agent.json (with the sessionId) survives for the replacement process.
+ * Set by auto-update before calling process.exit().
+ */
+let preserveRuntimeState = false;
+export function setPreserveRuntimeState(v: boolean): void { preserveRuntimeState = v; }
+
 /** Highlight a URL with bold + underline ANSI codes if stdout supports color. */
 function highlightUrl(url: string): string {
   if (!process.stdout.isTTY) return url;
@@ -65,7 +73,7 @@ export async function start(config: AgentConfig, daemon = false, pidFile?: strin
       console.log('\n[AgentLink] Shutting down...');
       shutdownScheduler();
       stopAutoUpdate();
-      clearRuntimeState();
+      if (!preserveRuntimeState) clearRuntimeState();
       disconnect();
       process.exit(0);
     };

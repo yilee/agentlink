@@ -9,8 +9,9 @@ import { execSync, spawn } from 'child_process';
 import { createRequire } from 'module';
 import { join } from 'path';
 import { openSync } from 'fs';
-import { resolveConfig, loadRuntimeState, getLogDir, getLogDate, cleanOldLogs } from './config.js';
+import { resolveConfig, loadRuntimeState, saveRuntimeState, getLogDir, getLogDate, cleanOldLogs } from './config.js';
 import { getConversation } from './claude.js';
+import { setPreserveRuntimeState } from './index.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -85,7 +86,6 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
 
   console.log(`[AutoUpdate] Updated to v${latestVersion}. Restarting daemon...`);
 
-  // Don't clear agent.json — the new process will restore sessionId from it.
   // We can't use `agentlink-client start --daemon` synchronously because
   // this process is still alive and the start command rejects "already running".
   // Instead, spawn the new daemon.js directly (detached), then exit.
@@ -124,6 +124,13 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
     windowsHide: true,
   });
   child.unref();
+
+  // Tell shutdown handler to keep agent.json so the new daemon can
+  // restore the sessionId and preserve the session URL across upgrades.
+  setPreserveRuntimeState(true);
+
+  // Rewrite agent.json in case it was already cleared (belt-and-suspenders)
+  if (runtimeState) saveRuntimeState(runtimeState);
 
   // Exit old process — new daemon is starting
   process.exit(0);
