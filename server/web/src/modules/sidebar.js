@@ -404,6 +404,7 @@ export function createSidebar(deps) {
 
     const groups = {};
     for (const s of historySessions.value) {
+      if (s.recapId) continue;
       let key;
       if (s.lastModified >= todayStart) key = 'today';
       else if (s.lastModified >= yesterdayStart) key = 'yesterday';
