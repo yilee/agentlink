@@ -26,6 +26,8 @@ import {
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 10_000;
+const HEARTBEAT_INTERVAL = 45_000;  // Send ping every 45s (staggered from server's 30s)
+const HEARTBEAT_TIMEOUT = 15_000;   // Max wait for pong before declaring dead
 
 interface ConnectionState {
   ws: WebSocket | null;
@@ -46,6 +48,9 @@ const state: ConnectionState = {
   workDir: process.cwd(),
   config: null,
 };
+
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+let heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Connect to the relay server. Returns the sessionId on first successful registration.
@@ -98,6 +103,55 @@ export function connect(config: AgentConfig): Promise<string> {
   });
 }
 
+function stopHeartbeat(): void {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+  if (heartbeatTimeout) {
+    clearTimeout(heartbeatTimeout);
+    heartbeatTimeout = null;
+  }
+}
+
+function startHeartbeat(): void {
+  stopHeartbeat();
+
+  if (!state.ws) return;
+  const ws: WebSocket = state.ws;
+
+  function sendPing(): void {
+    // Staleness guard: if state.ws has changed, this timer belongs to an
+    // old connection — stop and let the new connection manage its own.
+    if (state.ws !== ws) {
+      stopHeartbeat();
+      return;
+    }
+    if (ws.readyState !== WebSocket.OPEN) return;
+
+    ws.ping();
+
+    heartbeatTimeout = setTimeout(() => {
+      heartbeatTimeout = null;
+      if (state.ws !== ws) return;
+      if (ws.readyState !== WebSocket.OPEN) return;
+
+      console.warn('[AgentLink] Heartbeat timeout — server unresponsive, reconnecting...');
+      ws.terminate();
+    }, HEARTBEAT_TIMEOUT);
+  }
+
+  ws.on('pong', () => {
+    if (heartbeatTimeout) {
+      clearTimeout(heartbeatTimeout);
+      heartbeatTimeout = null;
+    }
+  });
+
+  sendPing();
+  heartbeatInterval = setInterval(sendPing, HEARTBEAT_INTERVAL);
+}
+
 /**
  * Internal connect. Calls onRegistered on success, onError on failure.
  * For reconnects, both callbacks are no-ops.
@@ -117,6 +171,7 @@ function doConnect(
   ws.on('open', () => {
     state.reconnectAttempts = 0;
     console.log('[AgentLink] Connected to server');
+    startHeartbeat();
   });
 
   ws.on('message', async (data) => {
@@ -167,6 +222,7 @@ function doConnect(
   });
 
   ws.on('close', () => {
+    stopHeartbeat();
     console.log('[AgentLink] Disconnected from server');
     if (state.shouldReconnect) {
       scheduleReconnect(config);
@@ -186,6 +242,7 @@ function doConnect(
 
 export function disconnect(): void {
   state.shouldReconnect = false;
+  stopHeartbeat();
   abortAllClaude();
   if (state.ws) {
     state.ws.close();
