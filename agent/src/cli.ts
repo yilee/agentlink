@@ -2,7 +2,7 @@
 import { Command } from 'commander';
 import {
   resolveConfig, loadConfig, saveConfig, getConfigPath,
-  loadRuntimeState, clearRuntimeState, getLogDir, getLogDate, cleanOldLogs,
+  loadRuntimeState, saveRuntimeState, clearRuntimeState, getLogDir, getLogDate, cleanOldLogs,
   killProcess, isProcessAlive, writePidFile,
 } from './config.js';
 import { serviceInstall, serviceUninstall } from './service.js';
@@ -480,20 +480,27 @@ program
 
     // Stop daemon if running, then restart with new binary
     if (daemonAlive) {
+      // Save runtime state BEFORE killing — on macOS/Linux the old process
+      // receives SIGTERM, runs its shutdown handler, and deletes agent.json.
+      // We rewrite it after the process exits so the new daemon can restore
+      // the sessionId and preserve the session URL across upgrades.
+      const savedState = { ...wasRunning! };
+
       console.log(`Stopping agent (PID ${wasRunning!.pid})...`);
       killProcess(wasRunning!.pid);
       for (let i = 0; i < 25; i++) {
         await new Promise(r => setTimeout(r, 200));
         if (!isProcessAlive(wasRunning!.pid)) break;
       }
-      // Don't clear runtime state — new process reads sessionId from agent.json
-      // to preserve the session URL across upgrades
       console.log('Agent stopped.');
+
+      // Rewrite agent.json so the new process can restore sessionId
+      saveRuntimeState(savedState);
 
       console.log('Restarting agent...');
       // Preserve password and auto-update from config so the new daemon keeps them
       const savedConfig = loadConfig();
-      const restartArgs = ['start', '--daemon'];
+      const restartArgs = ['start', '--daemon', '--dir', savedState.dir];
       if (savedConfig.password) restartArgs.push('--password', savedConfig.password);
       if (savedConfig.autoUpdate) restartArgs.push('--auto-update');
       if (savedConfig.entra) restartArgs.push('--entra');

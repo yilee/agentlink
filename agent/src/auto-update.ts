@@ -9,7 +9,7 @@ import { execSync, spawn } from 'child_process';
 import { createRequire } from 'module';
 import { join } from 'path';
 import { openSync } from 'fs';
-import { resolveConfig, getLogDir, getLogDate, cleanOldLogs } from './config.js';
+import { resolveConfig, loadRuntimeState, getLogDir, getLogDate, cleanOldLogs } from './config.js';
 import { getConversation } from './claude.js';
 
 const require = createRequire(import.meta.url);
@@ -103,8 +103,11 @@ async function checkAndUpdate(daemon: boolean): Promise<void> {
   }
 
   // Build config for the new daemon — use resolveConfig to ensure all fields
-  // (especially dir) have proper defaults, not just what's in config.json
-  const config = resolveConfig({});
+  // (especially dir) have proper defaults, not just what's in config.json.
+  // Override dir from runtime state (agent.json) which has the actual working
+  // directory the daemon was started with, rather than relying on process.cwd().
+  const runtimeState = loadRuntimeState();
+  const config = resolveConfig(runtimeState?.dir ? { dir: runtimeState.dir } : {});
   if (!config.autoUpdate) config.autoUpdate = true; // we're in auto-update, keep it on
 
   const logDir = getLogDir();
