@@ -5,13 +5,17 @@ export function createSessionHandlers(deps) {
   const {
     messages, isProcessing, isCompacting, streaming, scrollToBottom,
     historySessions, currentClaudeSessionId, loadingHistory,
-    loadingSessions, setPlanMode, setBrainMode, t, toolMsgMap,
+    loadingSessions, setPlanMode, setBrainMode, t, toolMsgMap, wsSend,
   } = deps;
 
   return {
     sessions_list(msg) {
       historySessions.value = msg.sessions || [];
       loadingSessions.value = false;
+      // Reconcile sidebar processing indicators: a stale active_conversations
+      // response may have re-added a finished session to activeClaudeSessions.
+      // Re-querying gives us the latest state from the agent.
+      if (wsSend) wsSend({ type: 'query_active_conversations' });
     },
     session_deleted(msg) {
       historySessions.value = historySessions.value.filter(s => s.sessionId !== msg.sessionId);
