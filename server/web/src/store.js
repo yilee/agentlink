@@ -73,6 +73,7 @@ export function createStore() {
 
   // Sidebar state
   const sidebarOpen = ref(window.innerWidth > 768);
+  const sidebarWidth = ref(parseInt(localStorage.getItem('agentlink-sidebar-width'), 10) || 260);
   const historySessions = ref([]);
   const currentClaudeSessionId = ref(null);
   const needsResume = ref(false);
@@ -303,7 +304,7 @@ export function createStore() {
 
   const sidebar = createSidebar({
     wsSend: (msg) => _wsSend(msg),
-    messages, isProcessing, sidebarOpen,
+    messages, isProcessing, sidebarOpen, sidebarWidth,
     historySessions, currentClaudeSessionId, needsResume,
     loadingSessions, loadingHistory, workDir, visibleLimit,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
@@ -788,7 +789,7 @@ export function createStore() {
   const _sidebar = {
     ...sidebar,
     // State refs owned by store but used by sidebar consumers
-    sidebarOpen, historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
+    sidebarOpen, sidebarWidth, historySessions, currentClaudeSessionId, loadingSessions, loadingHistory,
     processingConversations,
     // Folder picker state
     folderPickerOpen, folderPickerPath, folderPickerEntries,

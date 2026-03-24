@@ -28,7 +28,9 @@ const {
 
 const {
   sidebarOpen,
+  sidebarWidth,
   toggleSidebar,
+  onSidebarResizeStart,
   filteredWorkdirHistory,
   switchToWorkdir,
   removeFromWorkdirHistory,
@@ -88,7 +90,10 @@ const {
         <!-- Sidebar backdrop (mobile) -->
         <div v-if="sidebarOpen" class="sidebar-backdrop" @click="toggleSidebar(); sidebarView = 'sessions'"></div>
         <!-- Sidebar -->
-        <aside v-if="sidebarOpen" class="sidebar">
+        <aside v-if="sidebarOpen" class="sidebar" :style="!isMobile ? { width: sidebarWidth + 'px' } : undefined">
+          <div v-if="!isMobile" class="sidebar-resize-handle"
+               @mousedown="onSidebarResizeStart($event)"
+               @touchstart="onSidebarResizeStart($event)"></div>
           <!-- Mobile: file browser view -->
           <div v-if="isMobile && sidebarView === 'files'" class="file-panel-mobile">
             <div class="file-panel-mobile-header">

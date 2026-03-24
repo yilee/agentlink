@@ -28,7 +28,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog.js';
  */
 export function createSidebar(deps) {
   const {
-    wsSend, messages, isProcessing, sidebarOpen,
+    wsSend, messages, isProcessing, sidebarOpen, sidebarWidth,
     historySessions, currentClaudeSessionId, needsResume,
     loadingSessions, loadingHistory, workDir, visibleLimit,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
@@ -445,8 +445,54 @@ export function createSidebar(deps) {
     if (_git) _git.openPanel();
   }
 
+  // ── Sidebar resize handle (mouse + touch) ──
+
+  let _resizing = false;
+  let _startX = 0;
+  let _startWidth = 0;
+  const MIN_WIDTH = 220;
+  const MAX_WIDTH = 480;
+
+  function onSidebarResizeStart(e) {
+    e.preventDefault();
+    _resizing = true;
+    _startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    _startWidth = sidebarWidth.value;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    if (e.type === 'touchstart') {
+      document.addEventListener('touchmove', onSidebarResizeMove, { passive: false });
+      document.addEventListener('touchend', onSidebarResizeEnd);
+    } else {
+      document.addEventListener('mousemove', onSidebarResizeMove);
+      document.addEventListener('mouseup', onSidebarResizeEnd);
+    }
+  }
+
+  function onSidebarResizeMove(e) {
+    if (!_resizing) return;
+    if (e.type === 'touchmove') e.preventDefault();
+    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    const delta = clientX - _startX;
+    const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, _startWidth + delta));
+    sidebarWidth.value = newWidth;
+  }
+
+  function onSidebarResizeEnd() {
+    if (!_resizing) return;
+    _resizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', onSidebarResizeMove);
+    document.removeEventListener('mouseup', onSidebarResizeEnd);
+    document.removeEventListener('touchmove', onSidebarResizeMove);
+    document.removeEventListener('touchend', onSidebarResizeEnd);
+    localStorage.setItem('agentlink-sidebar-width', String(sidebarWidth.value));
+  }
+
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
+    onSidebarResizeStart,
     setOnSwitchToChat, setFileBrowser, setGit,
     deleteSession,
     startRename, confirmRename, cancelRename,
