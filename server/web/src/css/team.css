@@ -841,7 +841,7 @@
 
 /* ── Teams sidebar section (history list in sidebar) ── */
 .sidebar-teams {
-  padding: 0.1rem 0.75rem;
+  padding: 0.1rem 0.5rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -850,7 +850,7 @@
 
 /* ── Loops sidebar section ── */
 .sidebar-loops {
-  padding: 0.1rem 0.75rem;
+  padding: 0.1rem 0.5rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -878,11 +878,11 @@
 .team-history-item {
   display: flex;
   align-items: center;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s;
-  border-left: 3px solid transparent;
+  border-left: 2px solid transparent;
 }
 
 .team-history-item:hover {

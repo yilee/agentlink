@@ -29,7 +29,7 @@
 }
 
 .sidebar-section {
-  padding: 0.1rem 0.75rem;
+  padding: 0.1rem 0.5rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -325,16 +325,16 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-  padding: 0.15rem 8px 0.1rem;
+  padding: 0.15rem 6px 0.1rem;
   opacity: 0.7;
 }
 
 .session-item {
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s, transform 0.1s;
-  border-left: 3px solid transparent;
+  border-left: 2px solid transparent;
 }
 
 .session-item:hover {
@@ -359,7 +359,7 @@
   line-height: 1.3;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .session-team-icon {
@@ -370,7 +370,7 @@
 
 .session-brain-icon {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1;
 }
 
@@ -378,13 +378,13 @@
 .session-item.processing .session-title::before {
   content: '';
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  min-width: 6px;
+  width: 5px;
+  height: 5px;
+  min-width: 5px;
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--accent);
-  margin-right: 6px;
+  margin-right: 4px;
   vertical-align: middle;
   animation: pulse 1.5s ease-in-out infinite;
 }
