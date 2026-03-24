@@ -281,6 +281,11 @@
     max-height: calc(100vh - 160px);
   }
 
+  /* Sidebar resize handle hidden on mobile */
+  .sidebar-resize-handle {
+    display: none;
+  }
+
   /* Git panel — always show action buttons (no hover on touch) */
   .git-file-actions-mobile,
   .git-group-actions-mobile {
