@@ -334,14 +334,8 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
   /** Send a recap chat message. On first message, prepends meeting context. */
   function sendRecapChat(text, recapId, detail) {
-    const convId = currentConversationId.value;
-    const cached = conversationCache.value[convId];
-    const isFirstMessage = !cached || !cached.messages || cached.messages.length === 0;
-    // Also check live messages if already switched to this conversation
-    const liveEmpty = currentConversationId.value === convId && messages.value.length === 0;
-
     let prompt = text;
-    if (isFirstMessage || liveEmpty) {
+    if (!currentClaudeSessionId.value) {
       const ctx = buildMeetingContext(detail);
       prompt = ctx + '\n---\n' + text;
       // Save user's actual question for auto-rename when session_started arrives
@@ -350,7 +344,7 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
     wsSend({
       type: 'chat',
-      conversationId: convId,
+      conversationId: currentConversationId.value,
       prompt,
       brainMode: true,
       recapId,
