@@ -841,7 +841,7 @@
 
 /* ── Teams sidebar section (history list in sidebar) ── */
 .sidebar-teams {
-  padding: 0.5rem 0.75rem;
+  padding: 0.1rem 0.75rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -850,7 +850,7 @@
 
 /* ── Loops sidebar section ── */
 .sidebar-loops {
-  padding: 0.5rem 0.75rem;
+  padding: 0.1rem 0.75rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
