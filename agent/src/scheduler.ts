@@ -66,12 +66,17 @@ export type LoopExecutionSummary = Pick<
 const LOOPS_FILE = join(CONFIG_DIR, 'loops.json');
 const EXECUTIONS_DIR = join(CONFIG_DIR, 'loop-executions');
 const MAX_CONCURRENT_LOOPS = 3;
+/** How often (ms) to check for missed schedules (machine wake from sleep). */
+const MISSED_SCHEDULE_CHECK_INTERVAL = 60_000; // 1 minute
+/** Catch-up window: only fire catch-up if the missed time is within this window. */
+const MISSED_SCHEDULE_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 // ── Module state ──────────────────────────────────────────────────────────
 
 let loops: Loop[] = [];
 const cronJobs = new Map<string, cron.ScheduledTask>();
 const runningExecutions = new Map<string, LoopExecution>();
+let missedScheduleTimer: ReturnType<typeof setInterval> | null = null;
 
 type SendFn = (msg: Record<string, unknown>) => void;
 type HandleChatFn = (
@@ -130,6 +135,13 @@ export function initScheduler(deps: {
     }
   }
 
+  // Catch up any schedules missed while the machine was asleep / agent was down
+  catchUpMissedSchedules();
+
+  // Periodically check for missed schedules (handles machine sleep/wake)
+  if (missedScheduleTimer) clearInterval(missedScheduleTimer);
+  missedScheduleTimer = setInterval(catchUpMissedSchedules, MISSED_SCHEDULE_CHECK_INTERVAL);
+
   console.log(`[Scheduler] Initialized with ${loops.length} loops (${cronJobs.size} scheduled)`);
 }
 
@@ -142,6 +154,11 @@ export function shutdownScheduler(): void {
     job.stop();
   }
   cronJobs.clear();
+
+  if (missedScheduleTimer) {
+    clearInterval(missedScheduleTimer);
+    missedScheduleTimer = null;
+  }
 
   // Remove observers
   if (removeOutputObserverFn) removeOutputObserverFn(onLoopOutput);
@@ -273,6 +290,121 @@ export function cancelLoopExecution(loopId: string): void {
 /** Get currently running executions (for status queries). */
 export function getRunningExecutions(): Map<string, LoopExecution> {
   return runningExecutions;
+}
+
+// ── Missed-Schedule Catch-up ──────────────────────────────────────────────
+
+/**
+ * Compute the most recent time a loop *should* have fired, based on its
+ * scheduleType and scheduleConfig.  Returns null for manual loops or if
+ * we can't determine a prior time.
+ */
+function getPreviousScheduledTime(loop: Loop): Date | null {
+  const now = new Date();
+  const { scheduleType, scheduleConfig } = loop;
+  const { hour, minute, dayOfWeek } = scheduleConfig;
+
+  if (scheduleType === 'manual') return null;
+
+  if (scheduleType === 'hourly') {
+    // Fires at :MM every hour
+    const m = minute ?? 0;
+    const prev = new Date(now);
+    prev.setSeconds(0, 0);
+    prev.setMinutes(m);
+    if (prev > now) {
+      prev.setHours(prev.getHours() - 1);
+    }
+    return prev;
+  }
+
+  if (scheduleType === 'daily') {
+    const h = hour ?? 0;
+    const m = minute ?? 0;
+    const prev = new Date(now);
+    prev.setSeconds(0, 0);
+    prev.setMinutes(m);
+    prev.setHours(h);
+    if (prev > now) {
+      prev.setDate(prev.getDate() - 1);
+    }
+    return prev;
+  }
+
+  if (scheduleType === 'weekly') {
+    const h = hour ?? 0;
+    const m = minute ?? 0;
+    const dow = dayOfWeek ?? 0; // 0 = Sunday
+    const prev = new Date(now);
+    prev.setSeconds(0, 0);
+    prev.setMinutes(m);
+    prev.setHours(h);
+    // Walk back to the most recent matching day-of-week
+    const currentDow = prev.getDay();
+    let daysBack = (currentDow - dow + 7) % 7;
+    if (daysBack === 0 && prev > now) daysBack = 7;
+    prev.setDate(prev.getDate() - daysBack);
+    return prev;
+  }
+
+  // For raw 'cron' type, use node-cron's getNextRun to work backwards:
+  // compute nextRun, then step back one period. This is a best-effort
+  // heuristic — works well for simple schedules.
+  try {
+    const tempJob = cron.schedule(loop.schedule, () => {});
+    const next = tempJob.getNextRun();
+    tempJob.stop();
+    if (next) {
+      // Approximate: the previous occurrence = nextRun minus one period.
+      // For complex expressions this is imprecise, but good enough for catch-up.
+      const nextMs = next.getTime();
+      const diffFromNow = nextMs - now.getTime();
+      // Previous fire ≈ now - (nextRun - now)  i.e. same distance before now
+      const prev = new Date(now.getTime() - diffFromNow);
+      return prev;
+    }
+  } catch { /* ignore */ }
+
+  return null;
+}
+
+/**
+ * Check all enabled scheduled loops for missed executions and fire catch-ups.
+ * A loop is considered "missed" if its previous scheduled time is after its
+ * lastExecution time (or it has never executed) AND within the catch-up window.
+ */
+function catchUpMissedSchedules(): void {
+  const now = Date.now();
+
+  for (const loop of loops) {
+    if (!loop.enabled || loop.scheduleType === 'manual') continue;
+
+    const prevTime = getPreviousScheduledTime(loop);
+    if (!prevTime) continue;
+
+    const prevMs = prevTime.getTime();
+    // Skip if the scheduled time is too far in the past
+    if (now - prevMs > MISSED_SCHEDULE_MAX_AGE_MS) continue;
+
+    // Check if this time slot was already covered by a recent execution
+    const lastExecMs = loop.lastExecution?.startedAt
+      ? new Date(loop.lastExecution.startedAt).getTime()
+      : 0;
+
+    // Only catch up if the last execution was before the previous scheduled time
+    // (with a 2-minute tolerance to avoid double-fires)
+    if (lastExecMs >= prevMs - 2 * 60_000) continue;
+
+    // Skip if already running
+    let alreadyRunning = false;
+    for (const exec of runningExecutions.values()) {
+      if (exec.loopId === loop.id) { alreadyRunning = true; break; }
+    }
+    if (alreadyRunning) continue;
+
+    console.log(`[Scheduler] Catch-up: loop "${loop.name}" missed schedule at ${prevTime.toISOString()}, executing now`);
+    executeLoop(loop.id, 'scheduled');
+  }
 }
 
 // ── Scheduling ────────────────────────────────────────────────────────────

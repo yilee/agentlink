@@ -28,8 +28,8 @@ vi.mock('node-cron', () => {
         if (expr === 'not a cron') return false;
         return true;
       },
-      schedule: (_expr: string, _cb: () => void) => {
-        return { stop: vi.fn() };
+      schedule: (_expr: string, _cb: () => void, _opts?: any) => {
+        return { stop: vi.fn(), getNextRun: () => new Date(Date.now() + 86400000) };
       },
     },
   };
@@ -672,6 +672,230 @@ describe('scheduler.ts', () => {
       const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
       const parsed = JSON.parse(readFileSync(loopsFile, 'utf-8'));
       expect(parsed[0].brainMode).toBe(true);
+    });
+  });
+
+  describe('missed schedule catch-up', () => {
+    it('fires catch-up for daily loop that missed its schedule', () => {
+      // Pre-seed loops.json with a daily loop whose lastExecution is >24h ago
+      const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
+      const now = new Date();
+      const missedHour = now.getHours(); // use current hour so "previous scheduled time" is today
+      const missedMinute = now.getMinutes() > 0 ? now.getMinutes() - 1 : 59;
+      const staleTime = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
+
+      const loopData = [{
+        id: 'catchup-daily-001',
+        name: 'Catch-up Daily',
+        prompt: 'catch me',
+        schedule: `${missedMinute} ${missedHour} * * *`,
+        scheduleType: 'daily',
+        scheduleConfig: { hour: missedHour, minute: missedMinute },
+        workDir: '/test',
+        enabled: true,
+        brainMode: false,
+        createdAt: staleTime.toISOString(),
+        updatedAt: staleTime.toISOString(),
+        lastExecution: {
+          id: 'old-exec-001',
+          status: 'success',
+          startedAt: staleTime.toISOString(),
+          durationMs: 5000,
+          trigger: 'scheduled',
+        },
+      }];
+      writeFileSync(loopsFile, JSON.stringify(loopData));
+
+      // Reinit — should trigger catch-up
+      shutdownScheduler();
+      const deps = makeDeps();
+      initScheduler(deps);
+
+      // Should have called handleChat for the catch-up
+      expect(handleChatCalls).toHaveLength(1);
+      expect(handleChatCalls[0].prompt).toBe('catch me');
+      expect(handleChatCalls[0].workDir).toBe('/test');
+
+      // Should have sent loop_execution_started
+      const startMsg = sentMessages.find(m => m.type === 'loop_execution_started');
+      expect(startMsg).toBeTruthy();
+      expect((startMsg!.execution as any).trigger).toBe('scheduled');
+    });
+
+    it('does NOT fire catch-up if lastExecution is recent', () => {
+      const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
+      const now = new Date();
+      // Schedule for a time that already passed today (2 minutes ago)
+      const pastDate = new Date(now.getTime() - 2 * 60 * 1000);
+      const scheduledHour = pastDate.getHours();
+      const scheduledMinute = pastDate.getMinutes();
+
+      // lastExecution started AT the scheduled time (i.e., it already ran)
+      const recentTime = new Date(pastDate);
+
+      const loopData = [{
+        id: 'nocatchup-001',
+        name: 'No Catch-up',
+        prompt: 'already ran',
+        schedule: `${scheduledMinute} ${scheduledHour} * * *`,
+        scheduleType: 'daily',
+        scheduleConfig: { hour: scheduledHour, minute: scheduledMinute },
+        workDir: '/test',
+        enabled: true,
+        brainMode: false,
+        createdAt: recentTime.toISOString(),
+        updatedAt: recentTime.toISOString(),
+        lastExecution: {
+          id: 'recent-exec-001',
+          status: 'success',
+          startedAt: recentTime.toISOString(),
+          durationMs: 5000,
+          trigger: 'scheduled',
+        },
+      }];
+      writeFileSync(loopsFile, JSON.stringify(loopData));
+
+      shutdownScheduler();
+      const deps = makeDeps();
+      initScheduler(deps);
+
+      // Should NOT have triggered catch-up
+      expect(handleChatCalls).toHaveLength(0);
+    });
+
+    it('does NOT fire catch-up for disabled loops', () => {
+      const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
+      const now = new Date();
+      const staleTime = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+
+      const loopData = [{
+        id: 'disabled-catchup-001',
+        name: 'Disabled Loop',
+        prompt: 'should not run',
+        schedule: `${now.getMinutes()} ${now.getHours()} * * *`,
+        scheduleType: 'daily',
+        scheduleConfig: { hour: now.getHours(), minute: now.getMinutes() },
+        workDir: '/test',
+        enabled: false,
+        brainMode: false,
+        createdAt: staleTime.toISOString(),
+        updatedAt: staleTime.toISOString(),
+        lastExecution: {
+          id: 'old-exec-002',
+          status: 'success',
+          startedAt: staleTime.toISOString(),
+          durationMs: 5000,
+          trigger: 'scheduled',
+        },
+      }];
+      writeFileSync(loopsFile, JSON.stringify(loopData));
+
+      shutdownScheduler();
+      const deps = makeDeps();
+      initScheduler(deps);
+
+      expect(handleChatCalls).toHaveLength(0);
+    });
+
+    it('does NOT fire catch-up for manual loops', () => {
+      const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
+      const staleTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+      const loopData = [{
+        id: 'manual-catchup-001',
+        name: 'Manual Loop',
+        prompt: 'manual only',
+        schedule: '',
+        scheduleType: 'manual',
+        scheduleConfig: { hour: 9, minute: 0 },
+        workDir: '/test',
+        enabled: true,
+        brainMode: false,
+        createdAt: staleTime.toISOString(),
+        updatedAt: staleTime.toISOString(),
+      }];
+      writeFileSync(loopsFile, JSON.stringify(loopData));
+
+      shutdownScheduler();
+      const deps = makeDeps();
+      initScheduler(deps);
+
+      expect(handleChatCalls).toHaveLength(0);
+    });
+
+    it('fires catch-up for hourly loop that missed its schedule', () => {
+      const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
+      const now = new Date();
+      const minute = now.getMinutes() > 0 ? now.getMinutes() - 1 : 59;
+      const staleTime = new Date(now.getTime() - 3 * 60 * 60 * 1000); // 3 hours ago
+
+      const loopData = [{
+        id: 'catchup-hourly-001',
+        name: 'Catch-up Hourly',
+        prompt: 'hourly catch',
+        schedule: `${minute} * * * *`,
+        scheduleType: 'hourly',
+        scheduleConfig: { minute },
+        workDir: '/test',
+        enabled: true,
+        brainMode: false,
+        createdAt: staleTime.toISOString(),
+        updatedAt: staleTime.toISOString(),
+        lastExecution: {
+          id: 'old-hourly-001',
+          status: 'success',
+          startedAt: staleTime.toISOString(),
+          durationMs: 5000,
+          trigger: 'scheduled',
+        },
+      }];
+      writeFileSync(loopsFile, JSON.stringify(loopData));
+
+      shutdownScheduler();
+      const deps = makeDeps();
+      initScheduler(deps);
+
+      expect(handleChatCalls).toHaveLength(1);
+      expect(handleChatCalls[0].prompt).toBe('hourly catch');
+    });
+
+    it('fires catch-up for weekly loop that missed its schedule', () => {
+      const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
+      const now = new Date();
+      // Pick a minute in the past so the "previous scheduled time" falls earlier today
+      const minute = now.getMinutes() > 0 ? now.getMinutes() - 1 : 59;
+      const hour = minute === 59 ? (now.getHours() > 0 ? now.getHours() - 1 : 23) : now.getHours();
+      const dayOfWeek = now.getDay(); // today's day-of-week so previous = today
+      const staleTime = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000); // 8 days ago (>1 week)
+
+      const loopData = [{
+        id: 'catchup-weekly-001',
+        name: 'Catch-up Weekly',
+        prompt: 'weekly catch',
+        schedule: `${minute} ${hour} * * ${dayOfWeek}`,
+        scheduleType: 'weekly',
+        scheduleConfig: { hour, minute, dayOfWeek },
+        workDir: '/test',
+        enabled: true,
+        brainMode: false,
+        createdAt: staleTime.toISOString(),
+        updatedAt: staleTime.toISOString(),
+        lastExecution: {
+          id: 'old-weekly-001',
+          status: 'success',
+          startedAt: staleTime.toISOString(),
+          durationMs: 5000,
+          trigger: 'scheduled',
+        },
+      }];
+      writeFileSync(loopsFile, JSON.stringify(loopData));
+
+      shutdownScheduler();
+      const deps = makeDeps();
+      initScheduler(deps);
+
+      expect(handleChatCalls).toHaveLength(1);
+      expect(handleChatCalls[0].prompt).toBe('weekly catch');
     });
   });
 });
