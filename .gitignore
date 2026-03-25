@@ -35,8 +35,8 @@ agent/package-lock.json
 server/web/dist/
 server/web/node_modules/
 
-# Test artifacts
-*.png
+# Test artifacts (screenshots, etc.)
+test/**/*.png
 .playwright-mcp/
 nul
 coverage/
