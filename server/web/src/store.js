@@ -23,6 +23,7 @@ import { createMemory } from './modules/memory.js';
 import { createGit } from './modules/git.js';
 import { createLoop } from './modules/loop.js';
 import { createRecap } from './modules/recap.js';
+import { createRouter } from './modules/router.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
 import { useTheme } from './composables/useTheme.js';
@@ -301,6 +302,8 @@ export function createStore() {
 
   const streaming = createStreaming({ messages, scrollToBottom });
 
+  const router = createRouter();
+
   const fileAttach = createFileAttachments(attachments, fileInputRef, dragOver);
 
   // Sidebar needs wsSend, but connection creates wsSend.
@@ -353,6 +356,8 @@ export function createStore() {
     setPlanMode,
     // Brain mode
     setBrainMode,
+    // Router — start after WebSocket connects
+    onConnected: () => router.start(),
     // i18n
     t,
   });
@@ -441,6 +446,92 @@ export function createStore() {
   }) : null;
   if (recap) setRecap(recap);
   if (recap) recap.setRequestSessionList(sidebar.requestSessionList);
+
+  // ── Hash router — route registration ──
+  // Register routes AFTER all modules are created so handlers can access module state.
+
+  // #/ → Chat (default)
+  router.addRoute('/', () => {
+    team.viewMode.value = 'chat';
+    if (recap) {
+      recap.goBackToFeed();
+      currentView.value = 'chat';
+    }
+  });
+
+  // #/chat/:sessionId → Resume historical session
+  router.addRoute('/chat/:sessionId', ({ sessionId: claudeId }) => {
+    team.viewMode.value = 'chat';
+    if (recap) currentView.value = 'chat';
+    sidebar.resumeSession({ sessionId: claudeId });
+  });
+
+  // #/team → Team dashboard
+  router.addRoute('/team', () => {
+    team.viewMode.value = 'team';
+    team.activeAgentView.value = null;
+  });
+
+  // #/loop → Loop list
+  router.addRoute('/loop', () => {
+    team.viewMode.value = 'loop';
+  });
+
+  // #/recap → Recap feed
+  if (recap) {
+    router.addRoute('/recap', () => {
+      team.viewMode.value = 'feed';
+      recap.goBackToFeed();
+    });
+
+    // #/recap/:recapId → Recap detail
+    router.addRoute('/recap/:recapId', ({ recapId }) => {
+      team.viewMode.value = 'feed';
+      currentView.value = 'recap-detail';
+      // Look up sidecarPath from loaded feed entries
+      const entry = recap.feedEntries.value.find(e => e.recap_id === recapId);
+      if (entry) {
+        recap.selectRecap(recapId, entry.sidecar_path);
+      } else {
+        // Feed not loaded yet — set selectedRecapId; detail will load when feed arrives
+        recap.selectedRecapId.value = recapId;
+      }
+    });
+  }
+
+  // ── Hash router — state → hash sync watchers ──
+
+  // viewMode changes → push hash
+  watch(team.viewMode, (mode) => {
+    if (router.isRestoring()) return;
+    if (mode === 'chat') {
+      // Only push #/ if no session is active (otherwise #/chat/:id takes precedence)
+      if (!currentClaudeSessionId.value) router.push('/');
+    } else if (mode === 'team') {
+      router.push('/team');
+    } else if (mode === 'loop') {
+      router.push('/loop');
+    } else if (mode === 'feed') {
+      router.push('/recap');
+    }
+  });
+
+  // Claude session changes → push #/chat/:sessionId or #/
+  watch(currentClaudeSessionId, (id) => {
+    if (router.isRestoring()) return;
+    if (team.viewMode.value !== 'chat') return;
+    if (recap && recap.recapChatActive.value) return; // recap chat has its own routing
+    router.push(id ? `/chat/${id}` : '/');
+  });
+
+  // Recap detail selection → push #/recap/:recapId or #/recap
+  if (recap) {
+    watch(recap.selectedRecapId, (id) => {
+      if (router.isRestoring()) return;
+      if (team.viewMode.value !== 'feed') return;
+      router.push(id ? `/recap/${id}` : '/recap');
+    });
+  }
 
   const isMemoryPreview = computed(() => {
     if (!previewFile.value?.filePath || !memoryDir.value) return false;
@@ -738,7 +829,9 @@ export function createStore() {
   if (recap) {
     watch(team.viewMode, (newMode, oldMode) => {
       if (newMode === 'feed') {
-        currentView.value = 'recap-feed';
+        // During hash-restore the route handler already set currentView precisely
+        // (e.g. 'recap-detail'), so skip the blanket 'recap-feed' override.
+        if (!router.isRestoring()) currentView.value = 'recap-feed';
         recap.loadFeed();
         recap.startAutoRefresh();
       } else if (oldMode === 'feed') {
@@ -785,6 +878,7 @@ export function createStore() {
   });
   onUnmounted(() => {
     closeWs(); streaming.cleanup(); cleanupScroll(); cleanupHighlight();
+    router.stop();
     window.removeEventListener('resize', _resizeHandler);
     document.removeEventListener('click', _workdirMenuClickHandler);
     document.removeEventListener('keydown', _workdirMenuKeyHandler);

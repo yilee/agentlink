@@ -515,6 +515,14 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
   function handleRecapsList(data) {
     feedEntries.value = data.recaps || [];
     loading.value = false;
+    // If a recapId was set before the feed loaded (e.g. direct hash navigation),
+    // now look up its sidecarPath and fetch the detail.
+    if (selectedRecapId.value && !selectedDetail.value && !detailLoading.value) {
+      const entry = feedEntries.value.find(e => e.recap_id === selectedRecapId.value);
+      if (entry) {
+        selectRecap(selectedRecapId.value, entry.sidecar_path);
+      }
+    }
   }
 
   function handleRecapDetail(data) {
