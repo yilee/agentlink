@@ -177,6 +177,74 @@
   background: rgba(212, 84, 84, 0.1);
 }
 
+/* ── Recent tab toggle (Dirs | Sessions) ── */
+.recent-tab-toggle {
+  display: flex;
+  gap: 0;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  padding: 1px;
+}
+.recent-tab-btn {
+  padding: 1px 6px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.recent-tab-btn:hover {
+  color: var(--text-primary);
+}
+.recent-tab-btn.active {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Global recent sessions list ── */
+.global-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.global-sessions-loading,
+.global-sessions-empty {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  padding: 4px 6px;
+}
+.global-session-item {
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.global-session-item:hover {
+  background: var(--bg-tertiary);
+}
+.global-session-title {
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.global-session-meta {
+  font-size: 0.62rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sidebar-sessions {
   display: flex;
   flex-direction: column;

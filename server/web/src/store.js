@@ -97,6 +97,11 @@ export function createStore() {
   const workdirHistory = ref([]);
   const workdirCollapsed = ref(false);
 
+  // Global recent sessions (cross-workdir)
+  const globalRecentSessions = ref([]);
+  const loadingGlobalSessions = ref(false);
+  const recentTab = ref('dirs'); // 'dirs' | 'sessions'
+
   // Working directory switching loading state
   const workdirSwitching = ref(false);
 
@@ -313,6 +318,8 @@ export function createStore() {
     hostname, workdirHistory, workdirCollapsed, workdirSwitching,
     workdirMenuOpen, memoryPanelOpen, filePanelOpen, gitPanelOpen,
     isMobile, sidebarView,
+    // Global recent sessions
+    globalRecentSessions, loadingGlobalSessions, recentTab,
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations, activeClaudeSessions,
     switchConversation,
@@ -326,6 +333,7 @@ export function createStore() {
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
     historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
+    globalRecentSessions, loadingGlobalSessions,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
     authRequired, authPassword, authError, authAttempts, authLocked,
     streaming, sidebar, scrollToBottom,
@@ -798,6 +806,8 @@ export function createStore() {
     renamingSessionId, renameText,
     // Working directory
     workdirHistory, workdirCollapsed, workdirSwitching, workdirMenuOpen,
+    // Global recent sessions
+    globalRecentSessions, loadingGlobalSessions, recentTab,
     // Sidebar collapse states
     teamsCollapsed, chatsCollapsed, loopsCollapsed, loadingTeams, loadingLoops,
     formatRelativeTime: (ts) => formatRelativeTime(ts, t),
