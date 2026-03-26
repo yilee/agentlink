@@ -12,7 +12,7 @@ vi.mock('os', async (importOriginal) => {
 });
 
 // Import after mock is set up
-const { listSessions, readSessionMessages, readConversationContext, CONTEXT_MAX_CHARS } = await import('../../agent/src/history.js');
+const { listSessions, readSessionMessages, readConversationContext, listAllRecentSessions, CONTEXT_MAX_CHARS } = await import('../../agent/src/history.js');
 
 // Test work directory and its JSONL folder
 const TEST_WORK_DIR = process.platform === 'win32' ? 'C:\\test\\project' : '/test/project';
@@ -363,6 +363,173 @@ describe('History', () => {
 
       const ctx = readConversationContext(TEST_WORK_DIR, 'ctx-multi-text');
       expect(ctx).toContain('[Assistant]\nPart 1\n\nPart 2');
+    });
+  });
+
+  describe('listAllRecentSessions', () => {
+    // Helper to write JSONL into an arbitrary project folder
+    function writeGlobalJsonl(folder: string, sessionId: string, lines: unknown[], mtimeMs?: number): void {
+      const dir = join(tempHome, '.claude', 'projects', folder);
+      mkdirSync(dir, { recursive: true });
+      const filePath = join(dir, `${sessionId}.jsonl`);
+      writeFileSync(filePath, lines.map(l => JSON.stringify(l)).join('\n') + '\n');
+      if (mtimeMs) {
+        const t = new Date(mtimeMs);
+        utimesSync(filePath, t, t);
+      }
+    }
+
+    it('returns empty when projects directory does not exist', async () => {
+      rmSync(tempHome, { recursive: true, force: true });
+      const sessions = await listAllRecentSessions();
+      expect(sessions).toEqual([]);
+    });
+
+    it('returns sessions from multiple project folders sorted by lastModified', async () => {
+      const now = Date.now();
+      writeGlobalJsonl('project-A', 'sess-a1', [
+        { type: 'user', cwd: '/project/a', sessionId: 'sess-a1', gitBranch: 'main', message: { content: 'Hello from A' } },
+      ], now - 1000);
+
+      writeGlobalJsonl('project-B', 'sess-b1', [
+        { type: 'user', cwd: '/project/b', sessionId: 'sess-b1', message: { content: 'Hello from B' } },
+      ], now);
+
+      writeGlobalJsonl('project-C', 'sess-c1', [
+        { type: 'user', cwd: '/project/c', sessionId: 'sess-c1', message: { content: 'Hello from C' } },
+      ], now - 2000);
+
+      const sessions = await listAllRecentSessions();
+      expect(sessions.length).toBe(3);
+      // Sorted by lastModified descending
+      expect(sessions[0].sessionId).toBe('sess-b1');
+      expect(sessions[1].sessionId).toBe('sess-a1');
+      expect(sessions[2].sessionId).toBe('sess-c1');
+    });
+
+    it('extracts projectPath from cwd field', async () => {
+      writeGlobalJsonl('project-X', 'sess-x', [
+        { type: 'user', cwd: '/my/project/x', message: { content: 'X message' } },
+      ]);
+
+      const sessions = await listAllRecentSessions();
+      expect(sessions[0].projectPath).toBe('/my/project/x');
+      expect(sessions[0].projectFolder).toBe('project-X');
+    });
+
+    it('extracts gitBranch from first user message', async () => {
+      writeGlobalJsonl('project-git', 'sess-g', [
+        { type: 'user', cwd: '/proj', gitBranch: 'feature/foo', message: { content: 'git test' } },
+      ]);
+
+      const sessions = await listAllRecentSessions();
+      expect(sessions[0].gitBranch).toBe('feature/foo');
+    });
+
+    it('uses custom-title over summary over firstPrompt for title', async () => {
+      writeGlobalJsonl('project-titles', 'sess-t', [
+        { type: 'user', cwd: '/proj', message: { content: 'first prompt text' } },
+        { type: 'summary', summary: 'A summary' },
+        { type: 'custom-title', customTitle: 'My Custom Title' },
+      ]);
+
+      const sessions = await listAllRecentSessions();
+      expect(sessions[0].title).toBe('My Custom Title');
+      expect(sessions[0].firstPrompt).toBe('first prompt text');
+    });
+
+    it('falls back to summary when no custom title', async () => {
+      writeGlobalJsonl('project-summary', 'sess-s', [
+        { type: 'user', cwd: '/proj', message: { content: 'prompt' } },
+        { type: 'summary', summary: 'Summary text' },
+      ]);
+
+      const sessions = await listAllRecentSessions();
+      expect(sessions[0].title).toBe('Summary text');
+    });
+
+    it('falls back to firstPrompt when no title or summary', async () => {
+      writeGlobalJsonl('project-fp', 'sess-fp', [
+        { type: 'user', cwd: '/proj', message: { content: 'just a prompt' } },
+      ]);
+
+      const sessions = await listAllRecentSessions();
+      expect(sessions[0].title).toBe('just a prompt');
+    });
+
+    it('skips sessions with only hidden commands', async () => {
+      writeGlobalJsonl('project-hidden', 'sess-hidden', [
+        { type: 'user', cwd: '/proj', message: { content: '<command-name>compact</command-name>' } },
+      ]);
+
+      const sessions = await listAllRecentSessions();
+      expect(sessions.find(s => s.sessionId === 'sess-hidden')).toBeUndefined();
+    });
+
+    it('respects limit parameter', async () => {
+      const now = Date.now();
+      for (let i = 0; i < 5; i++) {
+        writeGlobalJsonl(`project-limit-${i}`, `sess-l${i}`, [
+          { type: 'user', cwd: `/proj${i}`, message: { content: `msg ${i}` } },
+        ], now - i * 1000);
+      }
+
+      const sessions = await listAllRecentSessions(3);
+      expect(sessions.length).toBe(3);
+      expect(sessions[0].sessionId).toBe('sess-l0');
+      expect(sessions[2].sessionId).toBe('sess-l2');
+    });
+
+    it('respects perProjectLimit parameter', async () => {
+      const now = Date.now();
+      // Write 5 sessions into a single project
+      for (let i = 0; i < 5; i++) {
+        writeGlobalJsonl('project-ppl', `sess-ppl${i}`, [
+          { type: 'user', cwd: '/proj', message: { content: `msg ${i}` } },
+        ], now - i * 1000);
+      }
+
+      const sessions = await listAllRecentSessions(20, 2);
+      const pplSessions = sessions.filter(s => s.projectFolder === 'project-ppl');
+      expect(pplSessions.length).toBe(2);
+    });
+
+    it('handles malformed JSONL lines gracefully', async () => {
+      const dir = join(tempHome, '.claude', 'projects', 'project-malformed');
+      mkdirSync(dir, { recursive: true });
+      const filePath = join(dir, 'sess-bad.jsonl');
+      writeFileSync(filePath, 'not valid json\n{"type":"user","cwd":"/proj","message":{"content":"valid msg"}}\n');
+
+      const sessions = await listAllRecentSessions();
+      const found = sessions.find(s => s.sessionId === 'sess-bad');
+      expect(found).toBeDefined();
+      expect(found!.firstPrompt).toBe('valid msg');
+    });
+
+    it('ignores non-directory entries in projects folder', async () => {
+      const dir = join(tempHome, '.claude', 'projects');
+      mkdirSync(dir, { recursive: true });
+      // Write a regular file (not a directory) in the projects folder
+      writeFileSync(join(dir, 'not-a-directory.txt'), 'should be ignored');
+
+      writeGlobalJsonl('real-project', 'sess-real', [
+        { type: 'user', cwd: '/proj', message: { content: 'real session' } },
+      ]);
+
+      const sessions = await listAllRecentSessions();
+      expect(sessions.length).toBe(1);
+      expect(sessions[0].sessionId).toBe('sess-real');
+    });
+
+    it('skips files without cwd field (still works with empty projectPath)', async () => {
+      writeGlobalJsonl('project-nocwd', 'sess-nocwd', [
+        { type: 'user', message: { content: 'no cwd field' } },
+      ]);
+
+      const sessions = await listAllRecentSessions();
+      const found = sessions.find(s => s.sessionId === 'sess-nocwd');
+      expect(found).toBeDefined();
+      expect(found!.projectPath).toBe('');
     });
   });
 });
