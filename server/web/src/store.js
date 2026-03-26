@@ -325,6 +325,8 @@ export function createStore() {
     switchConversation,
     // Brain mode
     setBrainMode,
+    // Version gating
+    requireVersion,
     // i18n
     t,
   });

@@ -433,6 +433,112 @@ describe('globalRecentSessions', () => {
     });
   });
 
+  describe('version gating', () => {
+    it('requestGlobalSessions is blocked when agent version is too low', () => {
+      const globalRecentSessions = ref<any[]>([]);
+      const loadingGlobalSessions = ref(false);
+      const sent: any[] = [];
+      const wsSend = (msg: any) => sent.push(msg);
+      let loaded = false;
+      const requireVersion = (_minVer: string, _feature: string) => false; // version too low
+
+      function requestGlobalSessions() {
+        if (requireVersion && !requireVersion('0.1.127', 'Global Sessions')) return;
+        if (loaded && globalRecentSessions.value.length > 0) return;
+        loadingGlobalSessions.value = true;
+        wsSend({ type: 'list_recent_sessions', limit: 20 });
+        loaded = true;
+      }
+
+      requestGlobalSessions();
+      expect(sent).toHaveLength(0);
+      expect(loadingGlobalSessions.value).toBe(false);
+    });
+
+    it('requestGlobalSessions proceeds when agent version meets minimum', () => {
+      const globalRecentSessions = ref<any[]>([]);
+      const loadingGlobalSessions = ref(false);
+      const sent: any[] = [];
+      const wsSend = (msg: any) => sent.push(msg);
+      let loaded = false;
+      const requireVersion = (_minVer: string, _feature: string) => true; // version ok
+
+      function requestGlobalSessions() {
+        if (requireVersion && !requireVersion('0.1.127', 'Global Sessions')) return;
+        if (loaded && globalRecentSessions.value.length > 0) return;
+        loadingGlobalSessions.value = true;
+        wsSend({ type: 'list_recent_sessions', limit: 20 });
+        loaded = true;
+      }
+
+      requestGlobalSessions();
+      expect(sent).toHaveLength(1);
+      expect(sent[0].type).toBe('list_recent_sessions');
+    });
+
+    it('resumeGlobalSession is blocked when agent version is too low', () => {
+      const workDir = ref('Q:\\src\\agentlink');
+      const sent: any[] = [];
+      const wsSend = (msg: any) => sent.push(msg);
+      const resumed: any[] = [];
+      const requireVersion = (_minVer: string, _feature: string) => false;
+
+      function resumeSession(session: any) { resumed.push(session); }
+      function setWorkdirSwitching() {}
+
+      let pendingGlobalResume: string | null = null;
+
+      function resumeGlobalSession(session: any) {
+        if (requireVersion && !requireVersion('0.1.127', 'Global Sessions')) return;
+        const currentDir = (workDir.value || '').replace(/[/\\]+$/, '');
+        const sessionDir = (session.projectPath || '').replace(/[/\\]+$/, '');
+        const sameWorkDir = currentDir.toLowerCase() === sessionDir.toLowerCase();
+        if (sameWorkDir) {
+          resumeSession({ sessionId: session.sessionId, title: session.title });
+        } else {
+          setWorkdirSwitching();
+          wsSend({ type: 'change_workdir', workDir: session.projectPath });
+          pendingGlobalResume = session.sessionId;
+        }
+      }
+
+      resumeGlobalSession({ sessionId: 'abc', title: 'Test', projectPath: 'Q:\\src\\agentlink' });
+      expect(resumed).toHaveLength(0);
+      expect(sent).toHaveLength(0);
+    });
+
+    it('resumeGlobalSession proceeds when agent version meets minimum', () => {
+      const workDir = ref('Q:\\src\\agentlink');
+      const sent: any[] = [];
+      const wsSend = (msg: any) => sent.push(msg);
+      const resumed: any[] = [];
+      const requireVersion = (_minVer: string, _feature: string) => true;
+
+      function resumeSession(session: any) { resumed.push(session); }
+      function setWorkdirSwitching() {}
+
+      let pendingGlobalResume: string | null = null;
+
+      function resumeGlobalSession(session: any) {
+        if (requireVersion && !requireVersion('0.1.127', 'Global Sessions')) return;
+        const currentDir = (workDir.value || '').replace(/[/\\]+$/, '');
+        const sessionDir = (session.projectPath || '').replace(/[/\\]+$/, '');
+        const sameWorkDir = currentDir.toLowerCase() === sessionDir.toLowerCase();
+        if (sameWorkDir) {
+          resumeSession({ sessionId: session.sessionId, title: session.title });
+        } else {
+          setWorkdirSwitching();
+          wsSend({ type: 'change_workdir', workDir: session.projectPath });
+          pendingGlobalResume = session.sessionId;
+        }
+      }
+
+      resumeGlobalSession({ sessionId: 'abc', title: 'Test', projectPath: 'Q:\\src\\agentlink' });
+      expect(resumed).toHaveLength(1);
+      expect(resumed[0].sessionId).toBe('abc');
+    });
+  });
+
   describe('recentTab state', () => {
     it('defaults to dirs tab', () => {
       const recentTab = ref('dirs');

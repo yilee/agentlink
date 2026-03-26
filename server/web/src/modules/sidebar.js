@@ -43,6 +43,8 @@ export function createSidebar(deps) {
     switchConversation,
     // Brain mode
     setBrainMode,
+    // Version gating
+    requireVersion,
     // i18n
     t,
   } = deps;
@@ -497,6 +499,7 @@ export function createSidebar(deps) {
   let _globalSessionsLoaded = false;
 
   function requestGlobalSessions() {
+    if (requireVersion && !requireVersion('0.1.127', 'Global Sessions')) return;
     if (_globalSessionsLoaded && globalRecentSessions.value.length > 0) return;
     loadingGlobalSessions.value = true;
     wsSend({ type: 'list_recent_sessions', limit: 20 });
@@ -509,6 +512,7 @@ export function createSidebar(deps) {
   }
 
   function resumeGlobalSession(session) {
+    if (requireVersion && !requireVersion('0.1.127', 'Global Sessions')) return;
     if (window.innerWidth <= 768) sidebarOpen.value = false;
     if (_onSwitchToChat) _onSwitchToChat();
 
