@@ -330,6 +330,7 @@ export function createConnection(deps) {
       if (recap && team && team.viewMode.value === 'feed') recap.loadFeed();
       startPing();
       wsSend({ type: 'query_active_conversations' });
+      if (deps.onConnected) deps.onConnected();
     } else {
       status.value = 'Waiting';
       error.value = t('error.agentNotConnected');
