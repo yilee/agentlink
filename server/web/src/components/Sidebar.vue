@@ -41,11 +41,29 @@ const {
   workdirMenuChangeDir,
   workdirMenuCopyPath,
   workdirMenuGit,
+  globalRecentSessions,
+  loadingGlobalSessions,
+  recentTab,
+  requestGlobalSessions,
+  resumeGlobalSession,
+  formatRelativeTime,
 } = sidebarStore;
 
 function goToBrainHome() {
   if (!store.requireVersion('0.1.112', 'Brain Home')) return;
   switchToWorkdir('~/.brain/BrainCore');
+}
+
+function projectName(projectPath) {
+  if (!projectPath) return '';
+  return projectPath.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || projectPath;
+}
+
+function switchRecentTab(tab) {
+  recentTab.value = tab;
+  if (tab === 'sessions') {
+    requestGlobalSessions();
+  }
 }
 
 function goToFeed() {
@@ -497,12 +515,17 @@ const {
                   <span>Git</span>
                 </div>
               </div>
-              <div v-if="filteredWorkdirHistory.length > 0" class="workdir-history">
-                <div class="workdir-history-label" @click="workdirCollapsed = !workdirCollapsed">
-                  <span>{{ t('sidebar.recentDirectories') }}</span>
-                  <svg :class="{ collapsed: workdirCollapsed }" class="workdir-history-chevron" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+              <div v-if="filteredWorkdirHistory.length > 0 || globalRecentSessions.length > 0" class="workdir-history">
+                <div class="workdir-history-label">
+                  <span>{{ t('sidebar.recent') }}</span>
+                  <div class="recent-tab-toggle">
+                    <button :class="['recent-tab-btn', { active: recentTab === 'dirs' }]" @click.stop="switchRecentTab('dirs')">{{ t('sidebar.dirs') }}</button>
+                    <button :class="['recent-tab-btn', { active: recentTab === 'sessions' }]" @click.stop="switchRecentTab('sessions')">{{ t('sidebar.globalSessions') }}</button>
+                  </div>
                 </div>
-                <div v-show="!workdirCollapsed" class="workdir-history-list">
+
+                <!-- Dirs tab -->
+                <div v-if="recentTab === 'dirs'" class="workdir-history-list">
                   <div
                     v-for="path in filteredWorkdirHistory" :key="path"
                     class="workdir-history-item"
@@ -513,6 +536,23 @@ const {
                     <button class="workdir-history-delete" @click.stop="removeFromWorkdirHistory(path)" :title="t('sidebar.removeFromHistory')">
                       <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                     </button>
+                  </div>
+                  <div v-if="filteredWorkdirHistory.length === 0" class="global-sessions-empty">{{ t('sidebar.recentDirectories') }}</div>
+                </div>
+
+                <!-- Sessions tab -->
+                <div v-if="recentTab === 'sessions'" class="global-sessions-list">
+                  <div v-if="loadingGlobalSessions" class="global-sessions-loading">{{ t('sidebar.loadingGlobalSessions') }}</div>
+                  <div v-else-if="globalRecentSessions.length === 0" class="global-sessions-empty">{{ t('sidebar.noGlobalSessions') }}</div>
+                  <div
+                    v-else
+                    v-for="session in globalRecentSessions" :key="session.sessionId"
+                    class="global-session-item"
+                    @click="resumeGlobalSession(session)"
+                    :title="session.firstPrompt"
+                  >
+                    <div class="global-session-title">{{ session.title || session.firstPrompt || session.sessionId.slice(0, 8) }}</div>
+                    <div class="global-session-meta">{{ projectName(session.projectPath) }} &middot; {{ formatRelativeTime(session.lastModified) }}</div>
                   </div>
                 </div>
               </div>

@@ -36,6 +36,8 @@ export function createSidebar(deps) {
     hostname, workdirHistory, workdirCollapsed, workdirSwitching,
     workdirMenuOpen, memoryPanelOpen, filePanelOpen, gitPanelOpen,
     isMobile, sidebarView,
+    // Global recent sessions
+    globalRecentSessions, loadingGlobalSessions, recentTab,
     // Multi-session parallel
     currentConversationId, conversationCache, processingConversations, activeClaudeSessions,
     switchConversation,
@@ -490,6 +492,58 @@ export function createSidebar(deps) {
     localStorage.setItem('agentlink-sidebar-width', String(sidebarWidth.value));
   }
 
+  // ── Global recent sessions ──
+
+  let _globalSessionsLoaded = false;
+
+  function requestGlobalSessions() {
+    if (_globalSessionsLoaded && globalRecentSessions.value.length > 0) return;
+    loadingGlobalSessions.value = true;
+    wsSend({ type: 'list_recent_sessions', limit: 20 });
+    _globalSessionsLoaded = true;
+  }
+
+  function refreshGlobalSessions() {
+    loadingGlobalSessions.value = true;
+    wsSend({ type: 'list_recent_sessions', limit: 20 });
+  }
+
+  function resumeGlobalSession(session) {
+    if (window.innerWidth <= 768) sidebarOpen.value = false;
+    if (_onSwitchToChat) _onSwitchToChat();
+
+    const currentDir = (workDir.value || '').replace(/[/\\]+$/, '');
+    const sessionDir = (session.projectPath || '').replace(/[/\\]+$/, '');
+    const sameWorkDir = currentDir.toLowerCase() === sessionDir.toLowerCase();
+
+    if (sameWorkDir) {
+      // Same workDir — resume directly (reuse resumeSession logic)
+      resumeSession({ sessionId: session.sessionId, title: session.title });
+    } else {
+      // Different workDir — change first, then resume after workdir_changed
+      setWorkdirSwitching();
+      wsSend({ type: 'change_workdir', workDir: session.projectPath });
+      // Wait for workdir_changed, then send resume
+      _pendingGlobalResume = session.sessionId;
+    }
+  }
+
+  // Pending cross-workDir resume: called by onWorkdirChanged (exposed via return)
+  let _pendingGlobalResume = null;
+
+  function onWorkdirChanged() {
+    workdirSwitching.value = false;
+    clearTimeout(_workdirSwitchTimer);
+    if (_pendingGlobalResume) {
+      const sid = _pendingGlobalResume;
+      _pendingGlobalResume = null;
+      // After workDir switch, resume the session
+      resumeSession({ sessionId: sid });
+      return true; // signal: skip default new-conversation logic
+    }
+    return false;
+  }
+
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
     onSidebarResizeStart,
@@ -502,5 +556,6 @@ export function createSidebar(deps) {
     loadWorkdirHistory, addToWorkdirHistory, removeFromWorkdirHistory,
     switchToWorkdir, filteredWorkdirHistory, workdirCollapsed,
     toggleWorkdirMenu, workdirMenuBrowse, workdirMenuChangeDir, workdirMenuCopyPath, workdirMenuGit,
+    requestGlobalSessions, refreshGlobalSessions, resumeGlobalSession, onWorkdirChanged,
   };
 }

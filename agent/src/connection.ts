@@ -14,7 +14,7 @@ import { listRecaps, getRecapDetail } from './recap.js';
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
 import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, handleBtwQuestion, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, restartConversation, createPlaceholderConversation, type ChatFile } from './claude.js';
-import { listSessions, readSessionMessages, deleteSession, renameSession } from './history.js';
+import { listSessions, readSessionMessages, deleteSession, renameSession, listAllRecentSessions } from './history.js';
 import { listMemoryFiles, updateMemoryFile, deleteMemoryFile } from './memory.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
 import { setTeamSendFn, setTeamClaudeFns, getActiveTeam, serializeTeam } from './team.js';
@@ -351,6 +351,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'list_sessions':
       handleListSessions();
       break;
+    case 'list_recent_sessions':
+      handleListRecentSessions(msg as unknown as { limit?: number });
+      break;
     case 'list_directory':
       handleListDirectory(msg as unknown as { dirPath: string; source?: string }, state.workDir, send);
       break;
@@ -659,6 +662,18 @@ function handleListSessions(): void {
   } catch (err) {
     console.error(`[AgentLink] listSessions failed:`, err);
     send({ type: 'sessions_list', sessions: [], workDir: state.workDir });
+  }
+}
+
+async function handleListRecentSessions(msg: { limit?: number }): Promise<void> {
+  try {
+    const limit = msg.limit && msg.limit > 0 ? msg.limit : 20;
+    const sessions = await listAllRecentSessions(limit);
+    console.log(`[AgentLink] → recent_sessions_list (${sessions.length} sessions across all workDirs)`);
+    send({ type: 'recent_sessions_list', sessions });
+  } catch (err) {
+    console.error('[AgentLink] listAllRecentSessions failed:', err);
+    send({ type: 'recent_sessions_list', sessions: [] });
   }
 }
 

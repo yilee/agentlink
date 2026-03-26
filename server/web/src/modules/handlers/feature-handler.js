@@ -37,31 +37,37 @@ export function createFeatureHandlers(deps) {
       if (deps.fileBrowser) deps.fileBrowser.onWorkdirChanged();
       if (deps.filePreview) deps.filePreview.onWorkdirChanged();
 
-      // Multi-session: switch to a new blank conversation for the new workdir
-      if (switchConversation) {
-        const newConvId = crypto.randomUUID();
-        switchConversation(newConvId);
-      } else {
-        messages.value = [];
-        queuedMessages.value = [];
-        toolMsgMap.clear();
-        visibleLimit.value = 50;
-        streaming.setMessageIdCounter(0);
-        streaming.setStreamingMessageId(null);
-        streaming.reset();
-        currentClaudeSessionId.value = null;
-        isProcessing.value = false;
+      // Check for pending cross-workDir global session resume
+      const hasGlobalResume = sidebar.onWorkdirChanged();
+
+      if (!hasGlobalResume) {
+        // Normal workdir switch — create new blank conversation
+        if (switchConversation) {
+          const newConvId = crypto.randomUUID();
+          switchConversation(newConvId);
+        } else {
+          messages.value = [];
+          queuedMessages.value = [];
+          toolMsgMap.clear();
+          visibleLimit.value = 50;
+          streaming.setMessageIdCounter(0);
+          streaming.setStreamingMessageId(null);
+          streaming.reset();
+          currentClaudeSessionId.value = null;
+          isProcessing.value = false;
+        }
+
+        // Auto-enable brain mode when switching to Brain Home directory
+        // Must run AFTER switchConversation which resets brainMode to false
+        const normalizedDir = msg.workDir.replace(/\\/g, '/');
+        if (setBrainMode) setBrainMode(normalizedDir.endsWith('/.brain/BrainCore'));
+        messages.value.push({
+          id: streaming.nextId(), role: 'system',
+          content: t('system.workdirChanged', { dir: msg.workDir }),
+          timestamp: new Date(),
+        });
       }
 
-      // Auto-enable brain mode when switching to Brain Home directory
-      // Must run AFTER switchConversation which resets brainMode to false
-      const normalizedDir = msg.workDir.replace(/\\/g, '/');
-      if (setBrainMode) setBrainMode(normalizedDir.endsWith('/.brain/BrainCore'));
-      messages.value.push({
-        id: streaming.nextId(), role: 'system',
-        content: t('system.workdirChanged', { dir: msg.workDir }),
-        timestamp: new Date(),
-      });
       // Clear old history so UI doesn't show stale data
       historySessions.value = [];
       if (deps.team) {

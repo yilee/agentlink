@@ -6,8 +6,9 @@
  */
 
 import { homedir } from 'os';
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, appendFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync, appendFileSync, createReadStream } from 'fs';
 import { join } from 'path';
+import { createInterface } from 'readline';
 
 export interface SessionInfo {
   sessionId: string;
@@ -15,6 +16,16 @@ export interface SessionInfo {
   customTitle?: string;
   preview: string;
   lastModified: number;
+}
+
+export interface GlobalSessionInfo {
+  sessionId: string;
+  projectPath: string;    // original workDir from cwd field
+  projectFolder: string;  // sanitized folder name, e.g. "Q--src-agentlink"
+  title: string;          // custom-title > summary > firstPrompt (truncated)
+  firstPrompt: string;    // first user message (truncated ~100 chars)
+  lastModified: number;   // file mtime (epoch ms)
+  gitBranch?: string;
 }
 
 export interface HistoryMessage {
@@ -467,4 +478,170 @@ export function renameSession(workDir: string, sessionId: string, newTitle: stri
   } catch {
     return false;
   }
+}
+
+/**
+ * Read the first N lines of a JSONL file and extract session metadata.
+ * Only reads the beginning of the file (not the whole thing) for performance.
+ */
+function extractSessionMetadata(
+  filePath: string,
+  maxLines: number = 20,
+): Promise<{ projectPath?: string; firstPrompt?: string; title?: string; summary?: string; gitBranch?: string }> {
+  return new Promise((resolve) => {
+    const result: { projectPath?: string; firstPrompt?: string; title?: string; summary?: string; gitBranch?: string } = {};
+    let lineCount = 0;
+    let hasUserMessage = false;
+
+    let stream: ReturnType<typeof createReadStream> | null = null;
+    try {
+      stream = createReadStream(filePath, { encoding: 'utf-8' });
+    } catch {
+      resolve(result);
+      return;
+    }
+
+    const rl = createInterface({ input: stream, crlfDelay: Infinity });
+
+    rl.on('line', (line) => {
+      lineCount++;
+      if (lineCount > maxLines) {
+        rl.close();
+        return;
+      }
+
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      try {
+        const data = JSON.parse(trimmed);
+
+        if (!hasUserMessage && data.type === 'user' && data.message?.content) {
+          const text = typeof data.message.content === 'string'
+            ? data.message.content
+            : data.message.content[0]?.text || '';
+          if (text.trim() && !isHiddenCommand(text) && !extractCommandOutput(text)) {
+            const displayText = cleanUserText(text);
+            result.firstPrompt = displayText.substring(0, 100);
+            hasUserMessage = true;
+          }
+          if (data.cwd) {
+            result.projectPath = data.cwd;
+          }
+          if (data.gitBranch) {
+            result.gitBranch = data.gitBranch;
+          }
+        }
+
+        if (data.type === 'custom-title' && data.customTitle) {
+          result.title = data.customTitle;
+        }
+        if (data.type === 'summary' && data.summary) {
+          result.summary = data.summary;
+        }
+      } catch { /* skip malformed lines */ }
+    });
+
+    rl.on('close', () => {
+      stream?.destroy();
+      resolve(result);
+    });
+
+    rl.on('error', () => {
+      stream?.destroy();
+      resolve(result);
+    });
+  });
+}
+
+/**
+ * List the most recent sessions across ALL working directories.
+ * Scans all project folders under ~/.claude/projects/, reads only the first
+ * few lines of each JSONL file for metadata, and returns sessions sorted by
+ * lastModified descending.
+ *
+ * @param limit - Maximum number of sessions to return (default 20)
+ * @param perProjectLimit - Max files to scan per project folder (default 5)
+ */
+export async function listAllRecentSessions(
+  limit: number = 20,
+  perProjectLimit: number = 5,
+): Promise<GlobalSessionInfo[]> {
+  const projectsDir = getClaudeProjectsDir();
+
+  if (!existsSync(projectsDir)) {
+    return [];
+  }
+
+  let projectFolders: string[];
+  try {
+    projectFolders = readdirSync(projectsDir).filter(name => {
+      try {
+        return statSync(join(projectsDir, name)).isDirectory();
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return [];
+  }
+
+  const allSessions: GlobalSessionInfo[] = [];
+
+  for (const folder of projectFolders) {
+    const folderPath = join(projectsDir, folder);
+
+    let files: string[];
+    try {
+      files = readdirSync(folderPath).filter(f => f.endsWith('.jsonl'));
+    } catch {
+      continue;
+    }
+
+    // Get mtime for each file and sort by mtime descending
+    const fileStats: { name: string; mtimeMs: number }[] = [];
+    for (const file of files) {
+      try {
+        const stats = statSync(join(folderPath, file));
+        fileStats.push({ name: file, mtimeMs: stats.mtime.getTime() });
+      } catch {
+        continue;
+      }
+    }
+    fileStats.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+    // Take only the top N files per project
+    const topFiles = fileStats.slice(0, perProjectLimit);
+
+    // Extract metadata from each file (parallel within a project)
+    const metadataPromises = topFiles.map(async ({ name, mtimeMs }) => {
+      const sessionId = name.replace('.jsonl', '');
+      const filePath = join(folderPath, name);
+      const meta = await extractSessionMetadata(filePath);
+
+      // Skip files with no user message (empty or system-only sessions)
+      if (!meta.firstPrompt) return null;
+
+      const title = meta.title || meta.summary || meta.firstPrompt;
+      const session: GlobalSessionInfo = {
+        sessionId,
+        projectPath: meta.projectPath || '',
+        projectFolder: folder,
+        title,
+        firstPrompt: meta.firstPrompt,
+        lastModified: mtimeMs,
+      };
+      if (meta.gitBranch) session.gitBranch = meta.gitBranch;
+      return session;
+    });
+
+    const results = await Promise.all(metadataPromises);
+    for (const r of results) {
+      if (r) allSessions.push(r);
+    }
+  }
+
+  // Sort all sessions by lastModified descending, return top N
+  allSessions.sort((a, b) => b.lastModified - a.lastModified);
+  return allSessions.slice(0, limit);
 }

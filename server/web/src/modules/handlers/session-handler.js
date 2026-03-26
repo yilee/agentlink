@@ -6,6 +6,7 @@ export function createSessionHandlers(deps) {
     messages, isProcessing, isCompacting, streaming, scrollToBottom,
     historySessions, currentClaudeSessionId, loadingHistory,
     loadingSessions, setPlanMode, setBrainMode, t, toolMsgMap, wsSend,
+    globalRecentSessions, loadingGlobalSessions,
   } = deps;
 
   return {
@@ -26,6 +27,10 @@ export function createSessionHandlers(deps) {
         session.title = msg.newTitle;
         session.customTitle = msg.newTitle;
       }
+    },
+    recent_sessions_list(msg) {
+      globalRecentSessions.value = msg.sessions || [];
+      loadingGlobalSessions.value = false;
     },
     conversation_resumed(msg) {
       currentClaudeSessionId.value = msg.claudeSessionId;
