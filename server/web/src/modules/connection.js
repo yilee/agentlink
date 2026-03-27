@@ -8,6 +8,7 @@ import { createFileHandlers } from './handlers/file-handler.js';
 import { createFeatureHandlers } from './handlers/feature-handler.js';
 import { createRecapHandlers } from './handlers/recap-handler.js';
 import { createBriefingHandlers } from './handlers/briefing-handler.js';
+import { createDevopsHandlers } from './handlers/devops-handler.js';
 
 const MAX_RECONNECT_ATTEMPTS = 50;
 const RECONNECT_BASE_DELAY = 1000;
@@ -52,6 +53,8 @@ export function createConnection(deps) {
   function setRecap(r) { recap = r; }
   let briefing = null;
   function setBriefing(b) { briefing = b; }
+  let devops = null;
+  function setDevops(d) { devops = d; }
 
   let ws = null;
   let sessionKey = null;
@@ -147,6 +150,7 @@ export function createConnection(deps) {
     get git() { return git; },                     // late-bound
     get recap() { return recap; },                 // late-bound
     get briefing() { return briefing; },             // late-bound
+    get devops() { return devops; },                   // late-bound
   };
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
@@ -159,6 +163,7 @@ export function createConnection(deps) {
   const featureHandlers = createFeatureHandlers(handlerDeps);
   const recapHandlers = createRecapHandlers(handlerDeps);
   const briefingHandlers = createBriefingHandlers(handlerDeps);
+  const devopsHandlers = createDevopsHandlers(handlerDeps);
 
   // Dispatch map: message type → handler(msg, scheduleHighlight)
   const handlers = {
@@ -169,6 +174,7 @@ export function createConnection(deps) {
     ...featureHandlers,
     ...recapHandlers,
     ...briefingHandlers,
+    ...devopsHandlers,
   };
 
   function connect(scheduleHighlight) {
@@ -334,6 +340,8 @@ export function createConnection(deps) {
       if (team) team.requestTeamsList();
       if (loop) loop.requestLoopsList();
       if (recap && team && team.viewMode.value === 'feed') recap.loadFeed();
+      if (briefing && team && team.viewMode.value === 'feed') briefing.loadFeed();
+      if (devops && team && team.viewMode.value === 'feed') devops.loadFeed();
       startPing();
       wsSend({ type: 'query_active_conversations' });
       if (deps.onConnected) deps.onConnected();
@@ -382,6 +390,8 @@ export function createConnection(deps) {
     if (team) team.requestTeamsList();
     if (loop) loop.requestLoopsList();
     if (recap && team && team.viewMode.value === 'feed') recap.loadFeed();
+    if (briefing && team && team.viewMode.value === 'feed') briefing.loadFeed();
+    if (devops && team && team.viewMode.value === 'feed') devops.loadFeed();
     startPing();
     wsSend({ type: 'query_active_conversations' });
   }
@@ -521,5 +531,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }

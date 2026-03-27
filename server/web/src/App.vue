@@ -20,6 +20,8 @@ import RecapFeed from './components/RecapFeed.vue';
 import RecapDetail from './components/RecapDetail.vue';
 import BriefingFeed from './components/BriefingFeed.vue';
 import BriefingDetail from './components/BriefingDetail.vue';
+import DevOpsFeed from './components/DevOpsFeed.vue';
+import DevOpsDetail from './components/DevOpsDetail.vue';
 
 // Create store inside component setup() so onMounted/onUnmounted hooks fire correctly
 const store = createStore();
@@ -33,6 +35,9 @@ if (store._recap) {
 }
 if (store._briefing) {
   provide('briefing', store._briefing);
+}
+if (store._devops) {
+  provide('devops', store._devops);
 }
 
 // Only destructure what App.vue template actually needs
@@ -88,6 +93,10 @@ const {
           <!-- ══ Briefing Views ══ -->
           <BriefingFeed v-if="currentView === 'briefing-feed'" />
           <BriefingDetail v-if="currentView === 'briefing-detail'" />
+
+          <!-- ══ DevOps Views ══ -->
+          <DevOpsFeed v-if="currentView === 'devops-feed'" />
+          <DevOpsDetail v-if="currentView === 'devops-detail'" />
 
           <BtwOverlay />
 

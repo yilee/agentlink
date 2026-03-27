@@ -24,6 +24,7 @@ import { createGit } from './modules/git.js';
 import { createLoop } from './modules/loop.js';
 import { createRecap } from './modules/recap.js';
 import { createBriefing } from './modules/briefing.js';
+import { createDevops } from './modules/devops.js';
 import { createRouter } from './modules/router.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
@@ -334,7 +335,7 @@ export function createStore() {
     // i18n
     t,
   });
-  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -467,6 +468,25 @@ export function createStore() {
   if (briefing) setBriefing(briefing);
   if (briefing) briefing.setRequestSessionList(sidebar.requestSessionList);
 
+  // DevOps module (only in brain/ms mode)
+  const devops = isMsRoute ? createDevops({
+    wsSend,
+    currentView,
+    switchConversation,
+    conversationCache,
+    messages,
+    currentConversationId,
+    currentClaudeSessionId,
+    needsResume,
+    loadingHistory,
+    setBrainMode,
+    scrollToBottom,
+    historySessions,
+    loadingSessions,
+  }) : null;
+  if (devops) setDevops(devops);
+  if (devops) devops.setRequestSessionList(sidebar.requestSessionList);
+
   // ── Hash router — route registration ──
   // Register routes AFTER all modules are created so handlers can access module state.
 
@@ -536,6 +556,29 @@ export function createStore() {
     });
   }
 
+  // #/devops → DevOps feed
+  if (devops) {
+    router.addRoute('/devops', () => {
+      team.viewMode.value = 'feed';
+      currentView.value = 'devops-feed';
+      devops.goBackToFeed();
+    });
+
+    // #/devops/pr/:id → DevOps PR detail
+    router.addRoute('/devops/pr/:id', ({ id }) => {
+      team.viewMode.value = 'feed';
+      currentView.value = 'devops-detail';
+      devops.selectEntity('pr', id);
+    });
+
+    // #/devops/wi/:id → DevOps WI detail
+    router.addRoute('/devops/wi/:id', ({ id }) => {
+      team.viewMode.value = 'feed';
+      currentView.value = 'devops-detail';
+      devops.selectEntity('wi', id);
+    });
+  }
+
   // ── Hash router — state → hash sync watchers ──
 
   // viewMode changes → push hash
@@ -552,6 +595,8 @@ export function createStore() {
       // Push the hash for whichever feed tab was last active
       if (currentView.value === 'briefing-feed' || currentView.value === 'briefing-detail') {
         router.push('/briefing');
+      } else if (currentView.value === 'devops-feed' || currentView.value === 'devops-detail') {
+        router.push('/devops');
       } else {
         router.push('/recap');
       }
@@ -564,6 +609,7 @@ export function createStore() {
     if (team.viewMode.value !== 'chat') return;
     if (recap && recap.recapChatActive.value) return; // recap chat has its own routing
     if (briefing && briefing.briefingChatActive.value) return; // briefing chat has its own routing
+    if (devops && devops.devopsChatActive.value) return; // devops chat has its own routing
     router.push(id ? `/chat/${id}` : '/');
   });
 
@@ -585,12 +631,26 @@ export function createStore() {
     });
   }
 
+  // DevOps detail selection → push #/devops/pr/:id or #/devops/wi/:id or #/devops
+  if (devops) {
+    watch(devops.selectedEntityId, (id) => {
+      if (router.isRestoring()) return;
+      if (team.viewMode.value !== 'feed') return;
+      if (id) {
+        router.push(`/devops/${devops.selectedEntityType.value}/${id}`);
+      } else {
+        router.push('/devops');
+      }
+    });
+  }
+
   // Feed tab switch (recap-feed ↔ briefing-feed) → push hash
   watch(currentView, (view) => {
     if (router.isRestoring()) return;
     if (team.viewMode.value !== 'feed') return;
     if (view === 'recap-feed') router.push('/recap');
     else if (view === 'briefing-feed') router.push('/briefing');
+    else if (view === 'devops-feed') router.push('/devops');
   });
 
   const isMemoryPreview = computed(() => {
@@ -702,6 +762,28 @@ export function createStore() {
         processingConversations.value[currentConversationId.value] = true;
       }
       briefing.sendBriefingChat(text, date, content);
+      scrollToBottom(true);
+      return;
+    }
+
+    // DevOps chat — route through devops module when in devops detail view
+    if (devops && devops.devopsChatActive.value && currentView.value === 'devops-detail') {
+      const entityType = devops.selectedEntityType.value;
+      const entityId = devops.selectedEntityId.value;
+      const description = devops.selectedDescription.value;
+      const mentions = devops.selectedMentions.value;
+      inputText.value = '';
+      if (inputRef.value) inputRef.value.style.height = 'auto';
+      const userMsg = {
+        id: streaming.nextId(), role: 'user',
+        content: text, timestamp: new Date(), status: 'sent',
+      };
+      messages.value.push(userMsg);
+      isProcessing.value = true;
+      if (currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
+      devops.sendDevopsChat(text, entityType, entityId, description, mentions);
       scrollToBottom(true);
       return;
     }
@@ -905,8 +987,8 @@ export function createStore() {
   watch(loopsCollapsed, _saveSidebarCollapsed);
   watch(workdirCollapsed, _saveSidebarCollapsed);
 
-  // Sync feed mode lifecycle: enter/exit feed triggers recap/briefing load/autorefresh
-  if (recap || briefing) {
+  // Sync feed mode lifecycle: enter/exit feed triggers recap/briefing/devops load/autorefresh
+  if (recap || briefing || devops) {
     watch(team.viewMode, (newMode, oldMode) => {
       if (newMode === 'feed') {
         // During hash-restore the route handler already set currentView precisely
@@ -914,10 +996,12 @@ export function createStore() {
         if (!router.isRestoring()) currentView.value = 'recap-feed';
         if (recap) { recap.loadFeed(); recap.startAutoRefresh(); }
         if (briefing) { briefing.loadFeed(); briefing.startAutoRefresh(); }
+        if (devops) { devops.loadFeed(); devops.startAutoRefresh(); }
       } else if (oldMode === 'feed') {
         currentView.value = 'chat';
         if (recap) recap.stopAutoRefresh();
         if (briefing) briefing.stopAutoRefresh();
+        if (devops) devops.stopAutoRefresh();
       }
     });
   }
@@ -1081,6 +1165,6 @@ export function createStore() {
     // Team feed helpers (depend on both store + team)
     feedAgentName, feedContentRest,
     // Domain modules (for App.vue to provide separately)
-    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing,
+    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing, _devops: devops,
   };
 }
