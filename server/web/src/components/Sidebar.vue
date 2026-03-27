@@ -564,7 +564,7 @@ const {
                     <span class="feed-sidebar-icon">&#x1F4CB;</span>
                     Recaps
                   </button>
-                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'briefing-feed' || currentView === 'briefing-detail' }" @click="currentView = 'briefing-feed'">
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'briefing-feed' || currentView === 'briefing-detail' }" @click="store.requireVersion('0.1.128', 'Daily Briefing Feed') && (currentView = 'briefing-feed')">
                     <span class="feed-sidebar-icon">&#x1F4CA;</span>
                     Briefings
                   </button>
