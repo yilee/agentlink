@@ -11,6 +11,7 @@ import { handleCreateLoop, handleUpdateLoop, handleDeleteLoop, handleListLoops, 
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
 import { listRecaps, getRecapDetail } from './recap.js';
 import { listBriefings, getBriefingDetail } from './briefing.js';
+import { listDevops, getDevopsDetail } from './devops.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -615,6 +616,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'get_briefing_detail':
       handleGetBriefingDetailMsg(msg as unknown as { date: string });
       break;
+    case 'list_devops':
+      handleListDevops();
+      break;
+    case 'get_devops_detail':
+      handleGetDevopsDetailMsg(msg as unknown as { entityType: 'pr' | 'wi'; entityId: string });
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
@@ -662,6 +669,28 @@ async function handleGetBriefingDetailMsg(msg: { date: string }): Promise<void> 
   } catch (err) {
     console.error(`[AgentLink] getBriefingDetail failed for ${msg.date}:`, err);
     send({ type: 'briefing_detail', date: msg.date, content: null, error: String(err) });
+  }
+}
+
+async function handleListDevops(): Promise<void> {
+  try {
+    const result = await listDevops(BRAIN_DATA_DIR);
+    console.log(`[AgentLink] → devops_list (${result.pullRequests.length} PRs, ${result.workItems.length} WIs)`);
+    send({ type: 'devops_list', pullRequests: result.pullRequests, workItems: result.workItems, userName: result.userName });
+  } catch (err) {
+    console.error('[AgentLink] listDevops failed:', err);
+    send({ type: 'devops_list', pullRequests: [], workItems: [], userName: '', error: String(err) });
+  }
+}
+
+async function handleGetDevopsDetailMsg(msg: { entityType: 'pr' | 'wi'; entityId: string }): Promise<void> {
+  try {
+    const detail = await getDevopsDetail(BRAIN_DATA_DIR, msg.entityType, msg.entityId);
+    console.log(`[AgentLink] → devops_detail (${msg.entityType}/${msg.entityId})`);
+    send({ type: 'devops_detail', ...detail });
+  } catch (err) {
+    console.error(`[AgentLink] getDevopsDetail failed for ${msg.entityType}/${msg.entityId}:`, err);
+    send({ type: 'devops_detail', entityType: msg.entityType, entityId: msg.entityId, description: '', mentions: '', error: String(err) });
   }
 }
 
