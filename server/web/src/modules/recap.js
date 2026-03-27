@@ -412,7 +412,7 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
   });
 
   /** Loading state: true while feed data is being fetched. */
-  const recapChatLoading = computed(() => loading.value);
+  const recapChatLoading = computed(() => loading.value || loadingSessions.value);
 
   /** Sessions grouped by recap (meeting), each group sorted by lastModified desc. */
   const groupedRecapChatSessions = computed(() => {

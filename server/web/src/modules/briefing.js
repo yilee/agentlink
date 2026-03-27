@@ -41,7 +41,7 @@ export function buildBriefingContext(content, date) {
 export function createBriefing({ wsSend, currentView, switchConversation, conversationCache,
                                  messages, currentConversationId, currentClaudeSessionId,
                                  needsResume, loadingHistory, setBrainMode, scrollToBottom,
-                                 historySessions }) {
+                                 historySessions, loadingSessions }) {
   const feedEntries = ref([]);
   const selectedDate = ref(null);
   const selectedContent = ref(null);
@@ -292,7 +292,7 @@ export function createBriefing({ wsSend, currentView, switchConversation, conver
       .sort((a, b) => b.lastModified - a.lastModified);
   });
 
-  const briefingChatLoading = computed(() => loading.value);
+  const briefingChatLoading = computed(() => loading.value || loadingSessions.value);
 
   const groupedBriefingChatSessions = computed(() => {
     const sessions = briefingChatSessions.value;

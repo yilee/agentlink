@@ -462,6 +462,7 @@ export function createStore() {
     setBrainMode,
     scrollToBottom,
     historySessions,
+    loadingSessions,
   }) : null;
   if (briefing) setBriefing(briefing);
   if (briefing) briefing.setRequestSessionList(sidebar.requestSessionList);
