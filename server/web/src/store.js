@@ -481,6 +481,7 @@ export function createStore() {
   if (recap) {
     router.addRoute('/recap', () => {
       team.viewMode.value = 'feed';
+      currentView.value = 'recap-feed';
       recap.goBackToFeed();
     });
 
