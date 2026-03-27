@@ -12,6 +12,7 @@ import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } fr
 import { listRecaps, getRecapDetail } from './recap.js';
 import { listBriefings, getBriefingDetail } from './briefing.js';
 import { listDevops, getDevopsDetail } from './devops.js';
+import { listProjects, getProjectDetail } from './project.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -329,10 +330,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const devopsEntityType = (msg as unknown as { devopsEntityType?: string }).devopsEntityType;
       const devopsEntityId = (msg as unknown as { devopsEntityId?: string }).devopsEntityId;
       const devopsEntityTitle = (msg as unknown as { devopsEntityTitle?: string }).devopsEntityTitle;
+      const projectName = (msg as unknown as { projectName?: string }).projectName;
       const chatWorkDir = existingConv?.workDir || state.workDir;
       const effectiveBrainMode = isBrainMode || isBrainHomeDir(chatWorkDir);
       console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${effectiveBrainMode} (explicit=${isBrainMode}, workDir=${isBrainHomeDir(chatWorkDir)})`);
-      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string; briefingDate?: string; devopsEntityType?: string; devopsEntityId?: string; devopsEntityTitle?: string } = {
+      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string; briefingDate?: string; devopsEntityType?: string; devopsEntityId?: string; devopsEntityTitle?: string; projectName?: string } = {
         resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       };
       if (effectiveBrainMode) {
@@ -353,7 +355,10 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       if (devopsEntityTitle) {
         chatOptions.devopsEntityTitle = devopsEntityTitle;
       }
-      const chatDir = (recapId || briefingDate || devopsEntityType) ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
+      if (projectName) {
+        chatOptions.projectName = projectName;
+      }
+      const chatDir = (recapId || briefingDate || devopsEntityType || projectName) ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
       claudeHandleChat(
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
@@ -634,6 +639,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'get_devops_detail':
       handleGetDevopsDetailMsg(msg as unknown as { entityType: 'pr' | 'wi'; entityId: string });
       break;
+    case 'list_projects':
+      handleListProjects();
+      break;
+    case 'get_project_detail':
+      handleGetProjectDetailMsg(msg as unknown as { projectName: string });
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
@@ -706,6 +717,28 @@ async function handleGetDevopsDetailMsg(msg: { entityType: 'pr' | 'wi'; entityId
   }
 }
 
+async function handleListProjects(): Promise<void> {
+  try {
+    const projects = await listProjects(BRAIN_DATA_DIR);
+    console.log(`[AgentLink] → projects_list (${projects.length} projects)`);
+    send({ type: 'projects_list', projects });
+  } catch (err) {
+    console.error('[AgentLink] listProjects failed:', err);
+    send({ type: 'projects_list', projects: [], error: String(err) });
+  }
+}
+
+async function handleGetProjectDetailMsg(msg: { projectName: string }): Promise<void> {
+  try {
+    const detail = await getProjectDetail(BRAIN_DATA_DIR, msg.projectName);
+    console.log(`[AgentLink] → project_detail (${msg.projectName})`);
+    send({ type: 'project_detail', ...detail });
+  } catch (err) {
+    console.error(`[AgentLink] getProjectDetail failed for ${msg.projectName}:`, err);
+    send({ type: 'project_detail', name: msg.projectName, error: String(err) });
+  }
+}
+
 function handleListSessions(): void {
   try {
     const sessions = listSessions(state.workDir);
@@ -726,7 +759,7 @@ function handleListSessions(): void {
     for (const bs of brainSessions) {
       if (existingIds.has(bs.sessionId)) continue;
       const meta = metaMap.get(bs.sessionId);
-      if (meta?.recapId || meta?.briefingDate || meta?.devopsEntityType) {
+      if (meta?.recapId || meta?.briefingDate || meta?.devopsEntityType || meta?.projectName) {
         enriched.push({ ...bs, ...meta });
       }
     }

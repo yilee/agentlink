@@ -11,6 +11,7 @@ export interface SessionMetadata {
   devopsEntityType?: string;
   devopsEntityId?: string;
   devopsEntityTitle?: string;
+  projectName?: string;
 }
 
 function ensureSessionsDir(): void {
