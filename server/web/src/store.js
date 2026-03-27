@@ -23,6 +23,7 @@ import { createMemory } from './modules/memory.js';
 import { createGit } from './modules/git.js';
 import { createLoop } from './modules/loop.js';
 import { createRecap } from './modules/recap.js';
+import { createBriefing } from './modules/briefing.js';
 import { createRouter } from './modules/router.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
@@ -333,7 +334,7 @@ export function createStore() {
     // i18n
     t,
   });
-  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -447,6 +448,25 @@ export function createStore() {
   if (recap) setRecap(recap);
   if (recap) recap.setRequestSessionList(sidebar.requestSessionList);
 
+  // Briefing module (only in brain/ms mode)
+  const briefing = isMsRoute ? createBriefing({
+    wsSend,
+    currentView,
+    switchConversation,
+    conversationCache,
+    messages,
+    currentConversationId,
+    currentClaudeSessionId,
+    needsResume,
+    loadingHistory,
+    setBrainMode,
+    scrollToBottom,
+    historySessions,
+    loadingSessions,
+  }) : null;
+  if (briefing) setBriefing(briefing);
+  if (briefing) briefing.setRequestSessionList(sidebar.requestSessionList);
+
   // ── Hash router — route registration ──
   // Register routes AFTER all modules are created so handlers can access module state.
 
@@ -500,6 +520,22 @@ export function createStore() {
     });
   }
 
+  // #/briefing → Briefing feed
+  if (briefing) {
+    router.addRoute('/briefing', () => {
+      team.viewMode.value = 'feed';
+      currentView.value = 'briefing-feed';
+      briefing.goBackToFeed();
+    });
+
+    // #/briefing/:date → Briefing detail
+    router.addRoute('/briefing/:date', ({ date }) => {
+      team.viewMode.value = 'feed';
+      currentView.value = 'briefing-detail';
+      briefing.selectBriefing(date);
+    });
+  }
+
   // ── Hash router — state → hash sync watchers ──
 
   // viewMode changes → push hash
@@ -513,7 +549,12 @@ export function createStore() {
     } else if (mode === 'loop') {
       router.push('/loop');
     } else if (mode === 'feed') {
-      router.push('/recap');
+      // Push the hash for whichever feed tab was last active
+      if (currentView.value === 'briefing-feed' || currentView.value === 'briefing-detail') {
+        router.push('/briefing');
+      } else {
+        router.push('/recap');
+      }
     }
   });
 
@@ -522,6 +563,7 @@ export function createStore() {
     if (router.isRestoring()) return;
     if (team.viewMode.value !== 'chat') return;
     if (recap && recap.recapChatActive.value) return; // recap chat has its own routing
+    if (briefing && briefing.briefingChatActive.value) return; // briefing chat has its own routing
     router.push(id ? `/chat/${id}` : '/');
   });
 
@@ -533,6 +575,23 @@ export function createStore() {
       router.push(id ? `/recap/${id}` : '/recap');
     });
   }
+
+  // Briefing detail selection → push #/briefing/:date or #/briefing
+  if (briefing) {
+    watch(briefing.selectedDate, (date) => {
+      if (router.isRestoring()) return;
+      if (team.viewMode.value !== 'feed') return;
+      router.push(date ? `/briefing/${date}` : '/briefing');
+    });
+  }
+
+  // Feed tab switch (recap-feed ↔ briefing-feed) → push hash
+  watch(currentView, (view) => {
+    if (router.isRestoring()) return;
+    if (team.viewMode.value !== 'feed') return;
+    if (view === 'recap-feed') router.push('/recap');
+    else if (view === 'briefing-feed') router.push('/briefing');
+  });
 
   const isMemoryPreview = computed(() => {
     if (!previewFile.value?.filePath || !memoryDir.value) return false;
@@ -623,6 +682,26 @@ export function createStore() {
         processingConversations.value[currentConversationId.value] = true;
       }
       recap.sendRecapChat(text, recapId, detail);
+      scrollToBottom(true);
+      return;
+    }
+
+    // Briefing chat — route through briefing module when in briefing detail view
+    if (briefing && briefing.briefingChatActive.value && currentView.value === 'briefing-detail') {
+      const date = briefing.selectedDate.value;
+      const content = briefing.selectedContent.value;
+      inputText.value = '';
+      if (inputRef.value) inputRef.value.style.height = 'auto';
+      const userMsg = {
+        id: streaming.nextId(), role: 'user',
+        content: text, timestamp: new Date(), status: 'sent',
+      };
+      messages.value.push(userMsg);
+      isProcessing.value = true;
+      if (currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
+      briefing.sendBriefingChat(text, date, content);
       scrollToBottom(true);
       return;
     }
@@ -826,18 +905,19 @@ export function createStore() {
   watch(loopsCollapsed, _saveSidebarCollapsed);
   watch(workdirCollapsed, _saveSidebarCollapsed);
 
-  // Sync feed mode lifecycle: enter/exit feed triggers recap load/autorefresh
-  if (recap) {
+  // Sync feed mode lifecycle: enter/exit feed triggers recap/briefing load/autorefresh
+  if (recap || briefing) {
     watch(team.viewMode, (newMode, oldMode) => {
       if (newMode === 'feed') {
         // During hash-restore the route handler already set currentView precisely
-        // (e.g. 'recap-detail'), so skip the blanket 'recap-feed' override.
+        // (e.g. 'recap-detail', 'briefing-feed'), so skip the blanket override.
         if (!router.isRestoring()) currentView.value = 'recap-feed';
-        recap.loadFeed();
-        recap.startAutoRefresh();
+        if (recap) { recap.loadFeed(); recap.startAutoRefresh(); }
+        if (briefing) { briefing.loadFeed(); briefing.startAutoRefresh(); }
       } else if (oldMode === 'feed') {
         currentView.value = 'chat';
-        recap.stopAutoRefresh();
+        if (recap) recap.stopAutoRefresh();
+        if (briefing) briefing.stopAutoRefresh();
       }
     });
   }
@@ -1001,6 +1081,6 @@ export function createStore() {
     // Team feed helpers (depend on both store + team)
     feedAgentName, feedContentRest,
     // Domain modules (for App.vue to provide separately)
-    _team, _loop, _sidebar, _files, _recap: recap,
+    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing,
   };
 }

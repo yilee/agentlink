@@ -153,6 +153,18 @@ function isPrevAssistant(msgIdx) {
           </div>
         </div>
 
+        <!-- Briefing context (collapsed by default, injected in briefing chat first message) -->
+        <div v-else-if="msg.role === 'briefing-context'" class="context-summary-wrapper meeting-context-wrapper">
+          <div class="context-summary-bar meeting-context-bar" @click="toggleContextSummary(msg)">
+            <svg class="context-summary-icon" viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 13.25 16H2.75A1.75 1.75 0 0 1 1 14.25V3.75C1 2.784 1.784 2 2.75 2H4V.75A.75.75 0 0 1 4.75 0ZM2.5 7.5v6.75c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V7.5Zm10.75-4H2.75a.25.25 0 0 0-.25.25V6h11V3.75a.25.25 0 0 0-.25-.25Z"/></svg>
+            <span class="context-summary-label">{{ t('chat.briefingContextInjected') }}</span>
+            <span class="context-summary-toggle">{{ msg.contextExpanded ? t('chat.hide') : t('chat.show') }}</span>
+          </div>
+          <div v-if="msg.contextExpanded" class="context-summary-body">
+            <div class="markdown-body" v-html="getRenderedContent({ role: 'assistant', content: msg.content })"></div>
+          </div>
+        </div>
+
         <!-- System message -->
         <div v-else-if="msg.role === 'system'" :class="['system-msg', { 'compact-msg': msg.isCompactStart, 'command-output-msg': msg.isCommandOutput, 'error-msg': msg.isError }]">
           <template v-if="msg.isCompactStart && !msg.compactDone">

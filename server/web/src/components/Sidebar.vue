@@ -5,6 +5,7 @@ import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
 import RecapChatHistory from './RecapChatHistory.vue';
+import BriefingChatHistory from './BriefingChatHistory.vue';
 
 const vFocus = { mounted: (el) => el.focus() };
 
@@ -559,16 +560,17 @@ const {
               </template>
               <div v-if="viewMode === 'feed'" class="feed-sidebar">
                 <div class="feed-sidebar-nav">
-                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'recap-feed' || currentView === 'recap-detail' }">
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'recap-feed' || currentView === 'recap-detail' }" @click="currentView = 'recap-feed'">
                     <span class="feed-sidebar-icon">&#x1F4CB;</span>
                     Recaps
                   </button>
-                  <button class="feed-sidebar-btn disabled" disabled title="Coming soon">
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'briefing-feed' || currentView === 'briefing-detail' }" @click="currentView = 'briefing-feed'">
                     <span class="feed-sidebar-icon">&#x1F4CA;</span>
                     Briefings
                   </button>
                 </div>
-                <RecapChatHistory />
+                <RecapChatHistory v-if="currentView === 'recap-feed' || currentView === 'recap-detail'" />
+                <BriefingChatHistory v-if="currentView === 'briefing-feed' || currentView === 'briefing-detail'" />
               </div>
             </div>
           </div>

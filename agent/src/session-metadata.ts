@@ -7,6 +7,7 @@ const SESSIONS_DIR = join(CONFIG_DIR, 'sessions');
 export interface SessionMetadata {
   brainMode?: boolean;
   recapId?: string;
+  briefingDate?: string;
 }
 
 function ensureSessionsDir(): void {

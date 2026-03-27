@@ -10,6 +10,7 @@ import { handleCreateTeam, handleDissolveTeam, handleListTeams, handleGetTeam, h
 import { handleCreateLoop, handleUpdateLoop, handleDeleteLoop, handleListLoops, handleGetLoop, handleRunLoop, handleCancelLoopExecution, handleListLoopExecutions, handleGetLoopExecutionMessages, handleQueryLoopStatus } from './loop-handlers.js';
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
 import { listRecaps, getRecapDetail } from './recap.js';
+import { listBriefings, getBriefingDetail } from './briefing.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -323,10 +324,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const existingConv = chatConvId ? getConversation(chatConvId) : getConversation();
       const isBrainMode = (msg as unknown as { brainMode?: boolean }).brainMode;
       const recapId = (msg as unknown as { recapId?: string }).recapId;
+      const briefingDate = (msg as unknown as { briefingDate?: string }).briefingDate;
       const chatWorkDir = existingConv?.workDir || state.workDir;
       const effectiveBrainMode = isBrainMode || isBrainHomeDir(chatWorkDir);
       console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${effectiveBrainMode} (explicit=${isBrainMode}, workDir=${isBrainHomeDir(chatWorkDir)})`);
-      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string } = {
+      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string; briefingDate?: string } = {
         resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       };
       if (effectiveBrainMode) {
@@ -335,7 +337,10 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       if (recapId) {
         chatOptions.recapId = recapId;
       }
-      const chatDir = recapId ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
+      if (briefingDate) {
+        chatOptions.briefingDate = briefingDate;
+      }
+      const chatDir = (recapId || briefingDate) ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
       claudeHandleChat(
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
@@ -397,11 +402,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         rebindConversation(m.claudeSessionId, convId);
       }
 
-      // Try current workDir first; fall back to BRAIN_DATA_DIR for recap chat sessions
+      // Try current workDir first; fall back to BRAIN_DATA_DIR for recap/briefing chat sessions
       let history = readSessionMessages(state.workDir, m.claudeSessionId);
       if (history.length === 0) {
         const sessionMeta_ = loadSessionMetadata(m.claudeSessionId);
-        if (sessionMeta_.recapId) {
+        if (sessionMeta_.recapId || sessionMeta_.briefingDate) {
           history = readSessionMessages(BRAIN_DATA_DIR, m.claudeSessionId);
         }
       }
@@ -604,6 +609,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'get_recap_detail':
       handleGetRecapDetailMsg(msg as unknown as { recapId: string; sidecarPath: string });
       break;
+    case 'list_briefings':
+      handleListBriefings();
+      break;
+    case 'get_briefing_detail':
+      handleGetBriefingDetailMsg(msg as unknown as { date: string });
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
@@ -632,6 +643,28 @@ async function handleGetRecapDetailMsg(msg: { recapId: string; sidecarPath: stri
   }
 }
 
+async function handleListBriefings(): Promise<void> {
+  try {
+    const briefings = await listBriefings(BRAIN_DATA_DIR);
+    console.log(`[AgentLink] → briefings_list (${briefings.length} briefings)`);
+    send({ type: 'briefings_list', briefings });
+  } catch (err) {
+    console.error('[AgentLink] listBriefings failed:', err);
+    send({ type: 'briefings_list', briefings: [], error: String(err) });
+  }
+}
+
+async function handleGetBriefingDetailMsg(msg: { date: string }): Promise<void> {
+  try {
+    const detail = await getBriefingDetail(BRAIN_DATA_DIR, msg.date);
+    console.log(`[AgentLink] → briefing_detail (${msg.date})`);
+    send({ type: 'briefing_detail', date: msg.date, content: detail.content });
+  } catch (err) {
+    console.error(`[AgentLink] getBriefingDetail failed for ${msg.date}:`, err);
+    send({ type: 'briefing_detail', date: msg.date, content: null, error: String(err) });
+  }
+}
+
 function handleListSessions(): void {
   try {
     const sessions = listSessions(state.workDir);
@@ -644,15 +677,15 @@ function handleListSessions(): void {
       ...(isBrainHome ? { brainMode: true } : {}),
     }));
 
-    // Always merge recap chat sessions from BrainData directory — they live under a
+    // Always merge recap/briefing chat sessions from BrainData directory — they live under a
     // different Claude project folder, so listSessions(state.workDir) misses them.
-    // Recap history should be visible regardless of the current workDir.
+    // Recap/briefing history should be visible regardless of the current workDir.
     const brainSessions = listSessions(BRAIN_DATA_DIR);
     const existingIds = new Set(enriched.map(s => s.sessionId));
     for (const bs of brainSessions) {
       if (existingIds.has(bs.sessionId)) continue;
       const meta = metaMap.get(bs.sessionId);
-      if (meta?.recapId) {
+      if (meta?.recapId || meta?.briefingDate) {
         enriched.push({ ...bs, ...meta });
       }
     }
@@ -683,11 +716,11 @@ function handleDeleteSession(sessionId: string): void {
     send({ type: 'error', message: 'Cannot delete a session while it is processing.' });
     return;
   }
-  // Try current workDir first; if not found, check if it's a recap session in BrainData
+  // Try current workDir first; if not found, check if it's a recap/briefing session in BrainData
   let deleted = deleteSession(state.workDir, sessionId);
   if (!deleted) {
     const meta = loadSessionMetadata(sessionId);
-    if (meta.recapId) {
+    if (meta.recapId || meta.briefingDate) {
       deleted = deleteSession(BRAIN_DATA_DIR, sessionId);
     }
   }
@@ -700,11 +733,11 @@ function handleDeleteSession(sessionId: string): void {
 }
 
 function handleRenameSession(sessionId: string, newTitle: string): void {
-  // Try current workDir first; if not found, check if it's a recap session in BrainData
+  // Try current workDir first; if not found, check if it's a recap/briefing session in BrainData
   let renamed = renameSession(state.workDir, sessionId, newTitle);
   if (!renamed) {
     const meta = loadSessionMetadata(sessionId);
-    if (meta.recapId) {
+    if (meta.recapId || meta.briefingDate) {
       renamed = renameSession(BRAIN_DATA_DIR, sessionId, newTitle);
     }
   }

@@ -31,11 +31,11 @@ export function buildHistoryBatch(history, nextId) {
           timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
         });
       } else {
-        // Check for meeting context injection (recap chat first message)
+        // Check for meeting/briefing context injection (recap/briefing chat first message)
         const parsed = parseMeetingContext(h.content);
         if (parsed) {
           batch.push({
-            id: nextId(), role: 'meeting-context',
+            id: nextId(), role: parsed.type === 'briefing' ? 'briefing-context' : 'meeting-context',
             content: parsed.context, contextExpanded: false,
             timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
           });

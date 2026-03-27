@@ -110,6 +110,10 @@ export function createClaudeOutputHandlers(deps) {
       if (deps.recap) {
         deps.recap.handleRecapSessionStarted(msg.claudeSessionId);
       }
+      // Auto-rename briefing chat session with user's first question
+      if (deps.briefing) {
+        deps.briefing.handleBriefingSessionStarted(msg.claudeSessionId);
+      }
     },
     // Exposed for other handlers that need to finalize streaming
     finalizeStreamingMsg,
