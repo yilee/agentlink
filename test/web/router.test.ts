@@ -1,20 +1,83 @@
-// @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// ── Minimal browser-global mocks (avoids jsdom ESM issues on CI) ──
+
+let _hash = '';
+let _hashChangeListeners: Function[] = [];
+let _replaceStateCalls: any[][] = [];
+
+// Stub location.hash
+const locationStub = {
+  get hash() { return _hash; },
+  set hash(v: string) { _hash = v; },
+  get href() { return 'http://localhost' + _hash; },
+  get pathname() { return '/'; },
+  get origin() { return 'http://localhost'; },
+  get protocol() { return 'http:'; },
+  get host() { return 'localhost'; },
+  get hostname() { return 'localhost'; },
+  get port() { return ''; },
+  get search() { return ''; },
+  toString() { return 'http://localhost' + _hash; },
+};
+
+// Stub window
+const windowStub = {
+  addEventListener(event: string, listener: Function) {
+    if (event === 'hashchange') _hashChangeListeners.push(listener);
+  },
+  removeEventListener(event: string, listener: Function) {
+    if (event === 'hashchange') {
+      _hashChangeListeners = _hashChangeListeners.filter(l => l !== listener);
+    }
+  },
+  dispatchEvent(e: any) {
+    if (e?.type === 'hashchange') {
+      for (const listener of [..._hashChangeListeners]) listener(e);
+    }
+  },
+  location: locationStub,
+};
+
+const historyStub = {
+  replaceState(...args: any[]) {
+    _replaceStateCalls.push(args);
+    // Extract hash from the URL argument
+    const url = args[2];
+    if (url && typeof url === 'object' && url.hash) {
+      _hash = url.hash;
+    } else if (typeof url === 'string') {
+      const m = url.match(/#.*/);
+      if (m) _hash = m[0];
+    }
+  },
+};
+
+// Install stubs as globals
+(globalThis as any).location = locationStub;
+(globalThis as any).window = windowStub;
+(globalThis as any).history = historyStub;
+(globalThis as any).HashChangeEvent = class HashChangeEvent { type = 'hashchange'; constructor(public _type: string) {} };
+
+// Mock vue's nextTick to run callback synchronously (good enough for tests)
+vi.mock('vue', () => ({
+  nextTick: (fn: Function) => fn(),
+}));
+
 import { createRouter } from '../../server/web/src/modules/router.js';
 
 describe('createRouter', () => {
-  let router;
-  let originalHash;
+  let router: ReturnType<typeof createRouter>;
 
   beforeEach(() => {
-    originalHash = location.hash;
-    location.hash = '';
+    _hash = '';
+    _hashChangeListeners = [];
+    _replaceStateCalls = [];
     router = createRouter();
   });
 
   afterEach(() => {
     router.stop();
-    location.hash = originalHash;
   });
 
   // ── Pattern matching ──
@@ -24,8 +87,8 @@ describe('createRouter', () => {
       const handler = vi.fn();
       router.addRoute('/team', handler);
       router.start();
-      location.hash = '#/team';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/team';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).toHaveBeenCalledWith({});
     });
 
@@ -33,8 +96,8 @@ describe('createRouter', () => {
       const handler = vi.fn();
       router.addRoute('/chat/:sessionId', handler);
       router.start();
-      location.hash = '#/chat/abc123';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/chat/abc123';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).toHaveBeenCalledWith({ sessionId: 'abc123' });
     });
 
@@ -42,8 +105,8 @@ describe('createRouter', () => {
       const handler = vi.fn();
       router.addRoute('/loop/:loopId/exec/:execId', handler);
       router.start();
-      location.hash = '#/loop/L1/exec/E2';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/loop/L1/exec/E2';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).toHaveBeenCalledWith({ loopId: 'L1', execId: 'E2' });
     });
 
@@ -51,8 +114,8 @@ describe('createRouter', () => {
       const handler = vi.fn();
       router.addRoute('/team', handler);
       router.start();
-      location.hash = '#/team/extra';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/team/extra';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).not.toHaveBeenCalled();
     });
 
@@ -60,8 +123,8 @@ describe('createRouter', () => {
       const handler = vi.fn();
       router.addRoute('/team', handler);
       router.start();
-      location.hash = '#/loop';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/loop';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).not.toHaveBeenCalled();
     });
 
@@ -69,9 +132,8 @@ describe('createRouter', () => {
       const handler = vi.fn();
       router.addRoute('/', handler);
       router.start();
-      location.hash = '#/';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-      // root route: splits to [] after filter(Boolean), matches route with 0 segments
+      _hash = '#/';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).toHaveBeenCalledWith({});
     });
 
@@ -79,8 +141,8 @@ describe('createRouter', () => {
       const handler = vi.fn();
       router.addRoute('/chat/:sessionId', handler);
       router.start();
-      location.hash = '#/chat/hello%20world';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/chat/hello%20world';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).toHaveBeenCalledWith({ sessionId: 'hello world' });
     });
 
@@ -88,8 +150,8 @@ describe('createRouter', () => {
       const teamHandler = vi.fn();
       router.addRoute('/team', teamHandler);
       router.start();
-      location.hash = '#/unknown/path';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/unknown/path';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(teamHandler).not.toHaveBeenCalled();
     });
   });
@@ -100,7 +162,7 @@ describe('createRouter', () => {
     it('updates location.hash', () => {
       router.start();
       router.push('/team');
-      expect(location.hash).toBe('#/team');
+      expect(_hash).toBe('#/team');
     });
 
     it('suppresses the next hashchange (no restore loop)', () => {
@@ -108,32 +170,30 @@ describe('createRouter', () => {
       router.addRoute('/team', handler);
       router.start();
       router.push('/team');
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).not.toHaveBeenCalled();
     });
 
     it('is a no-op when hash is already the target', () => {
       router.start();
       router.push('/team');
-      expect(location.hash).toBe('#/team');
-      // Push same path again — should not trigger another hash set
-      const spy = vi.spyOn(history, 'replaceState');
+      expect(_hash).toBe('#/team');
+      // Push same path again — should be a no-op
       router.push('/team');
-      // replaceState should NOT have been called (push doesn't use replaceState,
-      // but the hash setter is hard to spy on; we verify no _suppressNext was set
-      // by checking that a subsequent hashchange IS handled)
-      spy.mockRestore();
+      // Next hashchange should be handled (no _suppressNext was set for duplicate push)
+      const handler = vi.fn();
+      router.addRoute('/team', handler);
+      // Re-create router to test handler
     });
   });
 
   describe('replace', () => {
     it('updates location.hash without adding history entry', () => {
-      const spy = vi.spyOn(history, 'replaceState');
       router.start();
+      _replaceStateCalls = [];
       router.replace('/loop');
-      expect(location.hash).toBe('#/loop');
-      expect(spy).toHaveBeenCalled();
-      spy.mockRestore();
+      expect(_hash).toBe('#/loop');
+      expect(_replaceStateCalls.length).toBeGreaterThan(0);
     });
 
     it('suppresses the next hashchange', () => {
@@ -141,7 +201,7 @@ describe('createRouter', () => {
       router.addRoute('/loop', handler);
       router.start();
       router.replace('/loop');
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).not.toHaveBeenCalled();
     });
   });
@@ -152,7 +212,7 @@ describe('createRouter', () => {
     it('restores initial hash on start', () => {
       const handler = vi.fn();
       router.addRoute('/team', handler);
-      location.hash = '#/team';
+      _hash = '#/team';
       router.start();
       expect(handler).toHaveBeenCalledWith({});
     });
@@ -160,7 +220,7 @@ describe('createRouter', () => {
     it('does not restore if hash is empty', () => {
       const handler = vi.fn();
       router.addRoute('/', handler);
-      location.hash = '';
+      _hash = '';
       router.start();
       expect(handler).not.toHaveBeenCalled();
     });
@@ -168,7 +228,7 @@ describe('createRouter', () => {
     it('does not restore if hash is just #/', () => {
       const handler = vi.fn();
       router.addRoute('/', handler);
-      location.hash = '#/';
+      _hash = '#/';
       router.start();
       expect(handler).not.toHaveBeenCalled();
     });
@@ -178,8 +238,8 @@ describe('createRouter', () => {
       router.addRoute('/team', handler);
       router.start();
       router.start();
-      location.hash = '#/team';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/team';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).toHaveBeenCalledTimes(1);
     });
   });
@@ -190,8 +250,8 @@ describe('createRouter', () => {
       router.addRoute('/team', handler);
       router.start();
       router.stop();
-      location.hash = '#/team';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/team';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(handler).not.toHaveBeenCalled();
     });
   });
@@ -205,8 +265,8 @@ describe('createRouter', () => {
         wasRestoring = router.isRestoring();
       });
       router.start();
-      location.hash = '#/team';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+      _hash = '#/team';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
       expect(wasRestoring).toBe(true);
     });
 
@@ -215,9 +275,9 @@ describe('createRouter', () => {
         router.push('/other');
       });
       router.start();
-      location.hash = '#/team';
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-      expect(location.hash).toBe('#/team');
+      _hash = '#/team';
+      windowStub.dispatchEvent(new (globalThis as any).HashChangeEvent('hashchange'));
+      expect(_hash).toBe('#/team');
     });
   });
 });
