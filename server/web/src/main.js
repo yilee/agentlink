@@ -19,6 +19,7 @@ import './css/toast.css';
 import './css/confirm-dialog.css';
 import './css/recap-feed.css';
 import './css/recap-detail.css';
+import './css/briefing.css';
 
 function mountApp() {
   createApp(App).mount('#app');

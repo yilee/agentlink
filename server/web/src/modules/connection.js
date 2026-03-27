@@ -7,6 +7,7 @@ import { createExecutionHandlers } from './handlers/execution-handler.js';
 import { createFileHandlers } from './handlers/file-handler.js';
 import { createFeatureHandlers } from './handlers/feature-handler.js';
 import { createRecapHandlers } from './handlers/recap-handler.js';
+import { createBriefingHandlers } from './handlers/briefing-handler.js';
 
 const MAX_RECONNECT_ATTEMPTS = 50;
 const RECONNECT_BASE_DELAY = 1000;
@@ -49,6 +50,8 @@ export function createConnection(deps) {
   function setGit(g) { git = g; }
   let recap = null;
   function setRecap(r) { recap = r; }
+  let briefing = null;
+  function setBriefing(b) { briefing = b; }
 
   let ws = null;
   let sessionKey = null;
@@ -143,6 +146,7 @@ export function createConnection(deps) {
     get loop() { return loop; },                   // late-bound
     get git() { return git; },                     // late-bound
     get recap() { return recap; },                 // late-bound
+    get briefing() { return briefing; },             // late-bound
   };
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
@@ -154,6 +158,7 @@ export function createConnection(deps) {
   const fileHandlers = createFileHandlers(handlerDeps);
   const featureHandlers = createFeatureHandlers(handlerDeps);
   const recapHandlers = createRecapHandlers(handlerDeps);
+  const briefingHandlers = createBriefingHandlers(handlerDeps);
 
   // Dispatch map: message type → handler(msg, scheduleHighlight)
   const handlers = {
@@ -163,6 +168,7 @@ export function createConnection(deps) {
     ...fileHandlers,
     ...featureHandlers,
     ...recapHandlers,
+    ...briefingHandlers,
   };
 
   function connect(scheduleHighlight) {
@@ -515,5 +521,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }

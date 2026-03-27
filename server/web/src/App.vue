@@ -18,6 +18,8 @@ import PreviewPanel from './components/PreviewPanel.vue';
 import ToastContainer from './components/ToastContainer.vue';
 import RecapFeed from './components/RecapFeed.vue';
 import RecapDetail from './components/RecapDetail.vue';
+import BriefingFeed from './components/BriefingFeed.vue';
+import BriefingDetail from './components/BriefingDetail.vue';
 
 // Create store inside component setup() so onMounted/onUnmounted hooks fire correctly
 const store = createStore();
@@ -28,6 +30,9 @@ provide('sidebar', store._sidebar);
 provide('files', store._files);
 if (store._recap) {
   provide('recap', store._recap);
+}
+if (store._briefing) {
+  provide('briefing', store._briefing);
 }
 
 // Only destructure what App.vue template actually needs
@@ -79,6 +84,10 @@ const {
           <!-- ══ Recap Views ══ -->
           <RecapFeed v-if="currentView === 'recap-feed'" />
           <RecapDetail v-if="currentView === 'recap-detail'" />
+
+          <!-- ══ Briefing Views ══ -->
+          <BriefingFeed v-if="currentView === 'briefing-feed'" />
+          <BriefingDetail v-if="currentView === 'briefing-detail'" />
 
           <BtwOverlay />
 

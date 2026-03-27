@@ -10,6 +10,7 @@ import { handleCreateTeam, handleDissolveTeam, handleListTeams, handleGetTeam, h
 import { handleCreateLoop, handleUpdateLoop, handleDeleteLoop, handleListLoops, handleGetLoop, handleRunLoop, handleCancelLoopExecution, handleListLoopExecutions, handleGetLoopExecutionMessages, handleQueryLoopStatus } from './loop-handlers.js';
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
 import { listRecaps, getRecapDetail } from './recap.js';
+import { listBriefings, getBriefingDetail } from './briefing.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -604,6 +605,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'get_recap_detail':
       handleGetRecapDetailMsg(msg as unknown as { recapId: string; sidecarPath: string });
       break;
+    case 'list_briefings':
+      handleListBriefings();
+      break;
+    case 'get_briefing_detail':
+      handleGetBriefingDetailMsg(msg as unknown as { date: string });
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
@@ -629,6 +636,28 @@ async function handleGetRecapDetailMsg(msg: { recapId: string; sidecarPath: stri
   } catch (err) {
     console.error(`[AgentLink] getRecapDetail failed for ${msg.recapId}:`, err);
     send({ type: 'recap_detail', recapId: msg.recapId, detail: null, error: String(err) });
+  }
+}
+
+async function handleListBriefings(): Promise<void> {
+  try {
+    const briefings = await listBriefings(BRAIN_DATA_DIR);
+    console.log(`[AgentLink] → briefings_list (${briefings.length} briefings)`);
+    send({ type: 'briefings_list', briefings });
+  } catch (err) {
+    console.error('[AgentLink] listBriefings failed:', err);
+    send({ type: 'briefings_list', briefings: [], error: String(err) });
+  }
+}
+
+async function handleGetBriefingDetailMsg(msg: { date: string }): Promise<void> {
+  try {
+    const detail = await getBriefingDetail(BRAIN_DATA_DIR, msg.date);
+    console.log(`[AgentLink] → briefing_detail (${msg.date})`);
+    send({ type: 'briefing_detail', date: msg.date, content: detail.content });
+  } catch (err) {
+    console.error(`[AgentLink] getBriefingDetail failed for ${msg.date}:`, err);
+    send({ type: 'briefing_detail', date: msg.date, content: null, error: String(err) });
   }
 }
 
