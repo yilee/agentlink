@@ -5,6 +5,7 @@ import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
 import RecapChatHistory from './RecapChatHistory.vue';
+import BriefingChatHistory from './BriefingChatHistory.vue';
 
 const vFocus = { mounted: (el) => el.focus() };
 
@@ -569,6 +570,7 @@ const {
                   </button>
                 </div>
                 <RecapChatHistory v-if="currentView === 'recap-feed' || currentView === 'recap-detail'" />
+                <BriefingChatHistory v-if="currentView === 'briefing-feed' || currentView === 'briefing-detail'" />
               </div>
             </div>
           </div>

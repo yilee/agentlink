@@ -1,27 +1,71 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Lightweight mock of Vue's ref/computed so we don't need the full vue package
+// Lightweight mock of Vue's ref/computed/nextTick so we don't need the full vue package
 function ref(val: unknown) {
   return { value: val };
 }
 function computed(fn: () => unknown) {
   return { get value() { return fn(); } };
 }
-vi.mock('vue', () => ({ ref, computed }));
+function nextTick(fn?: () => void) {
+  if (fn) fn();
+  return Promise.resolve();
+}
+vi.mock('vue', () => ({ ref, computed, nextTick }));
 
-import { createBriefing } from '../../server/web/src/modules/briefing.js';
+// Mock useConfirmDialog
+vi.mock('../../server/web/src/composables/useConfirmDialog.js', () => ({
+  useConfirmDialog: () => ({ showConfirm: vi.fn() }),
+}));
+
+// Mock localStorage if running outside browser
+if (typeof globalThis.localStorage === 'undefined') {
+  const store: Record<string, string> = {};
+  (globalThis as any).localStorage = {
+    getItem: (k: string) => store[k] ?? null,
+    setItem: (k: string, v: string) => { store[k] = v; },
+    removeItem: (k: string) => { delete store[k]; },
+  };
+}
+
+// Mock document.body and addEventListener/removeEventListener
+if (typeof globalThis.document === 'undefined') {
+  (globalThis as any).document = {
+    body: { style: {} },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+}
+
+import { createBriefing, buildBriefingContext } from '../../server/web/src/modules/briefing.js';
+
+function makeDeps(overrides: Record<string, unknown> = {}) {
+  return {
+    wsSend: vi.fn(),
+    currentView: ref('briefing-feed'),
+    switchConversation: vi.fn(),
+    conversationCache: ref({}),
+    messages: ref([]),
+    currentConversationId: ref('main'),
+    currentClaudeSessionId: ref(null),
+    needsResume: ref(false),
+    loadingHistory: ref(false),
+    setBrainMode: vi.fn(),
+    scrollToBottom: vi.fn(),
+    historySessions: ref([]),
+    ...overrides,
+  };
+}
 
 describe('createBriefing', () => {
-  let wsSend: ReturnType<typeof vi.fn>;
-  let currentView: { value: string };
+  let deps: ReturnType<typeof makeDeps>;
   let briefing: ReturnType<typeof createBriefing>;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 2, 27, 10, 0, 0)); // Thu Mar 27 2026
-    wsSend = vi.fn();
-    currentView = ref('briefing-feed');
-    briefing = createBriefing({ wsSend, currentView });
+    deps = makeDeps();
+    briefing = createBriefing(deps as any);
   });
 
   afterEach(() => {
@@ -33,7 +77,7 @@ describe('createBriefing', () => {
     it('sets loading and sends list_briefings message', () => {
       briefing.loadFeed();
       expect(briefing.loading.value).toBe(true);
-      expect(wsSend).toHaveBeenCalledWith({ type: 'list_briefings' });
+      expect(deps.wsSend).toHaveBeenCalledWith({ type: 'list_briefings' });
     });
   });
 
@@ -62,8 +106,8 @@ describe('createBriefing', () => {
       expect(briefing.selectedDate.value).toBe('2026-03-27');
       expect(briefing.selectedContent.value).toBeNull();
       expect(briefing.detailLoading.value).toBe(true);
-      expect(currentView.value).toBe('briefing-detail');
-      expect(wsSend).toHaveBeenCalledWith({ type: 'get_briefing_detail', date: '2026-03-27' });
+      expect(deps.currentView.value).toBe('briefing-detail');
+      expect(deps.wsSend).toHaveBeenCalledWith({ type: 'get_briefing_detail', date: '2026-03-27' });
     });
   });
 
@@ -91,7 +135,7 @@ describe('createBriefing', () => {
       expect(briefing.selectedDate.value).toBeNull();
       expect(briefing.selectedContent.value).toBeNull();
       expect(briefing.detailLoading.value).toBe(false);
-      expect(currentView.value).toBe('briefing-feed');
+      expect(deps.currentView.value).toBe('briefing-feed');
     });
   });
 
@@ -130,16 +174,16 @@ describe('createBriefing', () => {
   describe('auto-refresh', () => {
     it('starts and stops interval timer', () => {
       briefing.startAutoRefresh();
-      expect(wsSend).not.toHaveBeenCalled();
+      expect(deps.wsSend).not.toHaveBeenCalled();
 
       // Advance past the 30-minute interval
       vi.advanceTimersByTime(30 * 60 * 1000);
-      expect(wsSend).toHaveBeenCalledWith({ type: 'list_briefings' });
+      expect(deps.wsSend).toHaveBeenCalledWith({ type: 'list_briefings' });
 
       briefing.stopAutoRefresh();
-      wsSend.mockClear();
+      deps.wsSend.mockClear();
       vi.advanceTimersByTime(30 * 60 * 1000);
-      expect(wsSend).not.toHaveBeenCalled();
+      expect(deps.wsSend).not.toHaveBeenCalled();
     });
 
     it('restarts timer on repeated startAutoRefresh calls', () => {
@@ -147,7 +191,22 @@ describe('createBriefing', () => {
       briefing.startAutoRefresh(); // should clear old timer
       vi.advanceTimersByTime(30 * 60 * 1000);
       // Should only fire once (not twice from two timers)
-      expect(wsSend).toHaveBeenCalledTimes(1);
+      expect(deps.wsSend).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('buildBriefingContext', () => {
+  it('wraps content with context header', () => {
+    const result = buildBriefingContext('# My Briefing');
+    expect(result).toContain('Briefing Context');
+    expect(result).toContain('# My Briefing');
+    expect(result).toMatch(/---\n$/);
+  });
+
+  it('returns empty string for falsy content', () => {
+    expect(buildBriefingContext('')).toBe('');
+    expect(buildBriefingContext(null)).toBe('');
+    expect(buildBriefingContext(undefined)).toBe('');
   });
 });

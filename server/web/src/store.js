@@ -452,8 +452,19 @@ export function createStore() {
   const briefing = isMsRoute ? createBriefing({
     wsSend,
     currentView,
+    switchConversation,
+    conversationCache,
+    messages,
+    currentConversationId,
+    currentClaudeSessionId,
+    needsResume,
+    loadingHistory,
+    setBrainMode,
+    scrollToBottom,
+    historySessions,
   }) : null;
   if (briefing) setBriefing(briefing);
+  if (briefing) briefing.setRequestSessionList(sidebar.requestSessionList);
 
   // ── Hash router — route registration ──
   // Register routes AFTER all modules are created so handlers can access module state.
@@ -551,6 +562,7 @@ export function createStore() {
     if (router.isRestoring()) return;
     if (team.viewMode.value !== 'chat') return;
     if (recap && recap.recapChatActive.value) return; // recap chat has its own routing
+    if (briefing && briefing.briefingChatActive.value) return; // briefing chat has its own routing
     router.push(id ? `/chat/${id}` : '/');
   });
 
@@ -669,6 +681,26 @@ export function createStore() {
         processingConversations.value[currentConversationId.value] = true;
       }
       recap.sendRecapChat(text, recapId, detail);
+      scrollToBottom(true);
+      return;
+    }
+
+    // Briefing chat — route through briefing module when in briefing detail view
+    if (briefing && briefing.briefingChatActive.value && currentView.value === 'briefing-detail') {
+      const date = briefing.selectedDate.value;
+      const content = briefing.selectedContent.value;
+      inputText.value = '';
+      if (inputRef.value) inputRef.value.style.height = 'auto';
+      const userMsg = {
+        id: streaming.nextId(), role: 'user',
+        content: text, timestamp: new Date(), status: 'sent',
+      };
+      messages.value.push(userMsg);
+      isProcessing.value = true;
+      if (currentConversationId.value) {
+        processingConversations.value[currentConversationId.value] = true;
+      }
+      briefing.sendBriefingChat(text, date, content);
       scrollToBottom(true);
       return;
     }
