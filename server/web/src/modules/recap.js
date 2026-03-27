@@ -411,8 +411,9 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
       .sort((a, b) => b.lastModified - a.lastModified);
   });
 
-  /** Loading state: true while feed data is being fetched. */
-  const recapChatLoading = computed(() => loading.value || loadingSessions.value);
+  /** Loading state for refresh button spinner — stays true for at least 500ms so animation is visible. */
+  const _refreshing = ref(false);
+  const recapChatLoading = computed(() => loading.value || loadingSessions.value || _refreshing.value);
 
   /** Sessions grouped by recap (meeting), each group sorted by lastModified desc. */
   const groupedRecapChatSessions = computed(() => {
@@ -440,8 +441,10 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
 
   /** Refresh recap chat history by re-fetching both sessions list and feed entries. */
   function refreshRecapChats() {
+    _refreshing.value = true;
     loadFeed();
     if (_requestSessionList) _requestSessionList();
+    setTimeout(() => { _refreshing.value = false; }, 500);
   }
 
   function setRequestSessionList(fn) { _requestSessionList = fn; }

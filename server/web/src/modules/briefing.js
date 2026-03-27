@@ -292,7 +292,8 @@ export function createBriefing({ wsSend, currentView, switchConversation, conver
       .sort((a, b) => b.lastModified - a.lastModified);
   });
 
-  const briefingChatLoading = computed(() => loading.value || loadingSessions.value);
+  const _refreshing = ref(false);
+  const briefingChatLoading = computed(() => loading.value || loadingSessions.value || _refreshing.value);
 
   const groupedBriefingChatSessions = computed(() => {
     const sessions = briefingChatSessions.value;
@@ -315,8 +316,10 @@ export function createBriefing({ wsSend, currentView, switchConversation, conver
   });
 
   function refreshBriefingChats() {
+    _refreshing.value = true;
     loadFeed();
     if (_requestSessionList) _requestSessionList();
+    setTimeout(() => { _refreshing.value = false; }, 500);
   }
 
   function setRequestSessionList(fn) { _requestSessionList = fn; }
