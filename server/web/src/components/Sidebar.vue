@@ -569,7 +569,7 @@ const {
                     <span class="feed-sidebar-icon">&#x1F4CA;</span>
                     Briefings
                   </button>
-                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'devops-feed' || currentView === 'devops-detail' }" @click="store.requireVersion('0.1.128', 'DevOps Board') && (currentView = 'devops-feed')">
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'devops-feed' || currentView === 'devops-detail' }" @click="store.requireVersion('0.1.129', 'DevOps Board') && (currentView = 'devops-feed')">
                     <span class="feed-sidebar-icon">&#x1F6E0;</span>
                     DevOps
                   </button>
