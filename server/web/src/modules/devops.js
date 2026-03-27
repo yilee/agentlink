@@ -28,10 +28,17 @@ function groupPrsByRole(prs, userName) {
   const groups = { 'My PRs': [], 'Reviewing': [], 'Other': [] };
   const lowerUser = (userName || '').toLowerCase();
 
+  function matchesUser(name) {
+    if (!name || !lowerUser) return false;
+    const lower = name.toLowerCase();
+    // Match "kailunshi" in "Kailun Shi" — compare with and without spaces
+    return lower.includes(lowerUser) || lower.replace(/\s+/g, '').includes(lowerUser);
+  }
+
   for (const pr of prs) {
-    const isAuthor = pr.created_by && pr.created_by.toLowerCase().includes(lowerUser);
+    const isAuthor = matchesUser(pr.created_by);
     const isReviewer = !isAuthor && pr.reviewers &&
-      pr.reviewers.some(r => r.name.toLowerCase().includes(lowerUser));
+      pr.reviewers.some(r => matchesUser(r.name));
 
     if (isAuthor) groups['My PRs'].push(pr);
     else if (isReviewer) groups['Reviewing'].push(pr);

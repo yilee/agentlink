@@ -58,7 +58,7 @@ const priorityClass = computed(() => {
         <span class="devops-card-repo">{{ entry.repository }}</span>
       </template>
       <template v-else>
-        <span :class="['devops-card-priority', priorityClass]">P{{ entry.priority || 'N/A' }}</span>
+        <span :class="['devops-card-priority', priorityClass]">{{ entry.priority && entry.priority !== 'N/A' ? 'P' + entry.priority : 'N/A' }}</span>
         <span class="devops-card-dot">&middot;</span>
         <span class="devops-card-project">{{ entry.project }}</span>
       </template>

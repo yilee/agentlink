@@ -37,6 +37,11 @@ export interface WiEntry {
 const PR_DIR = 'devops/pull_requests';
 const WI_DIR = 'devops/work_items';
 
+/** Read a text file and normalize Windows-style \r\n to \n. */
+function readText(filePath: string): string {
+  return fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n');
+}
+
 /** Simple YAML parser for flat key-value metadata files (no nested objects). */
 function parseSimpleYaml(content: string): Record<string, string | number> {
   const result: Record<string, string | number> = {};
@@ -86,18 +91,34 @@ function parseReviewers(content: string): Array<{ name: string; vote: string }> 
   return reviewers;
 }
 
+/** Check if description.md contains real content (not just error/placeholder text). */
+function hasValidDescription(content: string): boolean {
+  if (!content) return false;
+  // Failed WI fetches start with "Fetching work item:"
+  if (content.startsWith('Fetching work item:')) return false;
+  // Failed PR fetches have "(No URL available to fetch PR details)"
+  if (content.includes('(No URL available to fetch PR details)') && !content.includes('## Status')) return false;
+  // Error fetching (timeout, command failure)
+  if (content.startsWith('(Error fetching')) return false;
+  return true;
+}
+
 /** Parse title from description.md H1 line. */
 function parseTitleFromDescription(content: string, entityType: 'pr' | 'wi'): string | null {
   const h1Match = content.match(/^# (.+)$/m);
   if (!h1Match) return null;
   const h1 = h1Match[1];
   if (entityType === 'pr') {
-    // "Pull Request #6325916: Add video asset..." → "Add video asset..."
-    const m = h1.match(/Pull Request #\d+:\s*(.+)/);
-    return m ? m[1].trim() : h1;
+    // "Pull Request #6325916: Add video asset..." or "PR 6490982: Fixing setup..."
+    const m = h1.match(/(?:Pull Request #|PR\s+)\d+:\s*(.+)/);
+    if (!m) return h1;
+    const title = m[1].trim();
+    // Treat literal "None" as null (Brain placeholder for missing titles)
+    return title === 'None' ? null : title;
   } else {
     // "[Task 6493060] Refactor Slideshow..." or "[Bug 128076] AnswersException..."
-    const m = h1.match(/\[(?:Task|Bug|Feature|User Story|Epic|Issue)\s+\d+\]\s*(.+)/i);
+    // Also handle "[Map DSat 6493725] ...", "[Bug Instance 6507192] ..."
+    const m = h1.match(/\[(?:[\w\s]+?)\s+\d+\]\s*(.+)/i);
     return m ? m[1].trim() : h1;
   }
 }
@@ -129,25 +150,31 @@ async function listPullRequests(brainHome: string): Promise<PrEntry[]> {
 
       try {
         const metaPath = path.join(prDir, 'metadata.yaml');
-        const metaContent = fs.readFileSync(metaPath, 'utf-8');
+        const metaContent = readText(metaPath);
         const meta = parseSimpleYaml(metaContent);
 
         let descContent = '';
         const descPath = path.join(prDir, 'description.md');
         try {
-          descContent = fs.readFileSync(descPath, 'utf-8');
+          descContent = readText(descPath);
         } catch { /* no description.md */ }
 
-        const title = (meta.title && meta.title !== 'null')
-          ? String(meta.title)
-          : parseTitleFromDescription(descContent, 'pr');
+        // Skip PRs with no valid description (failed fetch, placeholder)
+        if (!hasValidDescription(descContent) && (!meta.title || meta.title === 'null' || meta.title === 'None')) {
+          continue;
+        }
+
+        const metaTitle = meta.title && meta.title !== 'null' && meta.title !== 'None'
+          ? String(meta.title) : null;
+        const title = metaTitle || parseTitleFromDescription(descContent, 'pr');
 
         entries.push({
           pr_number: String(meta.pr_number || ''),
           title,
           url: String(meta.url || ''),
           project: String(meta.project || ''),
-          repository: String(meta.repository || ''),
+          repository: meta.repository && meta.repository !== 'null' && meta.repository !== 'None'
+            ? String(meta.repository) : '',
           source: (String(meta.source || '') === 'github' ? 'github' : 'azure_devops'),
           total_mentions: Number(meta.total_mentions) || 0,
           status: extractTableField(descContent, 'Status').toLowerCase() || 'active',
@@ -189,14 +216,19 @@ async function listWorkItems(brainHome: string): Promise<WiEntry[]> {
 
       try {
         const metaPath = path.join(wiDir, 'metadata.yaml');
-        const metaContent = fs.readFileSync(metaPath, 'utf-8');
+        const metaContent = readText(metaPath);
         const meta = parseSimpleYaml(metaContent);
 
         let descContent = '';
         const descPath = path.join(wiDir, 'description.md');
         try {
-          descContent = fs.readFileSync(descPath, 'utf-8');
+          descContent = readText(descPath);
         } catch { /* no description.md */ }
+
+        // Skip WIs with no valid description (failed fetch, 404 errors)
+        if (!hasValidDescription(descContent)) {
+          continue;
+        }
 
         const title = parseTitleFromDescription(descContent, 'wi') || String(meta.title || null);
 
@@ -254,11 +286,11 @@ export async function getDevopsDetail(
   let mentions = '';
 
   try {
-    description = fs.readFileSync(path.join(entityDir, 'description.md'), 'utf-8');
+    description = readText(path.join(entityDir, 'description.md'));
   } catch { /* no description.md */ }
 
   try {
-    mentions = fs.readFileSync(path.join(entityDir, 'mentions.md'), 'utf-8');
+    mentions = readText(path.join(entityDir, 'mentions.md'));
   } catch { /* no mentions.md */ }
 
   if (!description && !mentions) {
