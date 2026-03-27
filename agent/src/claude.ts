@@ -84,6 +84,9 @@ export interface ConversationState {
   recapId: string | null;
   // Briefing date: when set, session metadata is persisted with briefingDate for briefing chat association
   briefingDate: string | null;
+  // DevOps entity type/id: when set, session metadata is persisted for devops chat association
+  devopsEntityType: string | null;
+  devopsEntityId: string | null;
 }
 
 export type SendFn = (msg: Record<string, unknown>) => void;
@@ -282,6 +285,8 @@ export interface HandleChatOptions {
   brainMode?: boolean;
   recapId?: string;
   briefingDate?: string;
+  devopsEntityType?: string;
+  devopsEntityId?: string;
 }
 
 /**
@@ -311,6 +316,8 @@ export function handleChat(
   if (options?.brainMode) state.brainMode = true;
   if (options?.recapId) state.recapId = options.recapId;
   if (options?.briefingDate) state.briefingDate = options.briefingDate;
+  if (options?.devopsEntityType) state.devopsEntityType = options.devopsEntityType;
+  if (options?.devopsEntityId) state.devopsEntityId = options.devopsEntityId;
 
   // When plan mode was just toggled, prepend a notice to the user's message
   // so Claude knows the mode changed (its old conversation history may say
@@ -630,6 +637,8 @@ export function restartConversation(
     brainMode: existing.brainMode,
     recapId: existing.recapId,
     briefingDate: existing.briefingDate,
+    devopsEntityType: existing.devopsEntityType,
+    devopsEntityId: existing.devopsEntityId,
   };
   conversations.set(convId, newState);
 
@@ -671,6 +680,8 @@ export function createPlaceholderConversation(
     brainMode: false,
     recapId: null,
     briefingDate: null,
+    devopsEntityType: null,
+    devopsEntityId: null,
   };
   conversations.set(convId, placeholder);
 }
@@ -754,6 +765,8 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     brainMode: brainMode || existing?.brainMode || false,
     recapId: existing?.recapId || null,
     briefingDate: existing?.briefingDate || null,
+    devopsEntityType: existing?.devopsEntityType || null,
+    devopsEntityId: existing?.devopsEntityId || null,
   };
 
   conversations.set(conversationId, state);
@@ -910,6 +923,10 @@ async function processOutput(
             // Persist briefing date metadata to disk
             if (state.briefingDate) {
               saveSessionMetadata(state.claudeSessionId, { briefingDate: state.briefingDate });
+            }
+            // Persist devops entity metadata to disk
+            if (state.devopsEntityType && state.devopsEntityId) {
+              saveSessionMetadata(state.claudeSessionId, { devopsEntityType: state.devopsEntityType, devopsEntityId: state.devopsEntityId });
             }
           }
 

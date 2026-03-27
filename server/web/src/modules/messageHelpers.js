@@ -5,6 +5,7 @@ import { renderMarkdown } from './markdown.js';
 const CONTEXT_SUMMARY_PREFIX = 'This session is being continued from a previous conversation';
 const MEETING_CONTEXT_PREFIX = '[Meeting Context';
 const BRIEFING_CONTEXT_PREFIX = '[Briefing Context';
+const DEVOPS_CONTEXT_PREFIX = '[DevOps Context';
 
 function parseToolInput(msg) {
   if (msg._parsedInput !== undefined) return msg._parsedInput;
@@ -28,6 +29,7 @@ export function parseMeetingContext(text) {
   let type = null;
   if (trimmed.startsWith(MEETING_CONTEXT_PREFIX)) type = 'meeting';
   else if (trimmed.startsWith(BRIEFING_CONTEXT_PREFIX)) type = 'briefing';
+  else if (trimmed.startsWith(DEVOPS_CONTEXT_PREFIX)) type = 'devops';
   if (!type) return null;
   // Split on the first '---' separator between context and user question
   const sepIdx = trimmed.indexOf('\n---\n');
