@@ -11,6 +11,7 @@ import { handleCreateLoop, handleUpdateLoop, handleDeleteLoop, handleListLoops, 
 import { loadSessionMetadata, loadAllSessionMetadata, deleteSessionMetadata } from './session-metadata.js';
 import { listRecaps, getRecapDetail } from './recap.js';
 import { listBriefings, getBriefingDetail } from './briefing.js';
+import { listDevops, getDevopsDetail } from './devops.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -325,10 +326,13 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const isBrainMode = (msg as unknown as { brainMode?: boolean }).brainMode;
       const recapId = (msg as unknown as { recapId?: string }).recapId;
       const briefingDate = (msg as unknown as { briefingDate?: string }).briefingDate;
+      const devopsEntityType = (msg as unknown as { devopsEntityType?: string }).devopsEntityType;
+      const devopsEntityId = (msg as unknown as { devopsEntityId?: string }).devopsEntityId;
+      const devopsEntityTitle = (msg as unknown as { devopsEntityTitle?: string }).devopsEntityTitle;
       const chatWorkDir = existingConv?.workDir || state.workDir;
       const effectiveBrainMode = isBrainMode || isBrainHomeDir(chatWorkDir);
       console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${effectiveBrainMode} (explicit=${isBrainMode}, workDir=${isBrainHomeDir(chatWorkDir)})`);
-      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string; briefingDate?: string } = {
+      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string; briefingDate?: string; devopsEntityType?: string; devopsEntityId?: string; devopsEntityTitle?: string } = {
         resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       };
       if (effectiveBrainMode) {
@@ -340,7 +344,16 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       if (briefingDate) {
         chatOptions.briefingDate = briefingDate;
       }
-      const chatDir = (recapId || briefingDate) ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
+      if (devopsEntityType) {
+        chatOptions.devopsEntityType = devopsEntityType;
+      }
+      if (devopsEntityId) {
+        chatOptions.devopsEntityId = devopsEntityId;
+      }
+      if (devopsEntityTitle) {
+        chatOptions.devopsEntityTitle = devopsEntityTitle;
+      }
+      const chatDir = (recapId || briefingDate || devopsEntityType) ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
       claudeHandleChat(
         chatConvId,
         (msg as unknown as { prompt: string }).prompt,
@@ -406,7 +419,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       let history = readSessionMessages(state.workDir, m.claudeSessionId);
       if (history.length === 0) {
         const sessionMeta_ = loadSessionMetadata(m.claudeSessionId);
-        if (sessionMeta_.recapId || sessionMeta_.briefingDate) {
+        if (sessionMeta_.recapId || sessionMeta_.briefingDate || sessionMeta_.devopsEntityType) {
           history = readSessionMessages(BRAIN_DATA_DIR, m.claudeSessionId);
         }
       }
@@ -615,6 +628,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'get_briefing_detail':
       handleGetBriefingDetailMsg(msg as unknown as { date: string });
       break;
+    case 'list_devops':
+      handleListDevops();
+      break;
+    case 'get_devops_detail':
+      handleGetDevopsDetailMsg(msg as unknown as { entityType: 'pr' | 'wi'; entityId: string });
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
@@ -665,6 +684,28 @@ async function handleGetBriefingDetailMsg(msg: { date: string }): Promise<void> 
   }
 }
 
+async function handleListDevops(): Promise<void> {
+  try {
+    const result = await listDevops(BRAIN_DATA_DIR);
+    console.log(`[AgentLink] → devops_list (${result.pullRequests.length} PRs, ${result.workItems.length} WIs)`);
+    send({ type: 'devops_list', pullRequests: result.pullRequests, workItems: result.workItems, userName: result.userName });
+  } catch (err) {
+    console.error('[AgentLink] listDevops failed:', err);
+    send({ type: 'devops_list', pullRequests: [], workItems: [], userName: '', error: String(err) });
+  }
+}
+
+async function handleGetDevopsDetailMsg(msg: { entityType: 'pr' | 'wi'; entityId: string }): Promise<void> {
+  try {
+    const detail = await getDevopsDetail(BRAIN_DATA_DIR, msg.entityType, msg.entityId);
+    console.log(`[AgentLink] → devops_detail (${msg.entityType}/${msg.entityId})`);
+    send({ type: 'devops_detail', ...detail });
+  } catch (err) {
+    console.error(`[AgentLink] getDevopsDetail failed for ${msg.entityType}/${msg.entityId}:`, err);
+    send({ type: 'devops_detail', entityType: msg.entityType, entityId: msg.entityId, description: '', mentions: '', error: String(err) });
+  }
+}
+
 function handleListSessions(): void {
   try {
     const sessions = listSessions(state.workDir);
@@ -677,15 +718,15 @@ function handleListSessions(): void {
       ...(isBrainHome ? { brainMode: true } : {}),
     }));
 
-    // Always merge recap/briefing chat sessions from BrainData directory — they live under a
+    // Always merge recap/briefing/devops chat sessions from BrainData directory — they live under a
     // different Claude project folder, so listSessions(state.workDir) misses them.
-    // Recap/briefing history should be visible regardless of the current workDir.
+    // These sessions should be visible regardless of the current workDir.
     const brainSessions = listSessions(BRAIN_DATA_DIR);
     const existingIds = new Set(enriched.map(s => s.sessionId));
     for (const bs of brainSessions) {
       if (existingIds.has(bs.sessionId)) continue;
       const meta = metaMap.get(bs.sessionId);
-      if (meta?.recapId || meta?.briefingDate) {
+      if (meta?.recapId || meta?.briefingDate || meta?.devopsEntityType) {
         enriched.push({ ...bs, ...meta });
       }
     }
@@ -716,11 +757,11 @@ function handleDeleteSession(sessionId: string): void {
     send({ type: 'error', message: 'Cannot delete a session while it is processing.' });
     return;
   }
-  // Try current workDir first; if not found, check if it's a recap/briefing session in BrainData
+  // Try current workDir first; if not found, check if it's a recap/briefing/devops session in BrainData
   let deleted = deleteSession(state.workDir, sessionId);
   if (!deleted) {
     const meta = loadSessionMetadata(sessionId);
-    if (meta.recapId || meta.briefingDate) {
+    if (meta.recapId || meta.briefingDate || meta.devopsEntityType) {
       deleted = deleteSession(BRAIN_DATA_DIR, sessionId);
     }
   }
@@ -733,11 +774,11 @@ function handleDeleteSession(sessionId: string): void {
 }
 
 function handleRenameSession(sessionId: string, newTitle: string): void {
-  // Try current workDir first; if not found, check if it's a recap/briefing session in BrainData
+  // Try current workDir first; if not found, check if it's a recap/briefing/devops session in BrainData
   let renamed = renameSession(state.workDir, sessionId, newTitle);
   if (!renamed) {
     const meta = loadSessionMetadata(sessionId);
-    if (meta.recapId || meta.briefingDate) {
+    if (meta.recapId || meta.briefingDate || meta.devopsEntityType) {
       renamed = renameSession(BRAIN_DATA_DIR, sessionId, newTitle);
     }
   }

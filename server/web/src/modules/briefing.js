@@ -28,7 +28,7 @@ export function buildBriefingContext(content, date) {
       + `- Daily briefing: reports/daily/${date}.md\n\n`
       + 'You can Read this file for the full daily briefing content if needed.\n';
   }
-  ctx += '\n---\n';
+  ctx += '\n</brain-context>\n';
   return ctx;
 }
 

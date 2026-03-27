@@ -337,7 +337,7 @@ export function createRecap({ wsSend, switchConversation, conversationCache, mes
     let prompt = text;
     if (!currentClaudeSessionId.value) {
       const ctx = buildMeetingContext(detail);
-      prompt = ctx + '\n---\n' + text;
+      prompt = ctx + '\n</brain-context>\n' + text;
       // Save user's actual question for auto-rename when session_started arrives
       _pendingRecapTitle = text.trim().substring(0, 100);
     }

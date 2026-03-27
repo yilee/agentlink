@@ -5,6 +5,7 @@ import { renderMarkdown } from './markdown.js';
 const CONTEXT_SUMMARY_PREFIX = 'This session is being continued from a previous conversation';
 const MEETING_CONTEXT_PREFIX = '[Meeting Context';
 const BRIEFING_CONTEXT_PREFIX = '[Briefing Context';
+const DEVOPS_CONTEXT_PREFIX = '[DevOps Context';
 
 function parseToolInput(msg) {
   if (msg._parsedInput !== undefined) return msg._parsedInput;
@@ -28,13 +29,21 @@ export function parseMeetingContext(text) {
   let type = null;
   if (trimmed.startsWith(MEETING_CONTEXT_PREFIX)) type = 'meeting';
   else if (trimmed.startsWith(BRIEFING_CONTEXT_PREFIX)) type = 'briefing';
+  else if (trimmed.startsWith(DEVOPS_CONTEXT_PREFIX)) type = 'devops';
   if (!type) return null;
-  // Split on the first '---' separator between context and user question
-  const sepIdx = trimmed.indexOf('\n---\n');
+  // Split on the closing </brain-context> tag (legacy: fall back to \n---\n)
+  const TAG = '</brain-context>';
+  let sepIdx = trimmed.indexOf(TAG);
+  let sepLen = TAG.length;
+  if (sepIdx === -1) {
+    // Legacy fallback for sessions created before tag-based separator
+    sepIdx = trimmed.indexOf('\n---\n');
+    sepLen = 5;
+  }
   if (sepIdx === -1) return null;
   return {
     context: trimmed.substring(0, sepIdx).trim(),
-    userText: trimmed.substring(sepIdx + 5).trim(),   // skip '\n---\n'
+    userText: trimmed.substring(sepIdx + sepLen).trim(),
     type,
   };
 }

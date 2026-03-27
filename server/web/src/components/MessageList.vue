@@ -165,6 +165,18 @@ function isPrevAssistant(msgIdx) {
           </div>
         </div>
 
+        <!-- DevOps context (collapsed by default, injected in devops chat first message) -->
+        <div v-else-if="msg.role === 'devops-context'" class="context-summary-wrapper meeting-context-wrapper">
+          <div class="context-summary-bar meeting-context-bar" @click="toggleContextSummary(msg)">
+            <svg class="context-summary-icon" viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M5.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM5.5 4.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm5 7a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm0-3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM2 12.5v1a.5.5 0 0 0 1 0v-1a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1a.5.5 0 0 0 1 0v-1a2 2 0 0 0-.268-1H9a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1a.5.5 0 0 0 1 0v-1a2 2 0 0 0-2-2H9.268A2 2 0 0 0 9 8.5v-4a.5.5 0 0 0-1 0v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a.5.5 0 0 0-1 0v4a2 2 0 0 0 .268 1H2a2 2 0 0 0-2 2v1a.5.5 0 0 0 1 0v-1a1 1 0 0 1 1-1Z"/></svg>
+            <span class="context-summary-label">{{ t('chat.devopsContextInjected') }}</span>
+            <span class="context-summary-toggle">{{ msg.contextExpanded ? t('chat.hide') : t('chat.show') }}</span>
+          </div>
+          <div v-if="msg.contextExpanded" class="context-summary-body">
+            <div class="markdown-body" v-html="getRenderedContent({ role: 'assistant', content: msg.content })"></div>
+          </div>
+        </div>
+
         <!-- System message -->
         <div v-else-if="msg.role === 'system'" :class="['system-msg', { 'compact-msg': msg.isCompactStart, 'command-output-msg': msg.isCommandOutput, 'error-msg': msg.isError }]">
           <template v-if="msg.isCompactStart && !msg.compactDone">

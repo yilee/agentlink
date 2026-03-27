@@ -6,6 +6,7 @@ import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
 import RecapChatHistory from './RecapChatHistory.vue';
 import BriefingChatHistory from './BriefingChatHistory.vue';
+import DevOpsChatHistory from './DevOpsChatHistory.vue';
 
 const vFocus = { mounted: (el) => el.focus() };
 
@@ -568,9 +569,14 @@ const {
                     <span class="feed-sidebar-icon">&#x1F4CA;</span>
                     Briefings
                   </button>
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'devops-feed' || currentView === 'devops-detail' }" @click="store.requireVersion('0.1.128', 'DevOps Board') && (currentView = 'devops-feed')">
+                    <span class="feed-sidebar-icon">&#x1F6E0;</span>
+                    DevOps
+                  </button>
                 </div>
                 <RecapChatHistory v-if="currentView === 'recap-feed' || currentView === 'recap-detail'" />
                 <BriefingChatHistory v-if="currentView === 'briefing-feed' || currentView === 'briefing-detail'" />
+                <DevOpsChatHistory v-if="currentView === 'devops-feed' || currentView === 'devops-detail'" />
               </div>
             </div>
           </div>

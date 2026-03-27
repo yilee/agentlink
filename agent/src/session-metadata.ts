@@ -8,6 +8,9 @@ export interface SessionMetadata {
   brainMode?: boolean;
   recapId?: string;
   briefingDate?: string;
+  devopsEntityType?: string;
+  devopsEntityId?: string;
+  devopsEntityTitle?: string;
 }
 
 function ensureSessionsDir(): void {
