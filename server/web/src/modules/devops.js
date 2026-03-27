@@ -17,7 +17,7 @@ export function buildDevopsContext(description, mentions, entityType, entityId) 
     + `- Description: devops/${subdir}${entityId}/description.md\n`
     + `- Mentions: devops/${subdir}${entityId}/mentions.md\n\n`
     + 'You can Read these files for the full content if needed.\n';
-  ctx += '\n---\n';
+  ctx += '\n</brain-context>\n';
   return ctx;
 }
 

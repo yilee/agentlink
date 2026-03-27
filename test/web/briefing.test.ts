@@ -201,7 +201,7 @@ describe('buildBriefingContext', () => {
     const result = buildBriefingContext('# My Briefing');
     expect(result).toContain('Briefing Context');
     expect(result).toContain('# My Briefing');
-    expect(result).toMatch(/---\n$/);
+    expect(result).toMatch(/<\/brain-context>\n$/);
   });
 
   it('includes source file path when date provided', () => {
