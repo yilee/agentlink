@@ -204,6 +204,17 @@ describe('buildBriefingContext', () => {
     expect(result).toMatch(/---\n$/);
   });
 
+  it('includes source file path when date provided', () => {
+    const result = buildBriefingContext('# My Briefing', '2026-03-27');
+    expect(result).toContain('Source Files');
+    expect(result).toContain('reports/daily/2026-03-27.md');
+  });
+
+  it('omits source files section when no date', () => {
+    const result = buildBriefingContext('# My Briefing');
+    expect(result).not.toContain('Source Files');
+  });
+
   it('returns empty string for falsy content', () => {
     expect(buildBriefingContext('')).toBe('');
     expect(buildBriefingContext(null)).toBe('');

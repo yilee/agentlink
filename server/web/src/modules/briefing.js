@@ -19,11 +19,17 @@ function groupBriefingsByDate(entries) {
  * Build briefing context string for injecting into first chat message.
  * Pure function — easily testable.
  */
-export function buildBriefingContext(content) {
+export function buildBriefingContext(content, date) {
   if (!content) return '';
-  return '[Briefing Context — You are answering questions about this daily briefing]\n\n'
-    + content
-    + '\n---\n';
+  let ctx = '[Briefing Context — You are answering questions about this daily briefing]\n\n'
+    + content + '\n';
+  if (date) {
+    ctx += '\n## Source Files (relative to working directory ~/BrainData/)\n'
+      + `- Daily briefing: reports/daily/${date}.md\n\n`
+      + 'You can Read this file for the full daily briefing content if needed.\n';
+  }
+  ctx += '\n---\n';
+  return ctx;
 }
 
 /**
@@ -217,7 +223,7 @@ export function createBriefing({ wsSend, currentView, switchConversation, conver
   function sendBriefingChat(text, date, content) {
     let prompt = text;
     if (!currentClaudeSessionId.value) {
-      const ctx = buildBriefingContext(content);
+      const ctx = buildBriefingContext(content, date);
       prompt = ctx + text;
       _pendingBriefingTitle = text.trim().substring(0, 100);
     }

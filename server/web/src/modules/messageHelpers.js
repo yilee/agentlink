@@ -4,6 +4,7 @@ import { renderMarkdown } from './markdown.js';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const CONTEXT_SUMMARY_PREFIX = 'This session is being continued from a previous conversation';
 const MEETING_CONTEXT_PREFIX = '[Meeting Context';
+const BRIEFING_CONTEXT_PREFIX = '[Briefing Context';
 
 function parseToolInput(msg) {
   if (msg._parsedInput !== undefined) return msg._parsedInput;
@@ -17,19 +18,24 @@ export function isContextSummary(text) {
 }
 
 /**
- * Detect meeting context injected into the first recap chat message.
- * Returns { context, userText } if found, or null if not a meeting context message.
+ * Detect meeting/briefing context injected into the first chat message.
+ * Returns { context, userText, type } if found, or null if not a context message.
+ * type is 'meeting' or 'briefing'.
  */
 export function parseMeetingContext(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trimStart();
-  if (!trimmed.startsWith(MEETING_CONTEXT_PREFIX)) return null;
+  let type = null;
+  if (trimmed.startsWith(MEETING_CONTEXT_PREFIX)) type = 'meeting';
+  else if (trimmed.startsWith(BRIEFING_CONTEXT_PREFIX)) type = 'briefing';
+  if (!type) return null;
   // Split on the first '---' separator between context and user question
   const sepIdx = trimmed.indexOf('\n---\n');
   if (sepIdx === -1) return null;
   return {
     context: trimmed.substring(0, sepIdx).trim(),
     userText: trimmed.substring(sepIdx + 5).trim(),   // skip '\n---\n'
+    type,
   };
 }
 
