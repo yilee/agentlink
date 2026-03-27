@@ -328,10 +328,11 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       const briefingDate = (msg as unknown as { briefingDate?: string }).briefingDate;
       const devopsEntityType = (msg as unknown as { devopsEntityType?: string }).devopsEntityType;
       const devopsEntityId = (msg as unknown as { devopsEntityId?: string }).devopsEntityId;
+      const devopsEntityTitle = (msg as unknown as { devopsEntityTitle?: string }).devopsEntityTitle;
       const chatWorkDir = existingConv?.workDir || state.workDir;
       const effectiveBrainMode = isBrainMode || isBrainHomeDir(chatWorkDir);
       console.log(`[AgentLink] chat: conversationId=${chatConvId}, existingConv.planMode=${existingConv?.planMode}, brainMode=${effectiveBrainMode} (explicit=${isBrainMode}, workDir=${isBrainHomeDir(chatWorkDir)})`);
-      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string; briefingDate?: string; devopsEntityType?: string; devopsEntityId?: string } = {
+      const chatOptions: { resumeSessionId?: string; brainMode?: boolean; recapId?: string; briefingDate?: string; devopsEntityType?: string; devopsEntityId?: string; devopsEntityTitle?: string } = {
         resumeSessionId: (msg as unknown as { resumeSessionId?: string }).resumeSessionId,
       };
       if (effectiveBrainMode) {
@@ -348,6 +349,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       }
       if (devopsEntityId) {
         chatOptions.devopsEntityId = devopsEntityId;
+      }
+      if (devopsEntityTitle) {
+        chatOptions.devopsEntityTitle = devopsEntityTitle;
       }
       const chatDir = (recapId || briefingDate || devopsEntityType) ? BRAIN_DATA_DIR : (existingConv?.workDir || state.workDir);
       claudeHandleChat(
@@ -415,7 +419,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       let history = readSessionMessages(state.workDir, m.claudeSessionId);
       if (history.length === 0) {
         const sessionMeta_ = loadSessionMetadata(m.claudeSessionId);
-        if (sessionMeta_.recapId || sessionMeta_.briefingDate) {
+        if (sessionMeta_.recapId || sessionMeta_.briefingDate || sessionMeta_.devopsEntityType) {
           history = readSessionMessages(BRAIN_DATA_DIR, m.claudeSessionId);
         }
       }

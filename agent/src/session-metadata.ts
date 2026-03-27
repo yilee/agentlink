@@ -10,6 +10,7 @@ export interface SessionMetadata {
   briefingDate?: string;
   devopsEntityType?: string;
   devopsEntityId?: string;
+  devopsEntityTitle?: string;
 }
 
 function ensureSessionsDir(): void {

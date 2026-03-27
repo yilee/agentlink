@@ -772,6 +772,7 @@ export function createStore() {
       const entityId = devops.selectedEntityId.value;
       const description = devops.selectedDescription.value;
       const mentions = devops.selectedMentions.value;
+      const entityTitle = devops.selectedEntity.value?.title || null;
       inputText.value = '';
       if (inputRef.value) inputRef.value.style.height = 'auto';
       const userMsg = {
@@ -783,7 +784,7 @@ export function createStore() {
       if (currentConversationId.value) {
         processingConversations.value[currentConversationId.value] = true;
       }
-      devops.sendDevopsChat(text, entityType, entityId, description, mentions);
+      devops.sendDevopsChat(text, entityType, entityId, description, mentions, entityTitle);
       scrollToBottom(true);
       return;
     }

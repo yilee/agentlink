@@ -283,7 +283,7 @@ export function createDevops({ wsSend, currentView, switchConversation, conversa
     _previousConvId = null;
   }
 
-  function sendDevopsChat(text, entityType, entityId, description, mentions) {
+  function sendDevopsChat(text, entityType, entityId, description, mentions, entityTitle) {
     let prompt = text;
     if (!currentClaudeSessionId.value) {
       const ctx = buildDevopsContext(description, mentions, entityType, entityId);
@@ -298,6 +298,7 @@ export function createDevops({ wsSend, currentView, switchConversation, conversa
       brainMode: true,
       devopsEntityType: entityType,
       devopsEntityId: entityId,
+      devopsEntityTitle: entityTitle || null,
     });
   }
 
@@ -350,6 +351,16 @@ export function createDevops({ wsSend, currentView, switchConversation, conversa
   const _refreshing = ref(false);
   const devopsChatLoading = computed(() => loading.value || loadingSessions.value || _refreshing.value);
 
+  /** Look up entity title from feed data. */
+  function _lookupEntityTitle(entityType, entityId) {
+    if (entityType === 'pr') {
+      const pr = prEntries.value.find(p => p.pr_number === entityId);
+      return pr?.title || null;
+    }
+    const wi = wiEntries.value.find(w => w.work_item_id === entityId);
+    return wi?.title || null;
+  }
+
   const groupedDevopsChatSessions = computed(() => {
     const sessions = devopsChatSessions.value;
     if (!sessions.length) return [];
@@ -357,10 +368,17 @@ export function createDevops({ wsSend, currentView, switchConversation, conversa
     for (const s of sessions) {
       const key = `${s.devopsEntityType}-${s.devopsEntityId}`;
       if (!groupMap[key]) {
+        const typeLabel = s.devopsEntityType === 'pr' ? 'PR' : 'WI';
+        const entityTitle = s.devopsEntityTitle
+          || _lookupEntityTitle(s.devopsEntityType, s.devopsEntityId);
         groupMap[key] = {
           entityType: s.devopsEntityType,
           entityId: s.devopsEntityId,
-          label: `${s.devopsEntityType === 'pr' ? 'PR' : 'WI'} #${s.devopsEntityId}`,
+          entityKey: key,
+          entityTitle: entityTitle
+            ? `${typeLabel} #${s.devopsEntityId} — ${entityTitle}`
+            : `${typeLabel} #${s.devopsEntityId}`,
+          label: `${typeLabel} #${s.devopsEntityId}`,
           sessions: [],
         };
       }
