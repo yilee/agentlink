@@ -1020,6 +1020,13 @@ export function createStore() {
       return;
     }
 
+    // Outline toggle shortcut
+    if (e.key === 'O' && e.ctrlKey && e.shiftKey) {
+      e.preventDefault();
+      toggleOutline();
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       sendMessage();
