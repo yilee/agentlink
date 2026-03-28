@@ -96,7 +96,7 @@ export function createDevops({ wsSend, currentView, switchConversation, conversa
 
   // ── Detail / Chat resize handle ──
   const MIN_DETAIL_HEIGHT = 60;
-  const MAX_DETAIL_RATIO = 0.7;
+  const MAX_DETAIL_RATIO = 0.92;
   let _resizing = false;
   let _startY = 0;
   let _startHeight = 0;

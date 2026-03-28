@@ -118,7 +118,6 @@
 .briefing-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-left: 3px solid #14b8a6;
   border-radius: 10px;
   padding: 0.85rem 1rem;
   cursor: pointer;
@@ -126,7 +125,7 @@
 }
 
 .briefing-card:hover {
-  border-color: #14b8a6;
+  border-color: var(--accent);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
@@ -612,9 +611,9 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding-left: 4px;
+  padding-left: 2px;
   border-left: 2px solid var(--border);
-  margin-left: 8px;
+  margin-left: 4px;
 }
 
 .briefing-chat-item {

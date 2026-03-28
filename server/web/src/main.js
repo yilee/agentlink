@@ -21,6 +21,7 @@ import './css/recap-feed.css';
 import './css/recap-detail.css';
 import './css/briefing.css';
 import './css/devops.css';
+import './css/project.css';
 
 function mountApp() {
   createApp(App).mount('#app');

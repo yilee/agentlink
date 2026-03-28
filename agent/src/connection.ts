@@ -424,7 +424,7 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       let history = readSessionMessages(state.workDir, m.claudeSessionId);
       if (history.length === 0) {
         const sessionMeta_ = loadSessionMetadata(m.claudeSessionId);
-        if (sessionMeta_.recapId || sessionMeta_.briefingDate || sessionMeta_.devopsEntityType) {
+        if (sessionMeta_.recapId || sessionMeta_.briefingDate || sessionMeta_.devopsEntityType || sessionMeta_.projectName) {
           history = readSessionMessages(BRAIN_DATA_DIR, m.claudeSessionId);
         }
       }
@@ -790,11 +790,11 @@ function handleDeleteSession(sessionId: string): void {
     send({ type: 'error', message: 'Cannot delete a session while it is processing.' });
     return;
   }
-  // Try current workDir first; if not found, check if it's a recap/briefing/devops session in BrainData
+  // Try current workDir first; if not found, check if it's a recap/briefing/devops/project session in BrainData
   let deleted = deleteSession(state.workDir, sessionId);
   if (!deleted) {
     const meta = loadSessionMetadata(sessionId);
-    if (meta.recapId || meta.briefingDate || meta.devopsEntityType) {
+    if (meta.recapId || meta.briefingDate || meta.devopsEntityType || meta.projectName) {
       deleted = deleteSession(BRAIN_DATA_DIR, sessionId);
     }
   }
@@ -807,11 +807,11 @@ function handleDeleteSession(sessionId: string): void {
 }
 
 function handleRenameSession(sessionId: string, newTitle: string): void {
-  // Try current workDir first; if not found, check if it's a recap/briefing/devops session in BrainData
+  // Try current workDir first; if not found, check if it's a recap/briefing/devops/project session in BrainData
   let renamed = renameSession(state.workDir, sessionId, newTitle);
   if (!renamed) {
     const meta = loadSessionMetadata(sessionId);
-    if (meta.recapId || meta.briefingDate || meta.devopsEntityType) {
+    if (meta.recapId || meta.briefingDate || meta.devopsEntityType || meta.projectName) {
       renamed = renameSession(BRAIN_DATA_DIR, sessionId, newTitle);
     }
   }

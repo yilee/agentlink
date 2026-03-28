@@ -169,16 +169,14 @@
 .devops-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--text-secondary);
   border-radius: 10px;
-  padding: 0.75rem 0.85rem;
+  padding: 0.85rem 1rem;
   cursor: pointer;
   transition: box-shadow 0.15s, border-color 0.15s;
 }
 
 .devops-card:hover {
   border-color: var(--accent);
-  border-left-color: var(--accent);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 

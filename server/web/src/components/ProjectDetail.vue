@@ -1,5 +1,5 @@
 <script setup>
-import { inject, computed, onMounted, onUnmounted, ref } from 'vue';
+import { inject, computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { renderMarkdown } from '../modules/markdown.js';
 import MessageList from './MessageList.vue';
 
@@ -14,7 +14,7 @@ const {
 const {
   selectedProject, selectedDetail, selectedContent,
   detailLoading, projectChatActive, detailExpanded, detailHeight,
-  onDetailResizeStart, isSectionCollapsed, toggleSection,
+  onDetailResizeStart,
 } = project;
 
 const headerTitle = computed(() => {
@@ -70,6 +70,26 @@ const sections = computed(() => {
   }
 
   return s;
+});
+
+// ── Active tab ──
+const STORAGE_KEY = 'agentlink-project-active-tab';
+const activeTab = ref(localStorage.getItem(STORAGE_KEY) || 'overview');
+
+// Ensure activeTab is valid when sections change
+watch(sections, (newSections) => {
+  if (newSections.length > 0 && !newSections.find(s => s.key === activeTab.value)) {
+    activeTab.value = newSections[0].key;
+  }
+});
+
+function selectTab(key) {
+  activeTab.value = key;
+  localStorage.setItem(STORAGE_KEY, key);
+}
+
+const activeSection = computed(() => {
+  return sections.value.find(s => s.key === activeTab.value) || sections.value[0] || null;
 });
 
 function renderedSection(content) {
@@ -143,22 +163,25 @@ onUnmounted(() => {
           <span class="devops-detail-icon">&#x1F4DA;</span>
           {{ headerTitle }}
         </span>
-        <button class="devops-reset-chat-btn" title="Reset chat (delete history and start fresh)" @click.stop="resetChat">
-          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>
       </div>
 
       <div v-if="detailExpanded" class="devops-detail-content project-detail-content" :style="detailContentStyle">
-        <div class="project-sections">
-          <div v-for="section in sections" :key="section.key" class="project-section">
-            <div class="project-section-header" @click="toggleSection(section.key)">
-              <span class="project-section-chevron">{{ isSectionCollapsed(section.key) ? '&#x25B6;' : '&#x25BC;' }}</span>
-              <span class="project-section-label">{{ section.label }}</span>
-            </div>
-            <div v-if="!isSectionCollapsed(section.key)" class="project-section-body">
-              <div class="devops-detail-markdown markdown-body" v-html="renderedSection(section.content)"></div>
-            </div>
-          </div>
+        <!-- Tab pills -->
+        <div class="project-tab-bar">
+          <button
+            v-for="section in sections"
+            :key="section.key"
+            class="project-tab-pill"
+            :class="{ active: activeTab === section.key }"
+            @click="selectTab(section.key)"
+          >
+            {{ section.label }}
+          </button>
+        </div>
+
+        <!-- Active section content -->
+        <div v-if="activeSection" class="project-tab-content">
+          <div class="devops-detail-markdown markdown-body" v-html="renderedSection(activeSection.content)"></div>
         </div>
       </div>
 
