@@ -301,5 +301,10 @@
   "btw.dismiss": "关闭",
   "btw.thinking": "思考中...",
   "btw.escDismiss": "按 Esc 关闭",
-  "btw.tapDismiss": "点击关闭"
+  "btw.tapDismiss": "点击关闭",
+
+  "outline.title": "大纲",
+  "outline.close": "关闭大纲",
+  "outline.toggle": "切换大纲",
+  "outline.empty": "暂无提问"
 }

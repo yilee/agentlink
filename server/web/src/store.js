@@ -75,6 +75,9 @@ export function createStore() {
   const btwState = ref(null);
   const btwPending = ref(false);
 
+  // Outline panel state
+  const outlineOpen = ref(false);
+
   // Sidebar state
   const sidebarOpen = ref(window.innerWidth > 768);
   const sidebarWidth = ref(parseInt(localStorage.getItem('agentlink-sidebar-width'), 10) || 260);
@@ -208,6 +211,7 @@ export function createStore() {
         planMode: planMode.value,
         brainMode: brainMode.value,
         brainModeLocked: brainModeLocked.value,
+        outlineOpen: outlineOpen.value,
         scrollTop: getScrollTop(),
       };
     }
@@ -230,6 +234,7 @@ export function createStore() {
       planMode.value = cached.planMode || false;
       brainMode.value = cached.brainMode || false;
       brainModeLocked.value = cached.brainModeLocked || false;
+      outlineOpen.value = cached.outlineOpen || false;
     } else {
       // New blank conversation
       messages.value = [];
@@ -248,6 +253,7 @@ export function createStore() {
       planMode.value = false;
       brainMode.value = false;
       brainModeLocked.value = false;
+      outlineOpen.value = false;
     }
 
     currentConversationId.value = newConvId;
@@ -944,6 +950,30 @@ export function createStore() {
     if (idx !== -1) queuedMessages.value.splice(idx, 1);
   }
 
+  // ── Outline panel ──
+  function toggleOutline() {
+    outlineOpen.value = !outlineOpen.value;
+  }
+
+  function scrollToMessage(msgIdx) {
+    // Ensure the target message is within the rendered (visible) range
+    const needed = messages.value.length - msgIdx;
+    if (needed > visibleLimit.value) {
+      visibleLimit.value = needed;
+    }
+
+    nextTick(() => {
+      const msg = messages.value[msgIdx];
+      if (!msg) return;
+      const el = document.querySelector(`[data-msg-id="${msg.id}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('outline-highlight');
+        setTimeout(() => el.classList.remove('outline-highlight'), 1500);
+      }
+    });
+  }
+
   // ── Plan mode ──
   function togglePlanMode() {
     if (isProcessing.value) return;
@@ -987,6 +1017,13 @@ export function createStore() {
     if (e.key === 'Escape' && btwState.value) {
       dismissBtw();
       e.preventDefault();
+      return;
+    }
+
+    // Outline toggle shortcut
+    if (e.key === 'O' && e.ctrlKey && e.shiftKey) {
+      e.preventDefault();
+      toggleOutline();
       return;
     }
 
@@ -1198,6 +1235,8 @@ export function createStore() {
     currentView,
     // Side question (/btw)
     btwState, btwPending, dismissBtw,
+    // Outline panel
+    outlineOpen, toggleOutline, scrollToMessage,
     // Message rendering helpers
     renderMarkdown, getRenderedContent, copyMessage, toggleTool,
     isPrevAssistant: _isPrevAssistant,

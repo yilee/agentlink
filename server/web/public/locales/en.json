@@ -301,5 +301,10 @@
   "btw.dismiss": "Dismiss",
   "btw.thinking": "Thinking...",
   "btw.escDismiss": "Press Esc to dismiss",
-  "btw.tapDismiss": "Tap to dismiss"
+  "btw.tapDismiss": "Tap to dismiss",
+
+  "outline.title": "Outline",
+  "outline.close": "Close outline",
+  "outline.toggle": "Toggle outline",
+  "outline.empty": "No questions yet"
 }
