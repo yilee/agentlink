@@ -10,6 +10,7 @@ import { createRecapHandlers } from './handlers/recap-handler.js';
 import { createBriefingHandlers } from './handlers/briefing-handler.js';
 import { createDevopsHandlers } from './handlers/devops-handler.js';
 import { createProjectHandlers } from './handlers/project-handler.js';
+import { createSearchHandlers } from './handlers/search-handler.js';
 
 const MAX_RECONNECT_ATTEMPTS = 50;
 const RECONNECT_BASE_DELAY = 1000;
@@ -58,6 +59,8 @@ export function createConnection(deps) {
   function setDevops(d) { devops = d; }
   let project = null;
   function setProject(p) { project = p; }
+  let search = null;
+  function setSearch(s) { search = s; }
 
   let ws = null;
   let sessionKey = null;
@@ -155,6 +158,7 @@ export function createConnection(deps) {
     get briefing() { return briefing; },             // late-bound
     get devops() { return devops; },                   // late-bound
     get project() { return project; },                 // late-bound
+    get search() { return search; },                   // late-bound
   };
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
@@ -169,6 +173,7 @@ export function createConnection(deps) {
   const briefingHandlers = createBriefingHandlers(handlerDeps);
   const devopsHandlers = createDevopsHandlers(handlerDeps);
   const projectHandlers = createProjectHandlers(handlerDeps);
+  const searchHandlers = createSearchHandlers(handlerDeps);
 
   // Dispatch map: message type → handler(msg, scheduleHighlight)
   const handlers = {
@@ -181,6 +186,7 @@ export function createConnection(deps) {
     ...briefingHandlers,
     ...devopsHandlers,
     ...projectHandlers,
+    ...searchHandlers,
   };
 
   function connect(scheduleHighlight) {
@@ -349,6 +355,7 @@ export function createConnection(deps) {
       if (briefing && team && team.viewMode.value === 'feed') briefing.loadFeed();
       if (devops && team && team.viewMode.value === 'feed') devops.loadFeed();
       if (project && team && team.viewMode.value === 'feed') project.loadFeed();
+      if (search && team && team.viewMode.value === 'feed') search.loadIndexStats();
       startPing();
       wsSend({ type: 'query_active_conversations' });
       if (deps.onConnected) deps.onConnected();
@@ -400,6 +407,7 @@ export function createConnection(deps) {
     if (briefing && team && team.viewMode.value === 'feed') briefing.loadFeed();
     if (devops && team && team.viewMode.value === 'feed') devops.loadFeed();
     if (project && team && team.viewMode.value === 'feed') project.loadFeed();
+    if (search && team && team.viewMode.value === 'feed') search.loadIndexStats();
     startPing();
     wsSend({ type: 'query_active_conversations' });
   }
@@ -539,5 +547,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, setSearch, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }

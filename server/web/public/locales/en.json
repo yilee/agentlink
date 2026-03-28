@@ -306,5 +306,15 @@
   "outline.title": "Outline",
   "outline.close": "Close outline",
   "outline.toggle": "Toggle outline",
-  "outline.empty": "No questions yet"
+  "outline.empty": "No questions yet",
+
+  "search.title": "Search",
+  "search.placeholder": "Search across all Brain sources…",
+  "search.clear": "Clear search",
+  "search.searching": "Searching…",
+  "search.resultsCount": "{n} results found",
+  "search.noResults": "No results found",
+  "search.noResultsHint": "Try different keywords or check your spelling",
+  "search.initialMessage": "Search across meetings, emails, PRs, work items, and more",
+  "search.availableSources": "Available Sources"
 }
