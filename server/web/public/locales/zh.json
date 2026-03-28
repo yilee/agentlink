@@ -316,5 +316,6 @@
   "search.noResults": "未找到结果",
   "search.noResultsHint": "试试不同的关键词或检查拼写",
   "search.initialMessage": "搜索会议、邮件、PR、工作项等内容",
-  "search.availableSources": "可用数据源"
+  "search.availableSources": "可用数据源",
+  "search.allSources": "全部"
 }

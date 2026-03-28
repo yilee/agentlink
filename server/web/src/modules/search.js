@@ -12,6 +12,7 @@ export function createSearch({ wsSend }) {
   const searching = ref(false);
   const indexStats = ref([]);      // Array<{ name, count, generated }>
   const searchError = ref('');
+  const selectedSource = ref('');   // '' = all sources, or a source key like 'teams'
 
   let debounceTimer = null;
 
@@ -81,6 +82,7 @@ export function createSearch({ wsSend }) {
     totalResults.value = 0;
     searching.value = false;
     searchError.value = '';
+    selectedSource.value = '';
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
   }
 
@@ -91,6 +93,7 @@ export function createSearch({ wsSend }) {
     searching,
     indexStats,
     searchError,
+    selectedSource,
     performSearch,
     performSearchDebounced,
     handleSearchResults,

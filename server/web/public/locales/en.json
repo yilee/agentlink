@@ -316,5 +316,6 @@
   "search.noResults": "No results found",
   "search.noResultsHint": "Try different keywords or check your spelling",
   "search.initialMessage": "Search across meetings, emails, PRs, work items, and more",
-  "search.availableSources": "Available Sources"
+  "search.availableSources": "Available Sources",
+  "search.allSources": "All"
 }

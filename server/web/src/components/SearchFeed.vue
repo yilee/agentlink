@@ -1,11 +1,11 @@
 <script setup>
-import { inject, onMounted, ref } from 'vue';
+import { inject, onMounted, ref, computed } from 'vue';
 
 const store = inject('store');
 const search = inject('search');
 
 const { currentView, t } = store;
-const { searchQuery, searchResults, totalResults, searching, indexStats, searchError } = search;
+const { searchQuery, searchResults, totalResults, searching, indexStats, searchError, selectedSource } = search;
 
 const inputRef = ref(null);
 
@@ -18,25 +18,58 @@ function clearSearch() {
   if (inputRef.value) inputRef.value.focus();
 }
 
+function selectSource(source) {
+  selectedSource.value = selectedSource.value === source ? '' : source;
+}
+
 onMounted(() => {
   if (indexStats.value.length === 0) {
     search.loadIndexStats();
   }
 });
 
-// Source icons
-const SOURCE_ICONS = {
-  teams: '\u{1F4AC}',
-  emails: '\u{1F4E7}',
-  meetings: '\u{1F4C5}',
-  pull_requests: '\u{1F517}',
-  work_items: '\u{1F4CB}',
-  documents: '\u{1F4C4}',
+// Source icons & labels
+const SOURCE_META = {
+  teams: { icon: '\u{1F4AC}', label: 'Teams' },
+  emails: { icon: '\u{1F4E7}', label: 'Email' },
+  meetings: { icon: '\u{1F4C5}', label: 'Meetings' },
+  pull_requests: { icon: '\u{1F517}', label: 'PRs' },
+  work_items: { icon: '\u{1F4CB}', label: 'Work Items' },
+  documents: { icon: '\u{1F4C4}', label: 'Docs' },
 };
 
 function sourceIcon(source) {
-  return SOURCE_ICONS[source] || '\u{1F50D}';
+  return SOURCE_META[source]?.icon || '\u{1F50D}';
 }
+
+function sourceLabel(source) {
+  return SOURCE_META[source]?.label || source;
+}
+
+// Filtered results based on selected source tab
+const filteredResults = computed(() => {
+  if (!selectedSource.value) return searchResults.value;
+  return searchResults.value.filter(g => g.source === selectedSource.value);
+});
+
+const filteredTotal = computed(() => {
+  if (!selectedSource.value) return totalResults.value;
+  return filteredResults.value.reduce((sum, g) => sum + (g.count || 0), 0);
+});
+
+// Source tabs with counts from current results
+const sourceTabs = computed(() => {
+  const counts = {};
+  for (const g of searchResults.value) {
+    counts[g.source] = g.count || g.entries?.length || 0;
+  }
+  return Object.entries(counts).map(([source, count]) => ({
+    source,
+    label: sourceLabel(source),
+    icon: sourceIcon(source),
+    count,
+  }));
+});
 
 function formatTimestamp(ts) {
   if (!ts) return '';
@@ -83,6 +116,29 @@ function formatTimestamp(ts) {
       </button>
     </div>
 
+    <!-- Source filter tabs (shown when results exist) -->
+    <div v-if="searchQuery && sourceTabs.length > 1 && !searching && !searchError" class="search-source-tabs">
+      <button
+        class="search-source-tab"
+        :class="{ active: !selectedSource }"
+        @click="selectedSource = ''"
+      >
+        {{ t('search.allSources') }}
+        <span class="search-source-tab-count">{{ totalResults }}</span>
+      </button>
+      <button
+        v-for="tab in sourceTabs"
+        :key="tab.source"
+        class="search-source-tab"
+        :class="{ active: selectedSource === tab.source }"
+        @click="selectSource(tab.source)"
+      >
+        <span class="search-source-tab-icon">{{ tab.icon }}</span>
+        {{ tab.label }}
+        <span class="search-source-tab-count">{{ tab.count }}</span>
+      </button>
+    </div>
+
     <!-- Loading -->
     <div v-if="searching" class="search-feed-loading">
       <div class="search-feed-spinner"></div>
@@ -98,9 +154,9 @@ function formatTimestamp(ts) {
     <!-- Results -->
     <div v-else-if="searchQuery && searchResults.length > 0" class="search-feed-body">
       <div class="search-results-summary">
-        {{ t('search.resultsCount', { n: totalResults }) }}
+        {{ t('search.resultsCount', { n: filteredTotal }) }}
       </div>
-      <div v-for="group in searchResults" :key="group.source" class="search-result-group">
+      <div v-for="group in filteredResults" :key="group.source" class="search-result-group">
         <div class="search-result-group-label">
           <span class="search-result-group-icon">{{ sourceIcon(group.source) }}</span>
           {{ group.label }}

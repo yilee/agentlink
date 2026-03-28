@@ -87,6 +87,63 @@
   background: var(--bg-tertiary);
 }
 
+/* Source filter tabs */
+.search-source-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 1.25rem 0.75rem;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.search-source-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.search-source-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.search-source-tab:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.search-source-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.search-source-tab-icon {
+  font-size: 0.8rem;
+}
+
+.search-source-tab-count {
+  font-size: 0.65rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 0 5px;
+  line-height: 1.5;
+}
+
+.search-source-tab.active .search-source-tab-count {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 /* Loading / Empty / Initial */
 .search-feed-loading,
 .search-feed-empty,
@@ -294,6 +351,10 @@
 @media (max-width: 640px) {
   .search-input-wrapper {
     margin: 0 0.75rem 0.5rem;
+  }
+
+  .search-source-tabs {
+    padding: 0 0.75rem 0.5rem;
   }
 
   .search-feed-body {

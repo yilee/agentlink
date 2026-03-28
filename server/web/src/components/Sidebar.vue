@@ -554,7 +554,7 @@ const {
               </template>
               <div v-if="viewMode === 'feed'" class="feed-sidebar">
                 <div class="feed-sidebar-nav">
-                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'search-feed' }" @click="store.requireVersion('0.1.240', 'Brain Search') && (currentView = 'search-feed')">
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'search-feed' }" @click="currentView = 'search-feed'">
                     <span class="feed-sidebar-icon">&#x1F50D;</span>
                     Search
                   </button>
