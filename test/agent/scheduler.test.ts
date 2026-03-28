@@ -680,8 +680,13 @@ describe('scheduler.ts', () => {
       // Pre-seed loops.json with a daily loop whose lastExecution is >24h ago
       const loopsFile = join(TEST_CONFIG_DIR, 'loops.json');
       const now = new Date();
-      const missedHour = now.getHours(); // use current hour so "previous scheduled time" is today
-      const missedMinute = now.getMinutes() > 0 ? now.getMinutes() - 1 : 59;
+      // Schedule for 1 minute ago so "previous scheduled time" is just before now
+      let missedHour = now.getHours();
+      let missedMinute = now.getMinutes() - 1;
+      if (missedMinute < 0) {
+        missedMinute = 59;
+        missedHour = (missedHour - 1 + 24) % 24;
+      }
       const staleTime = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
 
       const loopData = [{
