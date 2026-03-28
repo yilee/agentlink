@@ -172,6 +172,7 @@
   "chat.meetingContextInjected": "Meeting context injected into this chat",
   "chat.briefingContextInjected": "Briefing context injected into this chat",
   "chat.devopsContextInjected": "DevOps context injected into this chat",
+  "chat.projectContextInjected": "Project context injected into this chat",
   "chat.hide": "Hide",
   "chat.show": "Show",
   "chat.connectedTo": "Connected to",

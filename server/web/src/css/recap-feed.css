@@ -239,7 +239,7 @@
 }
 
 .feed-sidebar {
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.4rem;
 }
 
 .feed-sidebar-btn {
@@ -423,9 +423,9 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding-left: 4px;
+  padding-left: 2px;
   border-left: 2px solid var(--border);
-  margin-left: 8px;
+  margin-left: 4px;
 }
 
 .recap-chat-item {

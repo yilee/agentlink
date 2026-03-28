@@ -88,6 +88,8 @@ export interface ConversationState {
   devopsEntityType: string | null;
   devopsEntityId: string | null;
   devopsEntityTitle: string | null;
+  // Project name: when set, session metadata is persisted for project chat association
+  projectName: string | null;
 }
 
 export type SendFn = (msg: Record<string, unknown>) => void;
@@ -289,6 +291,7 @@ export interface HandleChatOptions {
   devopsEntityType?: string;
   devopsEntityId?: string;
   devopsEntityTitle?: string;
+  projectName?: string;
 }
 
 /**
@@ -321,6 +324,7 @@ export function handleChat(
   if (options?.devopsEntityType) state.devopsEntityType = options.devopsEntityType;
   if (options?.devopsEntityId) state.devopsEntityId = options.devopsEntityId;
   if (options?.devopsEntityTitle) state.devopsEntityTitle = options.devopsEntityTitle;
+  if (options?.projectName) state.projectName = options.projectName;
 
   // When plan mode was just toggled, prepend a notice to the user's message
   // so Claude knows the mode changed (its old conversation history may say
@@ -643,6 +647,7 @@ export function restartConversation(
     devopsEntityType: existing.devopsEntityType,
     devopsEntityId: existing.devopsEntityId,
     devopsEntityTitle: existing.devopsEntityTitle,
+    projectName: existing.projectName,
   };
   conversations.set(convId, newState);
 
@@ -687,6 +692,7 @@ export function createPlaceholderConversation(
     devopsEntityType: null,
     devopsEntityId: null,
     devopsEntityTitle: null,
+    projectName: null,
   };
   conversations.set(convId, placeholder);
 }
@@ -773,6 +779,7 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
     devopsEntityType: existing?.devopsEntityType || null,
     devopsEntityId: existing?.devopsEntityId || null,
     devopsEntityTitle: existing?.devopsEntityTitle || null,
+    projectName: existing?.projectName || null,
   };
 
   conversations.set(conversationId, state);
@@ -933,6 +940,10 @@ async function processOutput(
             // Persist devops entity metadata to disk
             if (state.devopsEntityType && state.devopsEntityId) {
               saveSessionMetadata(state.claudeSessionId, { devopsEntityType: state.devopsEntityType, devopsEntityId: state.devopsEntityId, devopsEntityTitle: state.devopsEntityTitle || undefined });
+            }
+            // Persist project name metadata to disk
+            if (state.projectName) {
+              saveSessionMetadata(state.claudeSessionId, { projectName: state.projectName });
             }
           }
 

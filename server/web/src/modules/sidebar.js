@@ -409,7 +409,7 @@ export function createSidebar(deps) {
 
     const groups = {};
     for (const s of historySessions.value) {
-      if (s.recapId || s.devopsEntityType || s.briefingDate) continue;
+      if (s.recapId || s.devopsEntityType || s.briefingDate || s.projectName) continue;
       let key;
       if (s.lastModified >= todayStart) key = 'today';
       else if (s.lastModified >= yesterdayStart) key = 'yesterday';

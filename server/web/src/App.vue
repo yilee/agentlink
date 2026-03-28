@@ -22,6 +22,8 @@ import BriefingFeed from './components/BriefingFeed.vue';
 import BriefingDetail from './components/BriefingDetail.vue';
 import DevOpsFeed from './components/DevOpsFeed.vue';
 import DevOpsDetail from './components/DevOpsDetail.vue';
+import ProjectFeed from './components/ProjectFeed.vue';
+import ProjectDetail from './components/ProjectDetail.vue';
 
 // Create store inside component setup() so onMounted/onUnmounted hooks fire correctly
 const store = createStore();
@@ -38,6 +40,9 @@ if (store._briefing) {
 }
 if (store._devops) {
   provide('devops', store._devops);
+}
+if (store._project) {
+  provide('project', store._project);
 }
 
 // Only destructure what App.vue template actually needs
@@ -97,6 +102,10 @@ const {
           <!-- ══ DevOps Views ══ -->
           <DevOpsFeed v-if="currentView === 'devops-feed'" />
           <DevOpsDetail v-if="currentView === 'devops-detail'" />
+
+          <!-- ══ Project Views ══ -->
+          <ProjectFeed v-if="currentView === 'project-feed'" />
+          <ProjectDetail v-if="currentView === 'project-detail'" />
 
           <BtwOverlay />
 

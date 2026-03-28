@@ -118,6 +118,10 @@ export function createClaudeOutputHandlers(deps) {
       if (deps.devops) {
         deps.devops.handleDevopsSessionStarted(msg.claudeSessionId);
       }
+      // Auto-rename project chat session with user's first question
+      if (deps.project) {
+        deps.project.handleProjectSessionStarted(msg.claudeSessionId);
+      }
     },
     // Exposed for other handlers that need to finalize streaming
     finalizeStreamingMsg,

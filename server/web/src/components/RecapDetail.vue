@@ -127,9 +127,6 @@ onUnmounted(() => {
         <span class="recap-detail-meta-inline">
           {{ formattedDate }}<span v-if="duration"> &middot; {{ duration }}</span><span v-if="typeBadgeLabel"> &middot; {{ typeBadgeLabel }}</span>
         </span>
-        <button class="recap-reset-chat-btn" title="Reset chat (delete history and start fresh)" @click.stop="resetChat">
-          <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>
       </div>
 
       <div v-if="detailExpanded" class="recap-detail-content" :style="detailContentStyle">
