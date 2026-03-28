@@ -76,8 +76,8 @@
 
 .chat-outline-item {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.4rem 0.75rem;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
   cursor: pointer;
   border-left: 3px solid transparent;
   transition: background 0.15s;
@@ -92,11 +92,14 @@
 }
 
 .chat-outline-index {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 3px;
+  padding: 0.1rem 0.3rem;
   flex-shrink: 0;
-  min-width: 2rem;
+  line-height: 1.3;
 }
 
 .chat-outline-text {
