@@ -574,7 +574,7 @@ const {
                     <span class="feed-sidebar-icon">&#x1F6E0;</span>
                     DevOps
                   </button>
-                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'project-feed' || currentView === 'project-detail' }" @click="store.requireVersion('0.1.129', 'Project Knowledge Base') && (currentView = 'project-feed')">
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'project-feed' || currentView === 'project-detail' }" @click="store.requireVersion('0.1.130', 'Project Knowledge Base') && (currentView = 'project-feed')">
                     <span class="feed-sidebar-icon">&#x1F4DA;</span>
                     Projects
                   </button>
