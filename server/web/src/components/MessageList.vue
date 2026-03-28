@@ -67,7 +67,7 @@ function isPrevAssistant(msgIdx) {
         <button class="load-more-btn" @click="emit('load-more')">{{ t('chat.loadEarlier') }}</button>
       </div>
 
-      <div v-for="(msg, msgIdx) in visibleMessages" :key="msg.id" :class="['message', 'message-' + msg.role]">
+      <div v-for="(msg, msgIdx) in visibleMessages" :key="msg.id" :class="['message', 'message-' + msg.role]" :data-msg-id="msg.id">
 
         <!-- User message -->
         <template v-if="msg.role === 'user'">
