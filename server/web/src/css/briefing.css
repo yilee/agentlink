@@ -621,7 +621,6 @@
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s;
-  border-left: 3px solid transparent;
 }
 
 .briefing-chat-item:hover {
@@ -630,7 +629,6 @@
 
 .briefing-chat-item.active {
   background: var(--bg-tertiary);
-  border-left-color: var(--accent);
 }
 
 .briefing-chat-item-title {

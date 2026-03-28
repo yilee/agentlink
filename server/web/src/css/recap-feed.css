@@ -433,7 +433,6 @@
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s;
-  border-left: 3px solid transparent;
 }
 
 .recap-chat-item:hover {
@@ -442,7 +441,6 @@
 
 .recap-chat-item.active {
   background: var(--bg-tertiary);
-  border-left-color: var(--accent);
 }
 
 .recap-chat-item-title {

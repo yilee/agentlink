@@ -52,10 +52,6 @@ const {
   formatRelativeTime,
 } = sidebarStore;
 
-function goToBrainHome() {
-  if (!store.requireVersion('0.1.112', 'Brain Home')) return;
-  switchToWorkdir('~/.brain/BrainCore');
-}
 
 function projectName(projectPath) {
   if (!projectPath) return '';
@@ -480,7 +476,7 @@ const {
               </div>
               <div v-if="isMsRoute" class="sidebar-segmented-control">
                 <button :class="['seg-btn', { active: viewMode !== 'feed' }]" @click="viewMode = 'chat'">Chat</button>
-                <button :class="['seg-btn', { active: viewMode === 'feed' }]" @click="goToFeed">Feed</button>
+                <button :class="['seg-btn', { active: viewMode === 'feed' }]" @click="goToFeed">🧠 Feed</button>
               </div>
               <template v-if="viewMode !== 'feed'">
               <div class="sidebar-workdir-header">
@@ -489,10 +485,6 @@ const {
               <div class="sidebar-workdir-path-row" @click.stop="toggleWorkdirMenu()">
                 <div class="sidebar-workdir-path" :title="workDir">{{ workDir }}</div>
                 <svg class="sidebar-workdir-chevron" :class="{ open: workdirMenuOpen }" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
-              </div>
-              <div v-if="isMsRoute" class="brain-home-btn" @click.stop="goToBrainHome()" title="Go to Brain Home">
-                <span class="brain-home-icon">🧠</span>
-                <span>Brain Home</span>
               </div>
               <div v-if="workdirMenuOpen" class="workdir-menu">
                 <div class="workdir-menu-item" @click.stop="workdirMenuBrowse()">
