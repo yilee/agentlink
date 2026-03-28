@@ -15,6 +15,7 @@ import LoopView from './components/LoopView.vue';
 import ChatView from './components/ChatView.vue';
 import ChatInput from './components/ChatInput.vue';
 import PreviewPanel from './components/PreviewPanel.vue';
+import ChatOutline from './components/ChatOutline.vue';
 import ToastContainer from './components/ToastContainer.vue';
 import RecapFeed from './components/RecapFeed.vue';
 import RecapDetail from './components/RecapDetail.vue';
@@ -113,6 +114,8 @@ const {
           <ChatInput />
 
         </div>
+
+        <ChatOutline />
 
         <PreviewPanel />
 

@@ -22,6 +22,7 @@ import './css/recap-detail.css';
 import './css/briefing.css';
 import './css/devops.css';
 import './css/project.css';
+import './css/chat-outline.css';
 
 function mountApp() {
   createApp(App).mount('#app');
