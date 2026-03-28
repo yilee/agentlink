@@ -722,6 +722,7 @@ export function createStore() {
     else if (view === 'briefing-feed') router.push('/briefing');
     else if (view === 'devops-feed') router.push('/devops');
     else if (view === 'project-feed') router.push('/project');
+    else if (view === 'search-feed') router.push('/search');
   });
 
   const isMemoryPreview = computed(() => {

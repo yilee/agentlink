@@ -8,6 +8,7 @@ const { currentView, t } = store;
 const { searchQuery, searchResults, totalResults, searching, indexStats, searchError, selectedSource } = search;
 
 const inputRef = ref(null);
+const hasQuery = computed(() => !!searchQuery.value || searching.value);
 
 function onInput(e) {
   search.performSearchDebounced(e.target.value);
@@ -71,6 +72,10 @@ const sourceTabs = computed(() => {
   }));
 });
 
+function openEntry(entry) {
+  if (entry.url) window.open(entry.url, '_blank');
+}
+
 function formatTimestamp(ts) {
   if (!ts) return '';
   const d = new Date(ts);
@@ -78,17 +83,20 @@ function formatTimestamp(ts) {
   const now = new Date();
   const diff = now - d;
   if (diff < 86400000) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
   if (diff < 7 * 86400000) {
-    return d.toLocaleDateString([], { weekday: 'short' });
+    return d.toLocaleDateString([], { weekday: 'short' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 </script>
 
 <template>
   <div class="search-feed" v-if="currentView === 'search-feed'">
+    <!-- Top spacer: pushes content to ~center when no query, collapses when active -->
+    <div class="search-feed-spacer" :class="{ collapsed: hasQuery }"></div>
+
     <div class="search-feed-header">
       <div class="search-feed-title">
         <span class="search-feed-title-icon">&#x1F50D;</span>
@@ -98,7 +106,7 @@ function formatTimestamp(ts) {
 
     <!-- Search input -->
     <div class="search-input-wrapper">
-      <svg class="search-input-icon" viewBox="0 0 24 24" width="16" height="16">
+      <svg class="search-input-icon" viewBox="0 0 24 24" width="18" height="18">
         <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
       </svg>
       <input
@@ -163,16 +171,13 @@ function formatTimestamp(ts) {
           <span class="search-result-group-count">{{ group.count }}</span>
         </div>
         <div class="search-result-entries">
-          <div v-for="entry in group.entries" :key="entry.id" class="search-result-entry">
+          <div v-for="entry in group.entries" :key="entry.id" class="search-result-entry" :class="{ clickable: entry.url }" @click="openEntry(entry)">
             <div class="search-result-entry-header">
               <span class="search-result-entry-title">{{ entry.title }}</span>
               <span v-if="entry.timestamp" class="search-result-entry-time">{{ formatTimestamp(entry.timestamp) }}</span>
             </div>
             <div v-if="entry.subtitle" class="search-result-entry-subtitle">{{ entry.subtitle }}</div>
             <div v-if="entry.snippet" class="search-result-entry-snippet">{{ entry.snippet }}</div>
-            <div v-if="entry.url" class="search-result-entry-url">
-              <a :href="entry.url" target="_blank" rel="noopener">{{ entry.url }}</a>
-            </div>
           </div>
         </div>
       </div>
@@ -187,7 +192,6 @@ function formatTimestamp(ts) {
 
     <!-- Initial state (no query) -->
     <div v-else class="search-feed-initial">
-      <div class="search-feed-initial-icon">&#x1F50D;</div>
       <p>{{ t('search.initialMessage') }}</p>
       <div v-if="indexStats.length > 0" class="search-index-stats">
         <div class="search-index-stats-label">{{ t('search.availableSources') }}</div>
