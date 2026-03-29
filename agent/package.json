@@ -1,6 +1,6 @@
 {
   "name": "@agent-link/agent",
-  "version": "0.1.130",
+  "version": "0.1.131",
   "description": "AgentLink local agent CLI",
   "license": "MIT",
   "repository": {
