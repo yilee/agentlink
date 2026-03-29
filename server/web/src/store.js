@@ -450,7 +450,7 @@ export function createStore() {
   sidebar.setProxy(proxy);
 
   // Recap module (only in brain/ms mode)
-  const isMsRoute = window.location.pathname.startsWith('/ms/');
+  const isMsRoute = window.location.pathname.startsWith('/ms/') || /\/proxy\/\d+\/ms\//.test(window.location.pathname);
   const recap = isMsRoute ? createRecap({
     wsSend,
     switchConversation,

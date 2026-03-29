@@ -8,7 +8,7 @@ const teamStore = inject('team');
 const { t } = store;
 const { backToChat } = teamStore;
 
-const isMsRoute = window.location.pathname.startsWith('/ms/');
+const isMsRoute = window.location.pathname.startsWith('/ms/') || /\/proxy\/\d+\/ms\//.test(window.location.pathname);
 
 const {
   LOOP_TEMPLATES,
