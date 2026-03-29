@@ -510,7 +510,7 @@ const {
                   <span>Git</span>
                 </div>
               </div>
-              <div v-if="filteredWorkdirHistory.length > 0 || globalRecentSessions.length > 0" class="workdir-history">
+              <div class="workdir-history">
                 <div class="workdir-history-label">
                   <span>{{ t('sidebar.recent') }}</span>
                   <div class="recent-tab-toggle">
