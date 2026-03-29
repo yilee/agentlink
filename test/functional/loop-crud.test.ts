@@ -34,8 +34,12 @@ async function setupTest(agentName: string): Promise<{ agent: MockAgent; page: P
   return { agent, page };
 }
 
-/** Expand the loops sidebar section if collapsed. */
+/** Navigate to loop view and expand the loops sidebar section if collapsed. */
 async function expandLoopsSection(page: Page) {
+  // Navigate to loop view so LoopList is rendered in the sidebar
+  await page.evaluate(() => { window.location.hash = '#/loop'; });
+  await delay(300);
+
   const loopsSection = page.locator('.sidebar-section.sidebar-loops');
   const count = await loopsSection.count();
   if (count === 0) return;

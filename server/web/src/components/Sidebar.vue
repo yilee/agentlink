@@ -583,9 +583,9 @@ const {
             </div>
           </div>
 
-          <SessionList v-if="viewMode !== 'feed'" />
-          <TeamList v-if="viewMode !== 'feed'" />
-          <LoopList v-if="viewMode !== 'feed'" />
+          <SessionList v-if="viewMode === 'chat'" />
+          <TeamList v-if="viewMode === 'team'" />
+          <LoopList v-if="viewMode === 'loop'" />
 
           <div v-if="serverVersion || agentVersion" class="sidebar-version-footer">
             <span v-if="serverVersion">{{ t('sidebar.server') }} {{ serverVersion }}</span>
