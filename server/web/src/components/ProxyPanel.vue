@@ -45,6 +45,8 @@ function handleCopy(port) {
     </div>
 
     <!-- Global toggle -->
+    <div v-if="proxy.loading.value" class="proxy-empty" style="padding: 16px; text-align: center;">Loading...</div>
+    <template v-else>
     <div class="proxy-toggle-bar">
       <span class="proxy-toggle-label">Proxy</span>
       <button
@@ -121,6 +123,7 @@ function handleCopy(port) {
         </div>
       </div>
     </div>
+    </template>
   </div>
   </Transition>
 </template>

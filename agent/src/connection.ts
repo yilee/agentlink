@@ -676,6 +676,9 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'tunnel_ws_close':
       if (tunnelHandler) tunnelHandler.handleTunnelWsClose(msg as unknown as { type: 'tunnel_ws_close'; tunnelId: string; code?: number; reason?: string });
       break;
+    case 'get_proxy_config':
+      if (tunnelHandler) send({ type: 'proxy_config_updated', config: tunnelHandler.getProxyConfig() });
+      break;
     case 'proxy_config_update':
       if (tunnelHandler) tunnelHandler.handleProxyConfigUpdate(msg as unknown as { config: { enabled: boolean; ports: Array<{ port: number; enabled: boolean; label?: string }> } });
       break;

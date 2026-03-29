@@ -10,6 +10,7 @@ export function createProxy(deps) {
 
   // Internal reactive state
   const proxyConfig = ref({ enabled: false, ports: [] });
+  const loading = ref(false);
 
   const proxyEnabled = computed(() => proxyConfig.value.enabled);
   const proxyPorts = computed(() => proxyConfig.value.ports);
@@ -83,6 +84,8 @@ export function createProxy(deps) {
       gitPanelOpen.value = false;
       proxyPanelOpen.value = true;
     }
+    loading.value = true;
+    wsSend({ type: 'get_proxy_config' });
   }
 
   function closePanel() {
@@ -95,6 +98,7 @@ export function createProxy(deps) {
     if (msg.config) {
       proxyConfig.value = msg.config;
     }
+    loading.value = false;
   }
 
   function onWorkdirChanged() {
@@ -106,6 +110,7 @@ export function createProxy(deps) {
     proxyConfig,
     proxyEnabled,
     proxyPorts,
+    loading,
     toggleProxy,
     addPort,
     removePort,
