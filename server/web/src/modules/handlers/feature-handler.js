@@ -84,6 +84,7 @@ export function createFeatureHandlers(deps) {
       memoryPanelOpen.value = false;
       memoryEditing.value = false;
       if (deps.git) deps.git.onWorkdirChanged();
+      if (deps.proxy) deps.proxy.onWorkdirChanged();
       sidebar.requestSessionList();
       if (deps.team) deps.team.requestTeamsList();
       if (deps.loop) deps.loop.requestLoopsList();
@@ -105,6 +106,9 @@ export function createFeatureHandlers(deps) {
     },
     git_commit_result(msg) {
       if (deps.git) deps.git.handleGitCommitResult(msg);
+    },
+    proxy_config_updated(msg) {
+      if (deps.proxy) deps.proxy.handleProxyConfigUpdated(msg);
     },
   };
 }

@@ -7,6 +7,7 @@ import { sessions } from './session-manager.js';
 import { createApp } from './http.js';
 import { handleAgentConnection } from './ws-agent.js';
 import { handleWebConnection } from './ws-client.js';
+import { handleTunnelWsUpgrade } from './tunnel.js';
 import { saveServerRuntimeState, clearServerRuntimeState, writePidFile } from './config.js';
 import { encryptAndSend } from './encryption.js';
 
@@ -20,7 +21,23 @@ const PORT = parseInt(process.env.PORT || '3456', 10);
 const webDir = join(__dirname, '../web/dist');
 const app = createApp(webDir, pkg, startedAt);
 const server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
+
+// A separate WSS for tunnel WebSocket upgrades (browser ↔ agent proxy)
+const tunnelWss = new WebSocketServer({ noServer: true });
+
+// Handle HTTP upgrade: route proxy WS to tunnel handler, others to main WSS
+server.on('upgrade', (req, socket, head) => {
+  // Check if this is a tunnel proxy WebSocket upgrade
+  if (handleTunnelWsUpgrade(req, socket, head, tunnelWss)) {
+    return; // Handled by tunnel module
+  }
+
+  // Regular WebSocket (agent or web client)
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit('connection', ws, req);
+  });
+});
 
 // WebSocket routing: agent or web client
 wss.on('connection', (ws, req) => {

@@ -1,0 +1,210 @@
+/* ── Proxy Panel ── */
+
+.proxy-panel {
+  /* Inherits from .file-panel — same width/layout */
+}
+
+.proxy-toggle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.proxy-toggle-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.proxy-toggle-btn {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.proxy-toggle-btn.active {
+  background: #238636;
+  border-color: #238636;
+  color: #fff;
+}
+
+.proxy-toggle-btn:hover {
+  opacity: 0.85;
+}
+
+/* Add port form */
+.proxy-add-form {
+  display: flex;
+  gap: 4px;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.proxy-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.proxy-input:focus {
+  border-color: var(--accent, #58a6ff);
+}
+
+.proxy-port-input {
+  max-width: 110px;
+}
+
+.proxy-label-input {
+  flex: 2;
+}
+
+/* Remove spinner from number input */
+.proxy-port-input::-webkit-inner-spin-button,
+.proxy-port-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.proxy-port-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.proxy-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.proxy-add-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Port list */
+.proxy-port-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.proxy-empty {
+  padding: 1.5rem 0.75rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.proxy-port-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0.75rem;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+.proxy-port-item:hover {
+  background: var(--bg-hover);
+}
+
+.proxy-port-item.disabled {
+  opacity: 0.5;
+}
+
+.proxy-port-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.proxy-port-toggle.active {
+  color: #238636;
+  border-color: #238636;
+}
+
+.proxy-port-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.proxy-port-number {
+  font-family: var(--font-mono, 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.proxy-port-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proxy-port-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.proxy-port-item:hover .proxy-port-actions {
+  opacity: 1;
+}
+
+.proxy-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.proxy-action-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.proxy-action-remove:hover {
+  color: #f85149;
+}

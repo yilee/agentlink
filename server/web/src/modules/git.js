@@ -4,7 +4,7 @@ import { ref } from 'vue';
 export function createGit(deps) {
   const {
     wsSend, workDir,
-    gitPanelOpen, filePanelOpen, memoryPanelOpen,
+    gitPanelOpen, filePanelOpen, memoryPanelOpen, proxyPanelOpen,
     previewFile, previewPanelOpen,
     isMobile, sidebarView, workdirMenuOpen,
     t,
@@ -26,6 +26,7 @@ export function createGit(deps) {
     } else {
       filePanelOpen.value = false;
       memoryPanelOpen.value = false;
+      if (proxyPanelOpen) proxyPanelOpen.value = false;
       gitPanelOpen.value = true;
     }
     if (!gitInfo.value) {

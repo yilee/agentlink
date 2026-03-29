@@ -14,6 +14,7 @@ import { listBriefings, getBriefingDetail } from './briefing.js';
 import { listDevops, getDevopsDetail } from './devops.js';
 import { listProjects, getProjectDetail } from './project.js';
 import { brainSearch, getSearchIndexStats } from './search.js';
+import { createTunnelHandler } from './tunnel.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -27,6 +28,8 @@ import {
   shutdownScheduler,
   getRunningExecutions,
 } from './scheduler.js';
+
+let tunnelHandler: ReturnType<typeof createTunnelHandler> | null = null;
 
 const RECONNECT_BASE_DELAY = 1000;
 const RECONNECT_MAX_DELAY = 10_000;
@@ -74,6 +77,9 @@ export function connect(config: AgentConfig): Promise<string> {
 
   // Wire up the Claude module to send messages through our WebSocket
   setSendFn(send);
+
+  // Initialize the tunnel handler for port proxy
+  tunnelHandler = createTunnelHandler(send);
 
   // Wire up the Team module with send and claude dependencies
   setTeamSendFn(send);
@@ -215,6 +221,10 @@ function doConnect(
         }
       }
       console.log(`[AgentLink] Registered, session: ${state.sessionId}`);
+      // Sync initial proxy config to server
+      if (tunnelHandler) {
+        send({ type: 'proxy_config_updated', config: tunnelHandler.getProxyConfig() });
+      }
     } else {
       const msg = await parseMessage(raw, state.sessionKey);
       if (msg) {
@@ -248,6 +258,7 @@ export function disconnect(): void {
   state.shouldReconnect = false;
   stopHeartbeat();
   abortAllClaude();
+  if (tunnelHandler) tunnelHandler.cleanup();
   if (state.ws) {
     state.ws.close();
     state.ws = null;
@@ -651,6 +662,22 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
       break;
     case 'get_search_index_stats':
       handleGetSearchIndexStats();
+      break;
+    // ── Port Proxy tunnel handlers ──────────────────────────────────────
+    case 'tunnel_request':
+      if (tunnelHandler) tunnelHandler.handleTunnelRequest(msg as unknown as { type: 'tunnel_request'; tunnelId: string; port: number; method: string; path: string; headers: Record<string, string>; body?: string });
+      break;
+    case 'tunnel_ws_open':
+      if (tunnelHandler) tunnelHandler.handleTunnelWsOpen(msg as unknown as { type: 'tunnel_ws_open'; tunnelId: string; port: number; path: string; headers: Record<string, string> });
+      break;
+    case 'tunnel_ws_message':
+      if (tunnelHandler) tunnelHandler.handleTunnelWsMessage(msg as unknown as { type: 'tunnel_ws_message'; tunnelId: string; data: string; binary: boolean });
+      break;
+    case 'tunnel_ws_close':
+      if (tunnelHandler) tunnelHandler.handleTunnelWsClose(msg as unknown as { type: 'tunnel_ws_close'; tunnelId: string; code?: number; reason?: string });
+      break;
+    case 'proxy_config_update':
+      if (tunnelHandler) tunnelHandler.handleProxyConfigUpdate(msg as unknown as { config: { enabled: boolean; ports: Array<{ port: number; enabled: boolean; label?: string }> } });
       break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
