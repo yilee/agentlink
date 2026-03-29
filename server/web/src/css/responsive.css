@@ -291,6 +291,26 @@
   .git-group-actions-mobile {
     display: flex;
   }
+
+  /* Chat outline — fixed overlay from right */
+  .chat-outline-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 100;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .chat-outline-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+  }
 }
 
 /* ══════════════════════════════════════════

@@ -119,9 +119,12 @@ function onResizeEnd() {
 </script>
 
 <template>
+  <!-- Mobile backdrop -->
+  <div v-if="outlineOpen && isMobile" class="chat-outline-backdrop" @click="toggleOutline"></div>
+
   <Transition name="file-panel">
-    <div v-if="outlineOpen && !isMobile" class="chat-outline-panel" :style="{ width: outlineWidth + 'px' }">
-      <div class="chat-outline-resize-handle"
+    <div v-if="outlineOpen" class="chat-outline-panel" :style="!isMobile ? { width: outlineWidth + 'px' } : undefined">
+      <div v-if="!isMobile" class="chat-outline-resize-handle"
            @mousedown="onResizeStart($event)"
            @touchstart="onResizeStart($event)"></div>
       <div class="chat-outline-header">
