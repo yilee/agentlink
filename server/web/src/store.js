@@ -26,6 +26,7 @@ import { createRecap } from './modules/recap.js';
 import { createBriefing } from './modules/briefing.js';
 import { createDevops } from './modules/devops.js';
 import { createProject } from './modules/project.js';
+import { createSearch } from './modules/search.js';
 import { createRouter } from './modules/router.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
@@ -342,7 +343,7 @@ export function createStore() {
     // i18n
     t,
   });
-  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, setSearch, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -512,6 +513,10 @@ export function createStore() {
   if (project) setProject(project);
   if (project) project.setRequestSessionList(sidebar.requestSessionList);
 
+  // Search module (only in brain/ms mode)
+  const search = isMsRoute ? createSearch({ wsSend }) : null;
+  if (search) setSearch(search);
+
   // ── Hash router — route registration ──
   // Register routes AFTER all modules are created so handlers can access module state.
 
@@ -541,6 +546,14 @@ export function createStore() {
   router.addRoute('/loop', () => {
     team.viewMode.value = 'loop';
   });
+
+  // #/search → Brain Search feed
+  if (search) {
+    router.addRoute('/search', () => {
+      team.viewMode.value = 'feed';
+      currentView.value = 'search-feed';
+    });
+  }
 
   // #/recap → Recap feed
   if (recap) {
@@ -709,6 +722,7 @@ export function createStore() {
     else if (view === 'briefing-feed') router.push('/briefing');
     else if (view === 'devops-feed') router.push('/devops');
     else if (view === 'project-feed') router.push('/project');
+    else if (view === 'search-feed') router.push('/search');
   });
 
   const isMemoryPreview = computed(() => {
@@ -1098,12 +1112,12 @@ export function createStore() {
   watch(workdirCollapsed, _saveSidebarCollapsed);
 
   // Sync feed mode lifecycle: enter/exit feed triggers recap/briefing/devops load/autorefresh
-  if (recap || briefing || devops || project) {
+  if (search || recap || briefing || devops || project) {
     watch(team.viewMode, (newMode, oldMode) => {
       if (newMode === 'feed') {
         // During hash-restore the route handler already set currentView precisely
         // (e.g. 'recap-detail', 'briefing-feed'), so skip the blanket override.
-        if (!router.isRestoring()) currentView.value = 'recap-feed';
+        if (!router.isRestoring()) currentView.value = search ? 'search-feed' : 'recap-feed';
         if (recap) { recap.loadFeed(); recap.startAutoRefresh(); }
         if (briefing) { briefing.loadFeed(); briefing.startAutoRefresh(); }
         if (devops) { devops.loadFeed(); devops.startAutoRefresh(); }
@@ -1279,6 +1293,6 @@ export function createStore() {
     // Team feed helpers (depend on both store + team)
     feedAgentName, feedContentRest,
     // Domain modules (for App.vue to provide separately)
-    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing, _devops: devops, _project: project,
+    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing, _devops: devops, _project: project, _search: search,
   };
 }

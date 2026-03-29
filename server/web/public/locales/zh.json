@@ -306,5 +306,16 @@
   "outline.title": "大纲",
   "outline.close": "关闭大纲",
   "outline.toggle": "切换大纲",
-  "outline.empty": "暂无提问"
+  "outline.empty": "暂无提问",
+
+  "search.title": "搜索",
+  "search.placeholder": "搜索所有 Brain 数据源…",
+  "search.clear": "清除搜索",
+  "search.searching": "搜索中…",
+  "search.resultsCount": "找到 {n} 条结果",
+  "search.noResults": "未找到结果",
+  "search.noResultsHint": "试试不同的关键词或检查拼写",
+  "search.initialMessage": "搜索会议、邮件、PR、工作项等内容",
+  "search.availableSources": "可用数据源",
+  "search.allSources": "全部"
 }

@@ -554,20 +554,24 @@ const {
               </template>
               <div v-if="viewMode === 'feed'" class="feed-sidebar">
                 <div class="feed-sidebar-nav">
+                  <button class="feed-sidebar-btn" :class="{ active: currentView === 'search-feed' }" @click="currentView = 'search-feed'">
+                    <svg class="feed-sidebar-icon" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    Search
+                  </button>
                   <button class="feed-sidebar-btn" :class="{ active: currentView === 'recap-feed' || currentView === 'recap-detail' }" @click="currentView = 'recap-feed'">
-                    <span class="feed-sidebar-icon">&#x1F4CB;</span>
+                    <svg class="feed-sidebar-icon" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
                     Recaps
                   </button>
                   <button class="feed-sidebar-btn" :class="{ active: currentView === 'briefing-feed' || currentView === 'briefing-detail' }" @click="store.requireVersion('0.1.128', 'Daily Briefing Feed') && (currentView = 'briefing-feed')">
-                    <span class="feed-sidebar-icon">&#x1F4CA;</span>
+                    <svg class="feed-sidebar-icon" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                     Briefings
                   </button>
                   <button class="feed-sidebar-btn" :class="{ active: currentView === 'devops-feed' || currentView === 'devops-detail' }" @click="store.requireVersion('0.1.129', 'DevOps Board') && (currentView = 'devops-feed')">
-                    <span class="feed-sidebar-icon">&#x1F6E0;</span>
+                    <svg class="feed-sidebar-icon" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
                     DevOps
                   </button>
                   <button class="feed-sidebar-btn" :class="{ active: currentView === 'project-feed' || currentView === 'project-detail' }" @click="store.requireVersion('0.1.130', 'Project Knowledge Base') && (currentView = 'project-feed')">
-                    <span class="feed-sidebar-icon">&#x1F4DA;</span>
+                    <svg class="feed-sidebar-icon" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
                     Projects
                   </button>
                 </div>

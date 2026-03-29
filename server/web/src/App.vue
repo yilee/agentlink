@@ -25,6 +25,7 @@ import DevOpsFeed from './components/DevOpsFeed.vue';
 import DevOpsDetail from './components/DevOpsDetail.vue';
 import ProjectFeed from './components/ProjectFeed.vue';
 import ProjectDetail from './components/ProjectDetail.vue';
+import SearchFeed from './components/SearchFeed.vue';
 
 // Create store inside component setup() so onMounted/onUnmounted hooks fire correctly
 const store = createStore();
@@ -44,6 +45,9 @@ if (store._devops) {
 }
 if (store._project) {
   provide('project', store._project);
+}
+if (store._search) {
+  provide('search', store._search);
 }
 
 // Only destructure what App.vue template actually needs
@@ -107,6 +111,9 @@ const {
           <!-- ══ Project Views ══ -->
           <ProjectFeed v-if="currentView === 'project-feed'" />
           <ProjectDetail v-if="currentView === 'project-detail'" />
+
+          <!-- ══ Search View ══ -->
+          <SearchFeed v-if="currentView === 'search-feed'" />
 
           <BtwOverlay />
 

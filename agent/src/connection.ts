@@ -13,6 +13,7 @@ import { listRecaps, getRecapDetail } from './recap.js';
 import { listBriefings, getBriefingDetail } from './briefing.js';
 import { listDevops, getDevopsDetail } from './devops.js';
 import { listProjects, getProjectDetail } from './project.js';
+import { brainSearch, getSearchIndexStats } from './search.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
@@ -645,6 +646,12 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
     case 'get_project_detail':
       handleGetProjectDetailMsg(msg as unknown as { projectName: string });
       break;
+    case 'brain_search':
+      handleBrainSearch(msg as unknown as { query: string; sources?: string[]; limit?: number });
+      break;
+    case 'get_search_index_stats':
+      handleGetSearchIndexStats();
+      break;
     default:
       console.log(`[AgentLink] Unhandled server message: ${msg.type}`);
       send({ type: 'error', message: `Unsupported command: ${msg.type}. Please upgrade your agent: agentlink-client upgrade` });
@@ -736,6 +743,28 @@ async function handleGetProjectDetailMsg(msg: { projectName: string }): Promise<
   } catch (err) {
     console.error(`[AgentLink] getProjectDetail failed for ${msg.projectName}:`, err);
     send({ type: 'project_detail', name: msg.projectName, error: String(err) });
+  }
+}
+
+async function handleBrainSearch(msg: { query: string; sources?: string[]; limit?: number }): Promise<void> {
+  try {
+    const result = await brainSearch(BRAIN_DATA_DIR, msg.query, msg.sources, msg.limit);
+    console.log(`[AgentLink] → search_results (${result.totalResults} results for "${msg.query}")`);
+    send({ type: 'search_results', ...result });
+  } catch (err) {
+    console.error(`[AgentLink] brainSearch failed for "${msg.query}":`, err);
+    send({ type: 'search_results', query: msg.query, groups: [], totalResults: 0, error: String(err) });
+  }
+}
+
+async function handleGetSearchIndexStats(): Promise<void> {
+  try {
+    const stats = await getSearchIndexStats(BRAIN_DATA_DIR);
+    console.log(`[AgentLink] → search_index_stats (${stats.sources.length} sources)`);
+    send({ type: 'search_index_stats', ...stats });
+  } catch (err) {
+    console.error('[AgentLink] getSearchIndexStats failed:', err);
+    send({ type: 'search_index_stats', sources: [], error: String(err) });
   }
 }
 
