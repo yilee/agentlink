@@ -1,29 +1,26 @@
 /* ── Chat Outline Panel ── */
 
 .chat-outline-panel {
-  width: 220px;
-  min-width: 160px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-}
-
-.chat-outline-resize-handle {
   position: absolute;
   top: 0;
-  left: -3px;
-  width: 6px;
-  height: 100%;
-  cursor: col-resize;
-  z-index: 10;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  max-width: 85vw;
+  z-index: 50;
+  border-left: 1px solid var(--border);
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
 }
-.chat-outline-resize-handle:hover {
-  background: var(--accent);
-  opacity: 0.3;
+
+.chat-outline-backdrop {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 49;
 }
 
 .chat-outline-header {
@@ -123,7 +120,7 @@
   height: 36px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--bg-primary);
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;

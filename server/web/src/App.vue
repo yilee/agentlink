@@ -120,9 +120,9 @@ const {
           <!-- Input area (shown in both chat and team create mode) -->
           <ChatInput />
 
-        </div>
+          <ChatOutline />
 
-        <ChatOutline />
+        </div>
 
         <PreviewPanel />
 

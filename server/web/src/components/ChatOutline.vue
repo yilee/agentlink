@@ -4,7 +4,7 @@ import { inject, computed, ref, watch, nextTick, onUnmounted } from 'vue';
 const store = inject('store');
 const {
   messages, visibleMessages, outlineOpen, toggleOutline,
-  scrollToMessage, t, isMobile,
+  scrollToMessage, t,
 } = store;
 
 // Build outline items from ALL messages (not just visible)
@@ -81,52 +81,37 @@ function onItemClick(item) {
   activeId.value = item.msgId;
 }
 
-// Resize support
-const outlineWidth = ref(parseInt(localStorage.getItem('agentlink-outline-width'), 10) || 220);
-let resizing = false;
-let startX = 0;
-let startWidth = 0;
+// Track input-area height so panel stops above it
+const inputAreaHeight = ref(0);
+let resizeObserver = null;
 
-function onResizeStart(e) {
-  e.preventDefault();
-  resizing = true;
-  const ev = e.touches ? e.touches[0] : e;
-  startX = ev.clientX;
-  startWidth = outlineWidth.value;
-  document.addEventListener('mousemove', onResizeMove);
-  document.addEventListener('mouseup', onResizeEnd);
-  document.addEventListener('touchmove', onResizeMove);
-  document.addEventListener('touchend', onResizeEnd);
-}
+watch(outlineOpen, (open) => {
+  if (open) {
+    nextTick(() => {
+      const el = document.querySelector('.input-area');
+      if (!el) return;
+      inputAreaHeight.value = el.offsetHeight;
+      resizeObserver = new ResizeObserver(([entry]) => {
+        inputAreaHeight.value = entry.target.offsetHeight;
+      });
+      resizeObserver.observe(el);
+    });
+  } else {
+    if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; }
+  }
+}, { immediate: true });
 
-function onResizeMove(e) {
-  if (!resizing) return;
-  const ev = e.touches ? e.touches[0] : e;
-  // Dragging left-handle: moving left increases width
-  const delta = startX - ev.clientX;
-  const newWidth = Math.max(160, Math.min(400, startWidth + delta));
-  outlineWidth.value = newWidth;
-}
-
-function onResizeEnd() {
-  resizing = false;
-  localStorage.setItem('agentlink-outline-width', String(outlineWidth.value));
-  document.removeEventListener('mousemove', onResizeMove);
-  document.removeEventListener('mouseup', onResizeEnd);
-  document.removeEventListener('touchmove', onResizeMove);
-  document.removeEventListener('touchend', onResizeEnd);
-}
+onUnmounted(() => {
+  if (resizeObserver) resizeObserver.disconnect();
+});
 </script>
 
 <template>
-  <!-- Mobile backdrop -->
-  <div v-if="outlineOpen && isMobile" class="chat-outline-backdrop" @click="toggleOutline"></div>
+  <!-- Backdrop -->
+  <div v-if="outlineOpen" class="chat-outline-backdrop" :style="{ bottom: inputAreaHeight + 'px' }" @click="toggleOutline"></div>
 
   <Transition name="file-panel">
-    <div v-if="outlineOpen" class="chat-outline-panel" :style="!isMobile ? { width: outlineWidth + 'px' } : undefined">
-      <div v-if="!isMobile" class="chat-outline-resize-handle"
-           @mousedown="onResizeStart($event)"
-           @touchstart="onResizeStart($event)"></div>
+    <div v-if="outlineOpen" class="chat-outline-panel" :style="{ bottom: inputAreaHeight + 'px' }">
       <div class="chat-outline-header">
         <span class="chat-outline-title">{{ t('outline.title') }}</span>
         <button class="chat-outline-close" @click="toggleOutline" :title="t('outline.close')">&times;</button>
