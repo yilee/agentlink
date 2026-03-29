@@ -6,6 +6,7 @@ import { sessions, type AgentSession, type WebClient } from './session-manager.j
 import { auth } from './auth-manager.js';
 import { MessageRelay } from './message-relay.js';
 import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
+import { getProxyConfig } from './tunnel.js';
 
 const require = createRequire(import.meta.url);
 const serverPkg = require('../package.json');
@@ -176,6 +177,14 @@ function completeConnection(
   }
 
   ws.send(JSON.stringify(payload));
+
+  // Send cached proxy config so the UI shows the current state immediately
+  if (agent) {
+    const proxyConfig = getProxyConfig(agent.agentId);
+    if (proxyConfig) {
+      encryptAndSend(ws, { type: 'proxy_config_updated', config: proxyConfig }, sessionKey);
+    }
+  }
 
   console.log(`[Web] Client ${clientId.slice(0, 8)} connected to session ${sessionId}, agent: ${agent ? agent.name : 'none'}${authToken ? ' (authenticated)' : ''}`);
 
