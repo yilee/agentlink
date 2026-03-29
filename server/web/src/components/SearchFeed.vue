@@ -34,6 +34,7 @@ const SOURCE_META = {
   teams: { icon: '\u{1F4AC}', label: 'Teams' },
   emails: { icon: '\u{1F4E7}', label: 'Email' },
   meetings: { icon: '\u{1F4C5}', label: 'Meetings' },
+  meeting_recaps: { icon: '\u{1F4DD}', label: 'Recaps' },
   pull_requests: { icon: '\u{1F517}', label: 'PRs' },
   work_items: { icon: '\u{1F4CB}', label: 'Work Items' },
   documents: { icon: '\u{1F4C4}', label: 'Docs' },
@@ -72,7 +73,15 @@ const sourceTabs = computed(() => {
   }));
 });
 
+function isClickable(entry) {
+  return entry.url || entry.source === 'meeting_recaps';
+}
+
 function openEntry(entry) {
+  if (entry.source === 'meeting_recaps' && entry.extra?.recapId) {
+    window.location.hash = `/recap/${entry.extra.recapId}`;
+    return;
+  }
   if (entry.url) window.open(entry.url, '_blank');
 }
 
@@ -171,7 +180,7 @@ function formatTimestamp(ts) {
           <span class="search-result-group-count">{{ group.count }}</span>
         </div>
         <div class="search-result-entries">
-          <div v-for="entry in group.entries" :key="entry.id" class="search-result-entry" :class="{ clickable: entry.url }" @click="openEntry(entry)">
+          <div v-for="entry in group.entries" :key="entry.id" class="search-result-entry" :class="{ clickable: isClickable(entry) }" @click="openEntry(entry)">
             <div class="search-result-entry-header">
               <span class="search-result-entry-title">{{ entry.title }}</span>
               <span v-if="entry.timestamp" class="search-result-entry-time">{{ formatTimestamp(entry.timestamp) }}</span>

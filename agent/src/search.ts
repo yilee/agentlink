@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import yaml from 'js-yaml';
 
 export interface SearchResultEntry {
   id: string;
@@ -33,10 +34,12 @@ interface IndexFile {
 }
 
 const SEARCH_INDEX_DIR = '.search_index';
+const RECAP_INDEX_PATH = 'reports/meeting-recap/recap_index.yaml';
 const SOURCE_META: Record<string, { label: string; searchFields: string[] }> = {
   teams:          { label: 'Teams',          searchFields: ['sender', 'chat', 'body_preview'] },
   emails:         { label: 'Email',          searchFields: ['sender', 'subject', 'body_preview'] },
   meetings:       { label: 'Meetings',       searchFields: ['meeting_name', 'body_preview'] },
+  meeting_recaps: { label: 'Meeting Recaps', searchFields: ['meeting_name', 'series_name', 'tldr_snippet'] },
   pull_requests:  { label: 'Pull Requests',  searchFields: ['title', 'pr_number', 'project', 'repository'] },
   work_items:     { label: 'Work Items',     searchFields: ['title', 'project'] },
   documents:      { label: 'Documents',      searchFields: ['title'] },
@@ -52,6 +55,7 @@ function loadIndexes(brainHome: string): Map<string, IndexFile> {
   const indexes = new Map<string, IndexFile>();
 
   for (const source of Object.keys(SOURCE_META)) {
+    if (source === 'meeting_recaps') continue; // loaded separately below
     const filePath = path.join(indexDir, `${source}.json`);
     try {
       const raw = fs.readFileSync(filePath, 'utf-8');
@@ -62,6 +66,24 @@ function loadIndexes(brainHome: string): Map<string, IndexFile> {
     } catch {
       // Skip missing or malformed index files
     }
+  }
+
+  // Load meeting recaps from YAML index
+  try {
+    const recapPath = path.join(brainHome, RECAP_INDEX_PATH);
+    const raw = fs.readFileSync(recapPath, 'utf-8');
+    const parsed = yaml.load(raw) as Record<string, unknown>[] | { recaps?: Record<string, unknown>[] } | null;
+    const entries = Array.isArray(parsed) ? parsed : (parsed as { recaps?: Record<string, unknown>[] })?.recaps;
+    if (Array.isArray(entries) && entries.length > 0) {
+      indexes.set('meeting_recaps', {
+        source: 'meeting_recaps',
+        generated: '',
+        count: entries.length,
+        entries,
+      });
+    }
+  } catch {
+    // Skip if recap index not found
   }
 
   return indexes;
@@ -132,6 +154,16 @@ function mapEntry(source: string, entry: Record<string, unknown>): SearchResultE
         subtitle: '',
         snippet: e.body_preview || '',
         file: e.file,
+      };
+    case 'meeting_recaps':
+      return {
+        id: e.recap_id || e.id || '',
+        source,
+        timestamp: e.date_utc || '',
+        title: e.meeting_name || '',
+        subtitle: e.series_name || '',
+        snippet: e.tldr_snippet || '',
+        extra: { recapId: e.recap_id, sidecarPath: e.sidecar_path },
       };
     case 'pull_requests':
       return {
