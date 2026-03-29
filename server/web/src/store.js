@@ -653,7 +653,7 @@ export function createStore() {
     if (router.isRestoring()) return;
     if (mode === 'chat') {
       // Only push #/ if no session is active (otherwise #/chat/:id takes precedence)
-      if (!currentClaudeSessionId.value) router.push('/');
+      router.push(currentClaudeSessionId.value ? `/chat/${currentClaudeSessionId.value}` : '/');
     } else if (mode === 'team') {
       router.push('/team');
     } else if (mode === 'loop') {
