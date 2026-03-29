@@ -269,7 +269,7 @@ export function handleTunnelWsUpgrade(
 
   const sessionId = match[1];
   const port = parseInt(match[2], 10);
-  const proxyPath = match[3] || '/';
+  const proxyPath = (match[3] || '/') + url.search;
 
   if (!port || port < 1024 || port > 65535) {
     socket.destroy();

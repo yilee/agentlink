@@ -204,7 +204,12 @@ export function createConnection(deps) {
     error.value = '';
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsUrl = `${protocol}//${window.location.host}/?type=web&sessionId=${sid}`;
+    // When accessed through a proxy URL, WebSocket must also go through the proxy path
+    const proxyMatch = window.location.pathname.match(/^\/s\/[^/]+\/proxy\/(\d+)\//);
+    const wsBase = proxyMatch
+      ? `${protocol}//${window.location.host}${window.location.pathname.match(/^\/s\/[^/]+\/proxy\/\d+/)[0]}/`
+      : `${protocol}//${window.location.host}/`;
+    let wsUrl = `${wsBase}?type=web&sessionId=${sid}`;
     const savedToken = localStorage.getItem(`agentlink-auth-${sid}`);
     if (savedToken) {
       wsUrl += `&authToken=${encodeURIComponent(savedToken)}`;
