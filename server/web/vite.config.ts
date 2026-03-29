@@ -9,6 +9,7 @@ export default defineConfig({
       languageWorkers: ['editorWorkerService', 'css', 'html', 'json', 'typescript'],
     }),
   ],
+  base: './',
   build: {
     outDir: 'dist',
     emptyOutDir: true,

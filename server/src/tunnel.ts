@@ -231,7 +231,17 @@ export function httpProxyHandler(req: Request, res: Response): void {
       }
 
       const respBody = resp.body ? Buffer.from(resp.body as string, 'base64') : Buffer.alloc(0);
-      res.status(status).send(respBody);
+
+      // Inject <base> tag into HTML responses so relative asset paths resolve through the proxy prefix
+      const contentType = (respHeaders['content-type'] || respHeaders['Content-Type'] || '') as string;
+      if (contentType.includes('text/html') && respBody.length > 0) {
+        const html = respBody.toString('utf-8');
+        const baseHref = `/s/${sessionId}/proxy/${port}/`;
+        const injected = html.replace('<head>', `<head><base href="${baseHref}">`);
+        res.status(status).send(injected);
+      } else {
+        res.status(status).send(respBody);
+      }
     }).catch((err) => {
       const dec = sessionConcurrency.get(sessionId);
       if (dec) sessionConcurrency.set(sessionId, dec - 1);

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <base href="/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="color-scheme" content="dark light">
@@ -9,11 +10,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>AgenticWorker</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link id="hljs-theme" rel="stylesheet" href="/vendor/github.min.css">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+  <link id="hljs-theme" rel="stylesheet" href="./vendor/github.min.css">
   <script>
     // Apply saved theme immediately to prevent flash
     (function() {
@@ -21,8 +22,8 @@
       document.documentElement.setAttribute('data-theme', t);
       var link = document.getElementById('hljs-theme');
       if (link) link.href = t === 'light'
-        ? '/vendor/github.min.css'
-        : '/vendor/github-dark.min.css';
+        ? './vendor/github.min.css'
+        : './vendor/github-dark.min.css';
     })();
   </script>
 </head>
@@ -37,6 +38,6 @@
         '</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
     }
   </script>
-  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>

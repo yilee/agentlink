@@ -33,8 +33,9 @@ export function createI18n() {
   // Load locale JSON
   async function loadMessages(lang) {
     if (_loadedLocale === lang && Object.keys(_messages.value).length > 0) return;
+    const base = import.meta.env.BASE_URL;
     try {
-      const resp = await fetch(`/locales/${lang}.json`);
+      const resp = await fetch(`${base}locales/${lang}.json`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       _messages.value = await resp.json();
       _loadedLocale = lang;
@@ -43,7 +44,7 @@ export function createI18n() {
       // Fallback: try loading English
       if (lang !== DEFAULT_LOCALE) {
         try {
-          const resp = await fetch(`/locales/${DEFAULT_LOCALE}.json`);
+          const resp = await fetch(`${base}locales/${DEFAULT_LOCALE}.json`);
           if (resp.ok) {
             _messages.value = await resp.json();
             _loadedLocale = DEFAULT_LOCALE;

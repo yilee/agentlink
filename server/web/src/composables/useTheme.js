@@ -6,9 +6,10 @@ export function useTheme() {
   function applyTheme() {
     document.documentElement.setAttribute('data-theme', theme.value);
     const link = document.getElementById('hljs-theme');
+    const base = import.meta.env.BASE_URL;
     if (link) link.href = theme.value === 'light'
-      ? '/vendor/github.min.css'
-      : '/vendor/github-dark.min.css';
+      ? `${base}vendor/github.min.css`
+      : `${base}vendor/github-dark.min.css`;
   }
 
   function toggleTheme() {
