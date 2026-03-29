@@ -44,6 +44,7 @@ const {
   workdirMenuChangeDir,
   workdirMenuCopyPath,
   workdirMenuGit,
+  workdirMenuProxy,
   globalRecentSessions,
   loadingGlobalSessions,
   recentTab,
@@ -92,6 +93,7 @@ const {
   startMemoryEdit,
   workdirMenuMemory,
   git,
+  proxy,
   fileEditing,
   fileEditContent,
   fileSaving,
@@ -466,6 +468,77 @@ const {
             </div>
           </div>
 
+          <!-- Mobile: proxy view -->
+          <div v-else-if="isMobile && sidebarView === 'proxy'" class="file-panel-mobile proxy-panel-mobile">
+            <div class="file-panel-mobile-header">
+              <button class="file-panel-mobile-back" @click="sidebarView = 'sessions'">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                {{ t('sidebar.sessions') }}
+              </button>
+            </div>
+
+            <!-- Global toggle (mobile) -->
+            <div class="proxy-toggle-bar">
+              <span class="proxy-toggle-label">Proxy</span>
+              <button
+                class="proxy-toggle-btn"
+                :class="{ active: proxy.proxyEnabled.value }"
+                @click="proxy.toggleProxy()"
+              >
+                {{ proxy.proxyEnabled.value ? 'ON' : 'OFF' }}
+              </button>
+            </div>
+
+            <!-- Add port form (mobile) -->
+            <div class="proxy-add-form">
+              <input
+                type="number"
+                min="1024"
+                max="65535"
+                placeholder="Port"
+                class="proxy-input proxy-port-input"
+                @keydown.enter="proxy.addPort($event.target.value); $event.target.value = ''"
+              />
+              <button class="proxy-add-btn" @click="proxy.addPort(1024)" title="Add port">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              </button>
+            </div>
+
+            <!-- Port list (mobile) -->
+            <div class="proxy-port-list">
+              <div v-if="!proxy.proxyPorts.value.length" class="proxy-empty">
+                No ports configured.
+              </div>
+              <div
+                v-for="p in proxy.proxyPorts.value"
+                :key="p.port"
+                class="proxy-port-item"
+                :class="{ disabled: !p.enabled }"
+              >
+                <button
+                  class="proxy-port-toggle"
+                  :class="{ active: p.enabled }"
+                  @click="proxy.togglePort(p.port)"
+                >
+                  <svg v-if="p.enabled" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  <svg v-else viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </button>
+                <div class="proxy-port-info">
+                  <span class="proxy-port-number">:{{ p.port }}</span>
+                  <span v-if="p.label" class="proxy-port-label">{{ p.label }}</span>
+                </div>
+                <div class="proxy-port-actions" style="opacity:1">
+                  <button class="proxy-action-btn" @click="proxy.copyProxyUrl(p.port)" title="Copy URL">
+                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                  </button>
+                  <button class="proxy-action-btn proxy-action-remove" @click="proxy.removePort(p.port)" title="Remove">
+                    <svg viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Normal sidebar content (sessions view) -->
           <template v-else>
           <div class="sidebar-section">
@@ -508,6 +581,10 @@ const {
                     <path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122V6A2.5 2.5 0 0110 8.5H6a1 1 0 00-1 1v1.128a2.251 2.251 0 11-1.5 0V5.372a2.25 2.25 0 111.5 0v1.836A2.492 2.492 0 016 7h4a1 1 0 001-1v-.628A2.25 2.25 0 019.5 3.25zM4.25 12a.75.75 0 101.5 0 .75.75 0 00-1.5 0zM3.5 3.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z"/>
                   </svg>
                   <span>Git</span>
+                </div>
+                <div class="workdir-menu-item" @click.stop="workdirMenuProxy()">
+                  <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M15 9H9v6h6V9zm-2 4h-2v-2h2v2zm8-2V9h-2V7c0-1.1-.9-2-2-2h-2V3h-2v2h-2V3H9v2H7c-1.1 0-2 .9-2 2v2H3v2h2v2H3v2h2v2c0 1.1.9 2 2 2h2v2h2v-2h2v2h2v-2h2c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2zm-4 6H7V7h10v10z"/></svg>
+                  <span>Proxy</span>
                 </div>
               </div>
               <div class="workdir-history">

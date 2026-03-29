@@ -56,6 +56,8 @@ export function createSidebar(deps) {
   // Late-binding: set after git module is created
   let _git = null;
   function setGit(g) { _git = g; }
+  let _proxy = null;
+  function setProxy(p) { _proxy = p; }
 
   // Late-binding callback: called when user switches to a normal chat session
   let _onSwitchToChat = null;
@@ -449,6 +451,11 @@ export function createSidebar(deps) {
     if (_git) _git.openPanel();
   }
 
+  function workdirMenuProxy() {
+    workdirMenuOpen.value = false;
+    if (_proxy) _proxy.openPanel();
+  }
+
   // ── Sidebar resize handle (mouse + touch) ──
 
   let _resizing = false;
@@ -551,7 +558,7 @@ export function createSidebar(deps) {
   return {
     requestSessionList, resumeSession, newConversation, toggleSidebar,
     onSidebarResizeStart,
-    setOnSwitchToChat, setFileBrowser, setGit,
+    setOnSwitchToChat, setFileBrowser, setGit, setProxy,
     deleteSession,
     startRename, confirmRename, cancelRename,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
@@ -559,7 +566,7 @@ export function createSidebar(deps) {
     groupedSessions, isSessionProcessing,
     loadWorkdirHistory, addToWorkdirHistory, removeFromWorkdirHistory,
     switchToWorkdir, filteredWorkdirHistory, workdirCollapsed,
-    toggleWorkdirMenu, workdirMenuBrowse, workdirMenuChangeDir, workdirMenuCopyPath, workdirMenuGit,
+    toggleWorkdirMenu, workdirMenuBrowse, workdirMenuChangeDir, workdirMenuCopyPath, workdirMenuGit, workdirMenuProxy,
     requestGlobalSessions, refreshGlobalSessions, resumeGlobalSession, onWorkdirChanged,
   };
 }

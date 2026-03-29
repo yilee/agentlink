@@ -11,7 +11,7 @@ export function createMemory(deps) {
     memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
     memoryEditing, memoryEditContent, memorySaving,
     previewFile, filePreview, isMobile, sidebarView,
-    workdirMenuOpen, filePanelOpen, gitPanelOpen, t,
+    workdirMenuOpen, filePanelOpen, gitPanelOpen, proxyPanelOpen, t,
   } = deps;
 
   function workdirMenuMemory() {
@@ -23,6 +23,7 @@ export function createMemory(deps) {
       if (memoryPanelOpen.value) {
         filePanelOpen.value = false;
         gitPanelOpen.value = false;
+        if (proxyPanelOpen) proxyPanelOpen.value = false;
       }
     }
     if (!memoryFiles.value.length) {

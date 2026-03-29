@@ -21,6 +21,7 @@ import { createFilePreview } from './modules/filePreview.js';
 import { createTeam } from './modules/team.js';
 import { createMemory } from './modules/memory.js';
 import { createGit } from './modules/git.js';
+import { createProxy } from './modules/proxy.js';
 import { createLoop } from './modules/loop.js';
 import { createRecap } from './modules/recap.js';
 import { createBriefing } from './modules/briefing.js';
@@ -156,6 +157,8 @@ export function createStore() {
   const memoryPanelOpen = ref(false);
   // Git panel state
   const gitPanelOpen = ref(false);
+  // Proxy panel state
+  const proxyPanelOpen = ref(false);
   const memoryFiles = ref([]);
   const memoryDir = ref(null);
   const memoryLoading = ref(false);
@@ -343,7 +346,7 @@ export function createStore() {
     // i18n
     t,
   });
-  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, setSearch, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
+  const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, setSearch, setProxy, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
     messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
@@ -421,20 +424,30 @@ export function createStore() {
     memoryPanelOpen, memoryFiles, memoryDir, memoryLoading,
     memoryEditing, memoryEditContent, memorySaving,
     previewFile, filePreview,
-    isMobile, sidebarView, workdirMenuOpen, filePanelOpen, gitPanelOpen, t,
+    isMobile, sidebarView, workdirMenuOpen, filePanelOpen, gitPanelOpen, proxyPanelOpen, t,
   });
   setFilePreview(filePreview);
 
   // Git module
   const git = createGit({
     wsSend: (msg) => _wsSend(msg),
-    workDir, gitPanelOpen, filePanelOpen, memoryPanelOpen,
+    workDir, gitPanelOpen, filePanelOpen, memoryPanelOpen, proxyPanelOpen,
     previewFile, previewPanelOpen,
     isMobile, sidebarView, workdirMenuOpen,
     t,
   });
   setGit(git);
   sidebar.setGit(git);
+
+  // Proxy module
+  const proxy = createProxy({
+    wsSend: (msg) => _wsSend(msg),
+    sessionId,
+    proxyPanelOpen, filePanelOpen, memoryPanelOpen, gitPanelOpen,
+    isMobile, sidebarView, workdirMenuOpen,
+  });
+  setProxy(proxy);
+  sidebar.setProxy(proxy);
 
   // Recap module (only in brain/ms mode)
   const isMsRoute = window.location.pathname.startsWith('/ms/');
@@ -1226,6 +1239,8 @@ export function createStore() {
     deleteMemoryFile: memory.deleteMemoryFile,
     // Git panel
     gitPanelOpen, git,
+    // Proxy panel
+    proxyPanelOpen, proxy,
   };
 
   return {
@@ -1293,6 +1308,6 @@ export function createStore() {
     // Team feed helpers (depend on both store + team)
     feedAgentName, feedContentRest,
     // Domain modules (for App.vue to provide separately)
-    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing, _devops: devops, _project: project, _search: search,
+    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing, _devops: devops, _project: project, _search: search, _proxy: proxy,
   };
 }

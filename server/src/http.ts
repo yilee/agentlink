@@ -2,6 +2,7 @@ import express from 'express';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import { sessions } from './session-manager.js';
+import { httpProxyHandler } from './tunnel.js';
 
 // Entra ID config — read from environment variables at startup (optional)
 const entraClientId = process.env.ENTRA_CLIENT_ID;
@@ -64,6 +65,11 @@ export function createApp(webDir: string, pkg: { version: string }, startedAt: D
       }
     },
   }));
+
+  // ── Port proxy HTTP handler ────────────────────────────────────────────
+  app.all('/s/:sessionId/proxy/:port/*', httpProxyHandler);
+  // Also handle root path (no trailing path)
+  app.all('/s/:sessionId/proxy/:port', httpProxyHandler as any);
 
   // MSAL SPA callback — serve SPA with Entra config for MSAL.js to handle the auth code
   app.get('/auth/callback', (req, res) => {

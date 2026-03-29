@@ -61,6 +61,8 @@ export function createConnection(deps) {
   function setProject(p) { project = p; }
   let search = null;
   function setSearch(s) { search = s; }
+  let proxy = null;
+  function setProxy(p) { proxy = p; }
 
   let ws = null;
   let sessionKey = null;
@@ -159,6 +161,7 @@ export function createConnection(deps) {
     get devops() { return devops; },                   // late-bound
     get project() { return project; },                 // late-bound
     get search() { return search; },                   // late-bound
+    get proxy() { return proxy; },                     // late-bound
   };
 
   const claudeHandlers = createClaudeOutputHandlers(handlerDeps);
@@ -547,5 +550,5 @@ export function createConnection(deps) {
     ws.send(JSON.stringify({ type: 'authenticate', password: pwd }));
   }
 
-  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, setSearch, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
+  return { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, setSearch, setProxy, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap };
 }

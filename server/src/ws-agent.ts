@@ -5,6 +5,7 @@ import { sessions, type AgentSession } from './session-manager.js';
 import { auth } from './auth-manager.js';
 import { MessageRelay } from './message-relay.js';
 import { generateSessionKey, encodeKey, parseMessage, encryptAndSend } from './encryption.js';
+import { handleAgentTunnelMessage, updateProxyConfig, cleanupAgentTunnels } from './tunnel.js';
 
 const agentRelay = new MessageRelay();
 
@@ -92,6 +93,7 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
     const current = sessions.getAgent(agentId);
     if (current && current.ws === ws) {
       sessions.removeAgent(agentId);
+      cleanupAgentTunnels(agentId);
 
       // Notify connected web clients that agent is gone
       for (const client of sessions.getClientsForSession(sessionId)) {
@@ -126,6 +128,17 @@ async function handleAgentMessage(agentId: string, raw: string): Promise<void> {
   if (msg.type === 'workdir_changed' && typeof msg.workDir === 'string') {
     agent.workDir = msg.workDir;
     console.log(`[Agent] ${agent.name} changed workDir to: ${msg.workDir}`);
+  }
+
+  // Intercept proxy_config_updated to cache config on server side
+  if (msg.type === 'proxy_config_updated' && msg.config) {
+    updateProxyConfig(agent.agentId, msg.config as { enabled: boolean; ports: Array<{ port: number; enabled: boolean; label?: string }> });
+    // Fall through — also forward to web clients
+  }
+
+  // Route tunnel messages to tunnel handler (do NOT forward to web clients)
+  if (handleAgentTunnelMessage(msg)) {
+    return;
   }
 
   // Forward agent messages to all web clients connected to this session

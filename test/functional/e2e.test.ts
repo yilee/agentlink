@@ -1144,7 +1144,7 @@ describe('Functional: Workdir Dropdown Menu', () => {
 
       const items = await page.locator('.workdir-menu-item').allTextContents();
       const trimmed = items.map(t => t.trim());
-      expect(trimmed).toEqual(['Browse files', 'Change directory', 'Copy path', 'Memory', 'Git']);
+      expect(trimmed).toEqual(['Browse files', 'Change directory', 'Copy path', 'Memory', 'Git', 'Proxy']);
     } finally {
       await page.close();
       agent.ws.close();

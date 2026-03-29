@@ -10,6 +10,7 @@ import TopBar from './components/TopBar.vue';
 import Sidebar from './components/Sidebar.vue';
 import FilePanel from './components/FilePanel.vue';
 import GitPanel from './components/GitPanel.vue';
+import ProxyPanel from './components/ProxyPanel.vue';
 import TeamView from './components/TeamView.vue';
 import LoopView from './components/LoopView.vue';
 import ChatView from './components/ChatView.vue';
@@ -49,6 +50,7 @@ if (store._project) {
 if (store._search) {
   provide('search', store._search);
 }
+provide('proxy', store._proxy);
 
 // Only destructure what App.vue template actually needs
 const {
@@ -83,6 +85,8 @@ const {
         <FilePanel />
 
         <GitPanel />
+
+        <ProxyPanel />
 
         <!-- Chat area -->
         <div class="chat-area">
