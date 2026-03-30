@@ -45,7 +45,7 @@ vi.mock('child_process', () => ({
 vi.mock('../../agent/src/sdk.js', () => ({
   resolveClaudeCommand: () => ({ command: 'claude', prefixArgs: [], spawnOpts: {} }),
   getCleanEnv: () => ({ ...process.env }),
-  streamToStdin: vi.fn(),
+  streamToStdin: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../agent/src/config.js', () => ({

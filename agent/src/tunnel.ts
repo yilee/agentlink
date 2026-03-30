@@ -224,7 +224,8 @@ export function createTunnelHandler(send: SendFn) {
 
     ws.on('close', (code, reason) => {
       activeTunnelWs.delete(tunnelId);
-      send({ type: 'tunnel_ws_close', tunnelId, code, reason: reason?.toString() });
+      const safeCode = code >= 1000 && code <= 4999 ? code : 1000;
+      send({ type: 'tunnel_ws_close', tunnelId, code: safeCode, reason: reason?.toString() });
     });
 
     ws.on('error', (err) => {
@@ -237,8 +238,12 @@ export function createTunnelHandler(send: SendFn) {
     const ws = activeTunnelWs.get(msg.tunnelId);
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-    const buf = Buffer.from(msg.data, 'base64');
-    ws.send(msg.binary ? buf : buf.toString('utf8'));
+    try {
+      const buf = Buffer.from(msg.data, 'base64');
+      ws.send(msg.binary ? buf : buf.toString('utf8'));
+    } catch (err) {
+      console.error(`[Tunnel] Failed to send WS message for ${msg.tunnelId}:`, (err as Error).message);
+    }
   }
 
   function handleTunnelWsClose(msg: TunnelWsClose): void {
@@ -246,7 +251,12 @@ export function createTunnelHandler(send: SendFn) {
     if (ws) {
       activeTunnelWs.delete(msg.tunnelId);
       const code = msg.code && msg.code >= 1000 && msg.code <= 4999 ? msg.code : 1000;
-      ws.close(code, msg.reason || '');
+      try {
+        ws.close(code, msg.reason || '');
+      } catch (err) {
+        console.error(`[Tunnel] Failed to close WS for ${msg.tunnelId}:`, (err as Error).message);
+        try { ws.terminate(); } catch { /* swallow */ }
+      }
     }
   }
 
@@ -274,7 +284,7 @@ export function createTunnelHandler(send: SendFn) {
 
   function cleanup(): void {
     for (const [tunnelId, ws] of activeTunnelWs) {
-      ws.close(1001, 'Agent shutting down');
+      try { ws.close(1001, 'Agent shutting down'); } catch { /* swallow */ }
       activeTunnelWs.delete(tunnelId);
     }
   }

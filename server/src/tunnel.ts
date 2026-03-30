@@ -101,8 +101,12 @@ export function handleAgentTunnelMessage(msg: Record<string, unknown>): boolean 
       const tunnelId = msg.tunnelId as string;
       const tunnel = activeTunnelWs.get(tunnelId);
       if (tunnel && tunnel.browserWs.readyState === WebSocket.OPEN) {
-        const buf = Buffer.from(msg.data as string, 'base64');
-        tunnel.browserWs.send((msg.binary as boolean) ? buf : buf.toString('utf8'));
+        try {
+          const buf = Buffer.from(msg.data as string, 'base64');
+          tunnel.browserWs.send((msg.binary as boolean) ? buf : buf.toString('utf8'));
+        } catch (err) {
+          console.error(`[Tunnel] Failed to send to browser WS ${tunnelId}:`, (err as Error).message);
+        }
       }
       return true;
     }
@@ -113,10 +117,13 @@ export function handleAgentTunnelMessage(msg: Record<string, unknown>): boolean 
       if (tunnel) {
         activeTunnelWs.delete(tunnelId);
         if (tunnel.browserWs.readyState === WebSocket.OPEN) {
-          tunnel.browserWs.close(
-            (msg.code as number) || 1000,
-            (msg.reason as string) || '',
-          );
+          const code = typeof msg.code === 'number' && msg.code >= 1000 && msg.code <= 4999 ? msg.code : 1000;
+          try {
+            tunnel.browserWs.close(code, (msg.reason as string) || '');
+          } catch (err) {
+            console.error(`[Tunnel] Failed to close browser WS ${tunnelId}:`, (err as Error).message);
+            try { tunnel.browserWs.terminate(); } catch { /* swallow */ }
+          }
         }
       }
       return true;
@@ -128,7 +135,12 @@ export function handleAgentTunnelMessage(msg: Record<string, unknown>): boolean 
       if (tunnel) {
         activeTunnelWs.delete(tunnelId);
         if (tunnel.browserWs.readyState === WebSocket.OPEN) {
-          tunnel.browserWs.close(1011, (msg.message as string) || 'Tunnel error');
+          try {
+            tunnel.browserWs.close(1011, (msg.message as string) || 'Tunnel error');
+          } catch (err) {
+            console.error(`[Tunnel] Failed to close browser WS ${tunnelId} on error:`, (err as Error).message);
+            try { tunnel.browserWs.terminate(); } catch { /* swallow */ }
+          }
         }
       }
       return true;
@@ -208,7 +220,9 @@ export function httpProxyHandler(req: Request, res: Response): void {
       pendingRequests.set(tunnelId, { resolve, reject, timer });
     });
 
-    encryptAndSend(agent.ws, tunnelReq, agent.sessionKey);
+    encryptAndSend(agent.ws, tunnelReq, agent.sessionKey).catch((err) => {
+      console.error(`[Tunnel] Failed to send tunnel_request for ${tunnelId}:`, (err as Error).message);
+    });
 
     promise.then((resp) => {
       const dec = sessionConcurrency.get(sessionId);
@@ -306,7 +320,9 @@ export function handleTunnelWsUpgrade(
       port,
       path: proxyPath,
       headers,
-    }, agent.sessionKey);
+    }, agent.sessionKey).catch((err) => {
+      console.error(`[Tunnel] Failed to send tunnel_ws_open for ${tunnelId}:`, (err as Error).message);
+    });
 
     // Relay browser → agent messages
     browserWs.on('message', (data: RawData, isBinary: boolean) => {
@@ -316,17 +332,22 @@ export function handleTunnelWsUpgrade(
         tunnelId,
         data: buf.toString('base64'),
         binary: isBinary,
-      }, agent.sessionKey);
+      }, agent.sessionKey).catch((err) => {
+        console.error(`[Tunnel] Failed to relay browser→agent msg for ${tunnelId}:`, (err as Error).message);
+      });
     });
 
     browserWs.on('close', (code, reason) => {
       activeTunnelWs.delete(tunnelId);
+      const safeCode = code >= 1000 && code <= 4999 ? code : 1000;
       encryptAndSend(agent.ws, {
         type: 'tunnel_ws_close',
         tunnelId,
-        code,
+        code: safeCode,
         reason: reason?.toString(),
-      }, agent.sessionKey);
+      }, agent.sessionKey).catch((err) => {
+        console.error(`[Tunnel] Failed to send tunnel_ws_close for ${tunnelId}:`, (err as Error).message);
+      });
     });
 
     browserWs.on('error', () => {
@@ -336,7 +357,9 @@ export function handleTunnelWsUpgrade(
         tunnelId,
         code: 1011,
         reason: 'Browser WebSocket error',
-      }, agent.sessionKey);
+      }, agent.sessionKey).catch((err) => {
+        console.error(`[Tunnel] Failed to send tunnel_ws_close (error) for ${tunnelId}:`, (err as Error).message);
+      });
     });
   });
 
@@ -352,7 +375,7 @@ export function cleanupAgentTunnels(agentId: string): void {
     if (tunnel.agentId === agentId) {
       activeTunnelWs.delete(tunnelId);
       if (tunnel.browserWs.readyState === WebSocket.OPEN) {
-        tunnel.browserWs.close(1001, 'Agent disconnected');
+        try { tunnel.browserWs.close(1001, 'Agent disconnected'); } catch { /* swallow */ }
       }
     }
   }

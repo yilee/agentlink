@@ -826,8 +826,15 @@ function startQuery(conversationId: string, workDir: string, resumeSessionId?: s
 
   state.child = child;
 
+  // Guard against stdin errors (e.g. pipe broken when child exits unexpectedly)
+  child.stdin.on('error', (err) => {
+    console.error(`[Claude:${conversationId.slice(0, 8)}] stdin error: ${err.message}`);
+  });
+
   // Pipe user messages → stdin
-  streamToStdin(inputStream, child.stdin, abortController.signal);
+  streamToStdin(inputStream, child.stdin, abortController.signal).catch((err) => {
+    console.error(`[Claude:${conversationId.slice(0, 8)}] streamToStdin error: ${(err as Error).message}`);
+  });
 
   // Capture stderr for debugging (use object so processOutput sees updates)
   const stderr = { buf: '' };

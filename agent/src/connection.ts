@@ -139,7 +139,7 @@ function startHeartbeat(): void {
     }
     if (ws.readyState !== WebSocket.OPEN) return;
 
-    ws.ping();
+    try { ws.ping(); } catch { return; }
 
     heartbeatTimeout = setTimeout(() => {
       heartbeatTimeout = null;
@@ -185,6 +185,7 @@ function doConnect(
   });
 
   ws.on('message', async (data) => {
+    try {
     const raw = data.toString();
     let parsed: Record<string, unknown>;
     try {
@@ -233,6 +234,9 @@ function doConnect(
         console.error(`[AgentLink] Failed to decrypt message (key=${state.sessionKey ? 'set' : 'null'}, raw=${raw.slice(0, 120)})`);
       }
     }
+    } catch (err) {
+      console.error('[AgentLink] Unhandled error in message handler:', (err as Error).message, (err as Error).stack);
+    }
   });
 
   ws.on('close', () => {
@@ -269,8 +273,12 @@ let sendQueue = Promise.resolve();
 
 export function send(msg: Record<string, unknown>): void {
   if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-    sendQueue = sendQueue.then(() =>
-      encryptAndSend(state.ws!, msg, state.sessionKey));
+    sendQueue = sendQueue.then(() => {
+      if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+      return encryptAndSend(state.ws, msg, state.sessionKey);
+    }).catch((err) => {
+      console.error(`[AgentLink] send() failed for ${msg.type}:`, (err as Error).message);
+    });
   } else {
     console.warn(`[AgentLink] Cannot send ${msg.type}: WebSocket not open (readyState=${state.ws?.readyState})`);
   }

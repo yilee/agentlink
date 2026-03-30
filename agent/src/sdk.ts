@@ -153,7 +153,11 @@ export async function streamToStdin(
 ): Promise<void> {
   for await (const message of stream) {
     if (abort?.aborted) break;
-    stdin.write(JSON.stringify(message) + '\n');
+    try {
+      stdin.write(JSON.stringify(message) + '\n');
+    } catch {
+      break; // stdin destroyed
+    }
   }
-  stdin.end();
+  try { stdin.end(); } catch { /* already closed */ }
 }

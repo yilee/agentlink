@@ -19,7 +19,7 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
   const clientId = randomUUID();
 
   if (!sessionId) {
-    ws.send(JSON.stringify({ type: 'error', message: 'Missing sessionId' }));
+    try { ws.send(JSON.stringify({ type: 'error', message: 'Missing sessionId' })); } catch { /* swallow */ }
     ws.close();
     return;
   }
@@ -51,7 +51,7 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
     // Require authentication
     auth.setPending(clientId, sessionId);
 
-    ws.send(JSON.stringify({ type: 'auth_required', sessionId }));
+    try { ws.send(JSON.stringify({ type: 'auth_required', sessionId })); } catch { /* swallow */ }
 
     ws.on('message', (data) => {
       handlePendingAuthMessage(clientId, ws, data.toString());
@@ -59,6 +59,10 @@ export function handleWebConnection(ws: WebSocket, req: IncomingMessage): void {
 
     ws.on('close', () => {
       auth.removePending(clientId);
+    });
+
+    ws.on('error', (err) => {
+      console.error(`[Web] WebSocket error during auth for ${clientId.slice(0, 8)}:`, err.message);
     });
 
     return;
@@ -175,7 +179,11 @@ function completeConnection(
     payload.authToken = authToken;
   }
 
-  ws.send(JSON.stringify(payload));
+  try {
+    ws.send(JSON.stringify(payload));
+  } catch (err) {
+    console.error(`[Web] Failed to send connected payload to ${clientId.slice(0, 8)}:`, (err as Error).message);
+  }
 
   console.log(`[Web] Client ${clientId.slice(0, 8)} connected to session ${sessionId}, agent: ${agent ? agent.name : 'none'}${authToken ? ' (authenticated)' : ''}`);
 
@@ -191,6 +199,10 @@ function completeConnection(
 
   ws.on('pong', () => {
     client.isAlive = true;
+  });
+
+  ws.on('error', (err) => {
+    console.error(`[Web] WebSocket error for ${clientId.slice(0, 8)}:`, err.message);
   });
 }
 

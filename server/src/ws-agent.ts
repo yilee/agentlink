@@ -62,12 +62,16 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
   console.log(`[Agent] Registered: ${name} (${agentId}), session: ${sessionId}${requestedSessionId ? ' (reconnect)' : ''}${passwordHash ? ' (password protected)' : ''}`);
 
   // Send registration with session key (this initial message is plain text)
-  ws.send(JSON.stringify({
-    type: 'registered',
-    agentId,
-    sessionId,
-    sessionKey: encodeKey(sessionKey),
-  }));
+  try {
+    ws.send(JSON.stringify({
+      type: 'registered',
+      agentId,
+      sessionId,
+      sessionKey: encodeKey(sessionKey),
+    }));
+  } catch (err) {
+    console.error(`[Agent] Failed to send registration to ${name}:`, (err as Error).message);
+  }
 
   // Notify any web clients already connected to this session (reconnect scenario)
   for (const client of sessions.getClientsForSession(sessionId)) {
@@ -75,7 +79,9 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
       encryptAndSend(client.ws, {
         type: 'agent_reconnected',
         agent: { agentId, name, hostname, workDir, version },
-      }, client.sessionKey);
+      }, client.sessionKey).catch((err) => {
+        console.error(`[Agent] Failed to notify client of reconnect:`, (err as Error).message);
+      });
     }
   }
 
@@ -98,7 +104,9 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
       // Notify connected web clients that agent is gone
       for (const client of sessions.getClientsForSession(sessionId)) {
         if (client.ws.readyState === WebSocket.OPEN) {
-          encryptAndSend(client.ws, { type: 'agent_disconnected' }, client.sessionKey);
+          encryptAndSend(client.ws, { type: 'agent_disconnected' }, client.sessionKey).catch((err) => {
+            console.error(`[Agent] Failed to notify client of disconnect:`, (err as Error).message);
+          });
         }
       }
     }
@@ -106,6 +114,10 @@ export function handleAgentConnection(ws: WebSocket, req: IncomingMessage): void
 
   ws.on('pong', () => {
     agent.isAlive = true;
+  });
+
+  ws.on('error', (err) => {
+    console.error(`[Agent] WebSocket error for ${name} (${agentId}):`, err.message);
   });
 }
 

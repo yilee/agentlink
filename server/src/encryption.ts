@@ -81,10 +81,14 @@ export async function parseMessage(data: string, sessionKey: Uint8Array | null):
 }
 
 export async function encryptAndSend(ws: { send: (data: string) => void; readyState: number }, msg: unknown, sessionKey: Uint8Array | null): Promise<void> {
-  if (sessionKey) {
-    const encrypted = await encrypt(msg, sessionKey);
-    ws.send(JSON.stringify(encrypted));
-  } else {
-    ws.send(JSON.stringify(msg));
+  try {
+    if (sessionKey) {
+      const encrypted = await encrypt(msg, sessionKey);
+      ws.send(JSON.stringify(encrypted));
+    } else {
+      ws.send(JSON.stringify(msg));
+    }
+  } catch (err) {
+    console.error('[encryptAndSend] Failed to send message:', (err as Error).message);
   }
 }

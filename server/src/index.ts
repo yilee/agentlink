@@ -58,7 +58,9 @@ wss.on('connection', (ws, req) => {
 setInterval(() => {
   sessions.cleanupDeadConnections((client, msg) => {
     if (client.ws.readyState === WebSocket.OPEN) {
-      encryptAndSend(client.ws, msg, client.sessionKey);
+      encryptAndSend(client.ws, msg, client.sessionKey).catch((err) => {
+        console.error(`[Heartbeat] Failed to notify client:`, (err as Error).message);
+      });
     }
   });
 }, 30_000);

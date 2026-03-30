@@ -107,7 +107,7 @@ export class SessionManager {
         continue;
       }
       agent.isAlive = false;
-      agent.ws.ping();
+      try { agent.ws.ping(); } catch { /* swallow */ }
     }
 
     for (const [clientId, client] of this.webClients) {
@@ -118,7 +118,7 @@ export class SessionManager {
         continue;
       }
       client.isAlive = false;
-      client.ws.ping();
+      try { client.ws.ping(); } catch { /* swallow */ }
     }
 
     return { removedAgents, removedClients };
