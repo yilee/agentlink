@@ -658,18 +658,8 @@ export function createStore() {
       router.push('/team');
     } else if (mode === 'loop') {
       router.push('/loop');
-    } else if (mode === 'feed') {
-      // Push the hash for whichever feed tab was last active
-      if (currentView.value === 'briefing-feed' || currentView.value === 'briefing-detail') {
-        router.push('/briefing');
-      } else if (currentView.value === 'devops-feed' || currentView.value === 'devops-detail') {
-        router.push('/devops');
-      } else if (currentView.value === 'project-feed' || currentView.value === 'project-detail') {
-        router.push('/project');
-      } else {
-        router.push('/recap');
-      }
     }
+    // feed hash is driven by the currentView watcher below — not here
   });
 
   // Claude session changes → push #/chat/:sessionId or #/
