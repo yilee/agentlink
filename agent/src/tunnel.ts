@@ -245,7 +245,8 @@ export function createTunnelHandler(send: SendFn) {
     const ws = activeTunnelWs.get(msg.tunnelId);
     if (ws) {
       activeTunnelWs.delete(msg.tunnelId);
-      ws.close(msg.code || 1000, msg.reason || '');
+      const code = msg.code && msg.code >= 1000 && msg.code <= 4999 ? msg.code : 1000;
+      ws.close(code, msg.reason || '');
     }
   }
 

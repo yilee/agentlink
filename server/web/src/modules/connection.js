@@ -133,6 +133,9 @@ export function createConnection(deps) {
   }
 
   function getSessionId() {
+    // When accessed via proxy URL like /s/OUTER/proxy/PORT/ms/INNER, extract INNER session
+    const proxyMatch = window.location.pathname.match(/^\/s\/[^/]+\/proxy\/\d+\/(s|ms)\/([^/]+)/);
+    if (proxyMatch) return proxyMatch[2];
     const match = window.location.pathname.match(/^\/(s|ms)\/([^/]+)/);
     return match ? match[2] : null;
   }
