@@ -58,7 +58,7 @@ function selectableIndex(cmd, i) {
 </script>
 
 <template>
-          <div class="input-area" v-if="(viewMode === 'chat' && currentView === 'chat') || currentView === 'recap-detail' || currentView === 'briefing-detail' || currentView === 'devops-detail' || currentView === 'project-detail'">
+          <div class="input-area" v-show="(viewMode === 'chat' && currentView === 'chat') || currentView === 'recap-detail' || currentView === 'briefing-detail' || currentView === 'devops-detail' || currentView === 'project-detail'">
             <input
               type="file"
               ref="fileInputRef"
