@@ -933,6 +933,7 @@ export function createStore() {
 
   function cancelExecution() {
     if (!isProcessing.value) return;
+    needsResume.value = true;
     const cancelPayload = { type: 'cancel_execution' };
     if (currentConversationId.value) {
       cancelPayload.conversationId = currentConversationId.value;
@@ -948,6 +949,10 @@ export function createStore() {
   function dequeueNext() {
     if (queuedMessages.value.length === 0) return;
     const queued = queuedMessages.value.shift();
+    if (needsResume.value && currentClaudeSessionId.value && !queued.payload.resumeSessionId) {
+      queued.payload.resumeSessionId = currentClaudeSessionId.value;
+      needsResume.value = false;
+    }
     const userMsg = {
       id: queued.id, role: 'user', status: 'sent',
       content: queued.content, attachments: queued.attachments,

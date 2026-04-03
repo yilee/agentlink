@@ -140,6 +140,8 @@ function getConversationCount(type: 'chat' | 'loop'): number {
 // ── Module state ───────────────────────────────────────────────────────────
 
 const conversations = new Map<string, ConversationState>();
+/** Preserves claudeSessionId across cleanupConversation() deletes so handleChat() can resume. */
+const lastSessionIdsByConv = new Map<string, string>();
 let sendFn: SendFn = () => {};
 const pendingControlRequests = new Map<string, PendingControlRequest>();
 
@@ -273,10 +275,12 @@ export function clearSessionId(conversationId?: string): void {
     if (conv) {
       conv.lastClaudeSessionId = null;
     }
+    lastSessionIdsByConv.delete(conversationId);
   } else {
     for (const conv of conversations.values()) {
       conv.lastClaudeSessionId = null;
     }
+    lastSessionIdsByConv.clear();
   }
 }
 
@@ -311,8 +315,9 @@ export function handleChat(
 
   if (!existing || !existing.inputStream) {
     // If the process exited but we still know the session ID, resume it
-    const sessionToResume = options?.resumeSessionId || existing?.claudeSessionId || existing?.lastClaudeSessionId || undefined;
+    const sessionToResume = options?.resumeSessionId || existing?.claudeSessionId || existing?.lastClaudeSessionId || lastSessionIdsByConv.get(convId) || undefined;
     startQuery(convId, workDir, sessionToResume, options?.brainMode);
+    lastSessionIdsByConv.delete(convId);
   }
 
   const state = conversations.get(convId)!;
@@ -379,6 +384,7 @@ export function abortAll(): void {
   for (const convId of [...conversations.keys()]) {
     abort(convId);
   }
+  lastSessionIdsByConv.clear();
 }
 
 /**
@@ -1209,6 +1215,7 @@ function cleanupConversation(conversationId: string): void {
   // Preserve session ID so the next message can resume
   if (conv.claudeSessionId) {
     conv.lastClaudeSessionId = conv.claudeSessionId;
+    lastSessionIdsByConv.set(conversationId, conv.claudeSessionId);
   }
 
   if (conv.child && !conv.child.killed) {
