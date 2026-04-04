@@ -6,6 +6,7 @@
  */
 import { spawn, type ChildProcess } from 'child_process';
 import { resolve } from 'path';
+import { gunzipSync } from 'zlib';
 import WebSocket from 'ws';
 import { chromium, type Browser, type Page } from 'playwright';
 import tweetnacl from 'tweetnacl';
@@ -25,12 +26,16 @@ export function encryptMsg(data: unknown, key: Uint8Array): { n: string; c: stri
   return { n: encodeBase64(nonce), c: encodeBase64(encrypted) };
 }
 
-export function decryptMsg(encrypted: { n: string; c: string }, key: Uint8Array): unknown | null {
+export function decryptMsg(encrypted: { n: string; c: string; z?: boolean }, key: Uint8Array): unknown | null {
   try {
     const nonce = decodeBase64(encrypted.n);
     const ciphertext = decodeBase64(encrypted.c);
     const decrypted = tweetnacl.secretbox.open(ciphertext, nonce, key);
     if (!decrypted) return null;
+    if (encrypted.z) {
+      const decompressed = gunzipSync(Buffer.from(decrypted));
+      return JSON.parse(decompressed.toString('utf-8'));
+    }
     return JSON.parse(encodeUTF8(decrypted));
   } catch {
     return null;

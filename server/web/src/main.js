@@ -25,6 +25,7 @@ import './css/devops.css';
 import './css/project.css';
 import './css/search.css';
 import './css/chat-outline.css';
+import './css/fork.css';
 
 function mountApp() {
   createApp(App).mount('#app');

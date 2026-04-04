@@ -22,6 +22,7 @@ import { createTeam } from './modules/team.js';
 import { createMemory } from './modules/memory.js';
 import { createGit } from './modules/git.js';
 import { createProxy } from './modules/proxy.js';
+import { createFork } from './modules/fork.js';
 import { createLoop } from './modules/loop.js';
 import { createRecap } from './modules/recap.js';
 import { createBriefing } from './modules/briefing.js';
@@ -448,6 +449,17 @@ export function createStore() {
   });
   setProxy(proxy);
   sidebar.setProxy(proxy);
+
+  // Fork conversation module
+  const fork = createFork({
+    wsSend,
+    switchConversation,
+    messages,
+    streaming,
+    scrollToBottom,
+    isProcessing,
+    processingConversations,
+  });
 
   // Recap module (only in brain/ms mode)
   const isMsRoute = window.location.pathname.startsWith('/ms/') || /\/proxy\/\d+\/ms\//.test(window.location.pathname);
@@ -1294,6 +1306,8 @@ export function createStore() {
     handleDragLeave: fileAttach.handleDragLeave,
     handleDrop: fileAttach.handleDrop,
     handlePaste: fileAttach.handlePaste,
+    // Fork conversation
+    forkFromMessage: fork.forkFromMessage,
     // Shared utility
     formatDuration: loop.formatDuration,
     // UI state

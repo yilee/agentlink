@@ -34,17 +34,34 @@ export function buildHistoryBatch(history, nextId) {
         // Check for meeting/briefing/devops context injection (recap/briefing/devops chat first message)
         const parsed = parseMeetingContext(h.content);
         if (parsed) {
-          const contextRole = parsed.type === 'briefing' ? 'briefing-context' : parsed.type === 'devops' ? 'devops-context' : parsed.type === 'project' ? 'project-context' : 'meeting-context';
+          const contextRole = parsed.type === 'fork' ? 'fork-context' : parsed.type === 'briefing' ? 'briefing-context' : parsed.type === 'devops' ? 'devops-context' : parsed.type === 'project' ? 'project-context' : 'meeting-context';
+          // For fork-context, the context content starts with "[Fork Context]\n..." — strip the prefix line
+          let contextContent = parsed.context;
+          if (parsed.type === 'fork') {
+            const nlIdx = contextContent.indexOf('\n');
+            contextContent = nlIdx !== -1 ? contextContent.substring(nlIdx + 1) : contextContent;
+          }
           batch.push({
             id: nextId(), role: contextRole,
-            content: parsed.context, contextExpanded: false,
+            content: contextContent, contextExpanded: false,
             timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
           });
-          batch.push({
-            id: nextId(), role: 'user',
-            content: parsed.userText,
-            timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
-          });
+          // For fork-context, only show userText if it's a real user instruction (not the default prompt)
+          if (parsed.type === 'fork') {
+            if (parsed.userText && !parsed.userText.startsWith('Review the conversation history')) {
+              batch.push({
+                id: nextId(), role: 'user',
+                content: parsed.userText,
+                timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+              });
+            }
+          } else {
+            batch.push({
+              id: nextId(), role: 'user',
+              content: parsed.userText,
+              timestamp: h.timestamp ? new Date(h.timestamp) : new Date(),
+            });
+          }
         } else {
           batch.push({
             id: nextId(), role: 'user',
