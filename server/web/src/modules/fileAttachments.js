@@ -23,6 +23,14 @@ export function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function detectImageMimeFromBase64(base64, fallback) {
+  if (base64.startsWith('iVBOR')) return 'image/png';
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('R0lGOD')) return 'image/gif';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  return fallback;
+}
+
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -56,13 +64,16 @@ export function createFileAttachments(attachments, fileInputRef, dragOver) {
 
       const data = await readFileAsBase64(file);
       const isImage = file.type.startsWith('image/');
+      const mimeType = isImage
+        ? detectImageMimeFromBase64(data, file.type)
+        : (file.type || 'application/octet-stream');
       let thumbUrl = null;
       if (isImage) {
         thumbUrl = URL.createObjectURL(file);
       }
       attachments.value.push({
         name: file.name,
-        mimeType: file.type || 'application/octet-stream',
+        mimeType,
         size: file.size,
         data,
         isImage,
