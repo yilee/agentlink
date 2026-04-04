@@ -1125,7 +1125,7 @@ export function createStore() {
       if (newMode === 'feed') {
         // During hash-restore the route handler already set currentView precisely
         // (e.g. 'recap-detail', 'briefing-feed'), so skip the blanket override.
-        if (!router.isRestoring()) currentView.value = search ? 'search-feed' : 'recap-feed';
+        if (!router.isRestoring()) currentView.value = 'recap-feed';
         if (recap) { recap.loadFeed(); recap.startAutoRefresh(); }
         if (briefing) { briefing.loadFeed(); briefing.startAutoRefresh(); }
         if (devops) { devops.loadFeed(); devops.startAutoRefresh(); }
