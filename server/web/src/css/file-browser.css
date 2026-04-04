@@ -506,9 +506,6 @@
   .file-panel {
     max-width: clamp(200px, 20vw, 280px);
   }
-  .preview-panel {
-    max-width: min(400px, 40vw);
-  }
 }
 
 /* ══════════════════════════════════════════

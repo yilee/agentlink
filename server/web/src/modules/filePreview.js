@@ -147,7 +147,6 @@ export function createFilePreview(deps) {
   let _startX = 0;
   let _startWidth = 0;
   const MIN_WIDTH = 200;
-  const MAX_WIDTH = 800;
 
   function onResizeStart(e) {
     e.preventDefault();
@@ -171,7 +170,8 @@ export function createFilePreview(deps) {
     const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
     // Left edge resize: dragging left = wider, dragging right = narrower
     const delta = _startX - clientX;
-    const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, _startWidth + delta));
+    const maxWidth = Math.max(400, Math.floor(window.innerWidth * 0.6));
+    const newWidth = Math.max(MIN_WIDTH, Math.min(maxWidth, _startWidth + delta));
     previewPanelWidth.value = newWidth;
   }
 
