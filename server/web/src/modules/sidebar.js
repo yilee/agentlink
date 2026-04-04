@@ -509,13 +509,13 @@ export function createSidebar(deps) {
     if (requireVersion && !requireVersion('0.1.127', 'Global Sessions')) return;
     if (_globalSessionsLoaded && globalRecentSessions.value.length > 0) return;
     loadingGlobalSessions.value = true;
-    wsSend({ type: 'list_recent_sessions', limit: 20 });
+    wsSend({ type: 'list_recent_sessions', limit: 50 });
     _globalSessionsLoaded = true;
   }
 
   function refreshGlobalSessions() {
     loadingGlobalSessions.value = true;
-    wsSend({ type: 'list_recent_sessions', limit: 20 });
+    wsSend({ type: 'list_recent_sessions', limit: 50 });
   }
 
   function resumeGlobalSession(session) {
