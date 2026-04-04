@@ -499,6 +499,26 @@
   background: rgba(107, 159, 206, 0.12);
 }
 
+.session-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.session-refresh-btn:hover {
+  color: var(--accent);
+  background: rgba(107, 159, 206, 0.12);
+}
+
 .session-rename-row {
   display: flex;
   align-items: center;

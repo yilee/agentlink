@@ -42,6 +42,7 @@
   "sidebar.loadingSessions": "加载会话中...",
   "sidebar.noSessions": "没有找到历史会话。",
   "sidebar.renameSession": "重命名会话",
+  "sidebar.refreshSession": "刷新对话",
   "sidebar.deleteSession": "删除会话",
   "sidebar.confirm": "确认",
   "sidebar.cancel": "取消",

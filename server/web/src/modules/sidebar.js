@@ -142,6 +142,16 @@ export function createSidebar(deps) {
     });
   }
 
+  function refreshCurrentSession() {
+    if (!currentClaudeSessionId.value) return;
+    loadingHistory.value = true;
+    wsSend({
+      type: 'resume_conversation',
+      conversationId: currentConversationId.value,
+      claudeSessionId: currentClaudeSessionId.value,
+    });
+  }
+
   function newConversation() {
     if (window.innerWidth <= 768) sidebarOpen.value = false;
     if (_onSwitchToChat) _onSwitchToChat();
@@ -556,7 +566,7 @@ export function createSidebar(deps) {
   }
 
   return {
-    requestSessionList, resumeSession, newConversation, toggleSidebar,
+    requestSessionList, resumeSession, refreshCurrentSession, newConversation, toggleSidebar,
     onSidebarResizeStart,
     setOnSwitchToChat, setFileBrowser, setGit, setProxy,
     deleteSession,

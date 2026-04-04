@@ -42,6 +42,7 @@
   "sidebar.loadingSessions": "Loading sessions...",
   "sidebar.noSessions": "No previous sessions found.",
   "sidebar.renameSession": "Rename session",
+  "sidebar.refreshSession": "Refresh conversation",
   "sidebar.deleteSession": "Delete session",
   "sidebar.confirm": "Confirm",
   "sidebar.cancel": "Cancel",
