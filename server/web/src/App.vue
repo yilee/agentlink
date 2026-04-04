@@ -162,6 +162,10 @@ const {
             <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z"/></svg>
             {{ t('file.newFolder') }}
           </div>
+          <div class="file-context-item" @click="fileBrowser.copyPath()">
+            <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            {{ fileContextMenu.copied ? t('contextMenu.copied') : t('contextMenu.copyPath') }}
+          </div>
           <div class="file-context-separator"></div>
           <div class="file-context-item file-context-danger" @click="fileBrowser.deleteItem(fileContextMenu.path, fileContextMenu.name, true)">
             <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -170,10 +174,6 @@ const {
         </template>
         <!-- File menu items -->
         <template v-else>
-          <div class="file-context-item" @click="fileBrowser.askClaudeRead()">
-            <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM5 15h14v2H5zm0-4h14v2H5zm0-4h14v2H5z"/></svg>
-            {{ t('contextMenu.askClaudeRead') }}
-          </div>
           <div class="file-context-item" @click="fileBrowser.copyPath()">
             <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
             {{ fileContextMenu.copied ? t('contextMenu.copied') : t('contextMenu.copyPath') }}
