@@ -7,6 +7,7 @@ const MEETING_CONTEXT_PREFIX = '[Meeting Context';
 const BRIEFING_CONTEXT_PREFIX = '[Briefing Context';
 const DEVOPS_CONTEXT_PREFIX = '[DevOps Context';
 const PROJECT_CONTEXT_PREFIX = '[Project Context';
+const FORK_CONTEXT_PREFIX = '[Fork Context';
 
 function parseToolInput(msg) {
   if (msg._parsedInput !== undefined) return msg._parsedInput;
@@ -32,6 +33,7 @@ export function parseMeetingContext(text) {
   else if (trimmed.startsWith(BRIEFING_CONTEXT_PREFIX)) type = 'briefing';
   else if (trimmed.startsWith(DEVOPS_CONTEXT_PREFIX)) type = 'devops';
   else if (trimmed.startsWith(PROJECT_CONTEXT_PREFIX)) type = 'project';
+  else if (trimmed.startsWith(FORK_CONTEXT_PREFIX)) type = 'fork';
   if (!type) return null;
   // Split on the closing </brain-context> tag (legacy: fall back to \n---\n)
   const TAG = '</brain-context>';

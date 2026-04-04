@@ -3,6 +3,7 @@ import { inject } from 'vue';
 import ToolBlock from './ToolBlock.vue';
 import AskQuestionCard from './AskQuestionCard.vue';
 
+
 const props = defineProps({
   messages: { type: Array, required: true },
   visibleMessages: { type: Array, required: true },
@@ -91,6 +92,9 @@ function isPrevAssistant(msgIdx) {
           <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">{{ t('chat.claude') }}</div>
           <div :class="['message-bubble', 'assistant-bubble', { streaming: msg.isStreaming }]" :title="formatTimestamp(msg.timestamp)">
             <div class="message-actions">
+              <button class="icon-btn" @click="store.forkFromMessage(msg, msgIdx, $event)" :title="t('fork.forkConversation')">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm12-2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM7 9v2h4a2 2 0 0 1 2 2v2h-2l3 3 3-3h-2v-2a4 4 0 0 0-4-4H7z"/></svg>
+              </button>
               <button class="icon-btn" @click="copyMessage(msg)" :title="msg.copied ? t('chat.copied') : t('chat.copy')">
                 <svg v-if="!msg.copied" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
                 <svg v-else viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
@@ -182,6 +186,18 @@ function isPrevAssistant(msgIdx) {
           <div class="context-summary-bar meeting-context-bar" @click="toggleContextSummary(msg)">
             <svg class="context-summary-icon" viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
             <span class="context-summary-label">{{ t('chat.projectContextInjected') }}</span>
+            <span class="context-summary-toggle">{{ msg.contextExpanded ? t('chat.hide') : t('chat.show') }}</span>
+          </div>
+          <div v-if="msg.contextExpanded" class="context-summary-body">
+            <div class="markdown-body" v-html="getRenderedContent({ role: 'assistant', content: msg.content })"></div>
+          </div>
+        </div>
+
+        <!-- Fork context (collapsed by default, injected when forking a conversation) -->
+        <div v-else-if="msg.role === 'fork-context'" class="context-summary-wrapper fork-context-wrapper">
+          <div class="context-summary-bar fork-context-bar" @click="toggleContextSummary(msg)">
+            <svg class="context-summary-icon" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm12-2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM7 9v2h4a2 2 0 0 1 2 2v2h-2l3 3 3-3h-2v-2a4 4 0 0 0-4-4H7z"/></svg>
+            <span class="context-summary-label">{{ t('fork.forkedFromConversation') }}</span>
             <span class="context-summary-toggle">{{ msg.contextExpanded ? t('chat.hide') : t('chat.show') }}</span>
           </div>
           <div v-if="msg.contextExpanded" class="context-summary-body">
