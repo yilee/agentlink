@@ -227,6 +227,7 @@
   "system.generationStopped": "Generation stopped.",
   "system.agentProcessing": "Agent is processing...",
   "system.sessionRestored": "Session restored. You can continue the conversation.",
+  "system.reconnectResuming": "Reconnected. Refreshing conversation...",
   "system.workdirChanged": "Working directory changed to: {dir}",
 
   "error.noSessionId": "No session ID in URL. Use a session URL provided by agentlink start.",

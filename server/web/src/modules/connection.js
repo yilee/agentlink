@@ -314,8 +314,10 @@ export function createConnection(deps) {
       stopPing();
       clearIdleCheck();
       const wasConnected = status.value === 'Connected' || status.value === 'Connecting...';
-      isProcessing.value = false;
-      isCompacting.value = false;
+      // Preserve isProcessing/isCompacting across reconnect so the UI keeps
+      // showing the stop button instead of briefly enabling the input box.
+      // The authoritative state will arrive via query_active_conversations or
+      // conversation_resumed after reconnect.
       // Do NOT clear queuedMessages here — they should survive reconnect and
       // be drained once active_conversations confirms processing has stopped.
       loadingSessions.value = false;
@@ -369,6 +371,23 @@ export function createConnection(deps) {
       if (search && team && team.viewMode.value === 'feed') search.loadIndexStats();
       startPing();
       wsSend({ type: 'query_active_conversations' });
+      // Auto-refresh current conversation after reconnect to recover messages
+      // that arrived while disconnected. The resume response also carries the
+      // authoritative isProcessing/isCompacting state from the agent.
+      if (deps.currentClaudeSessionId && deps.currentClaudeSessionId.value) {
+        loadingHistory.value = true;
+        messages.value.push({
+          id: streaming.nextId(), role: 'system',
+          content: t('system.reconnectResuming'),
+          timestamp: new Date(),
+        });
+        scrollToBottom();
+        wsSend({
+          type: 'resume_conversation',
+          conversationId: currentConversationId.value,
+          claudeSessionId: deps.currentClaudeSessionId.value,
+        });
+      }
       if (deps.onConnected) deps.onConnected();
     } else {
       status.value = 'Waiting';

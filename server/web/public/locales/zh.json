@@ -227,6 +227,7 @@
   "system.generationStopped": "生成已停止。",
   "system.agentProcessing": "代理处理中...",
   "system.sessionRestored": "会话已恢复。您可以继续对话。",
+  "system.reconnectResuming": "已重连，正在恢复对话...",
   "system.workdirChanged": "工作目录已更改为：{dir}",
 
   "error.noSessionId": "URL 中没有会话 ID。请使用 agentlink start 提供的会话 URL。",
