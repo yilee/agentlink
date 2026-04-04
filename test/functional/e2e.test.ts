@@ -815,51 +815,10 @@ describe('Functional: File Browser Panel', () => {
       // Verify menu items
       const menuItems = await page.locator('.file-context-item').allTextContents();
       const menuText = menuItems.map(t => t.trim());
-      expect(menuText.some(t => t.includes('Ask Claude to read'))).toBe(true);
       expect(menuText.some(t => t.includes('Copy path'))).toBe(true);
       expect(menuText.some(t => t.includes('Insert path to input'))).toBe(true);
-    } finally {
-      await page.close();
-      agent.ws.close();
-    }
-  });
-
-  it('"Ask Claude to read" populates input without sending', async () => {
-    const { agent, page } = await setupFileBrowserTest('ReadAgent', '/read-test');
-    try {
-      // Open panel
-      await page.click('.sidebar-workdir-path-row');
-      await page.waitForSelector('.workdir-menu', { timeout: 3000 });
-      await page.click('.workdir-menu-item >> text=Browse files');
-      await page.waitForSelector('.file-panel', { timeout: 3000 });
-
-      await agent.waitForMessage((m) => m.type === 'list_directory');
-      respondWithDirectoryListing(agent, '/read-test', [
-        { name: 'data.json', type: 'file' },
-      ]);
-
-      await page.waitForFunction(() => {
-        return document.querySelectorAll('.file-tree-item').length === 1;
-      }, { timeout: 5000 });
-
-      // Right-click on file to open context menu
-      await page.click('.file-tree-item', { button: 'right' });
-      await page.waitForSelector('.file-context-menu', { timeout: 3000 });
-
-      // Click "Ask Claude to read"
-      await page.click('.file-context-item >> text=Ask Claude to read');
-
-      // Context menu should close
-      await page.waitForSelector('.file-context-menu', { state: 'detached', timeout: 3000 });
-
-      // Input textarea should contain the read command but NOT be sent
-      const inputValue = await page.locator('textarea').inputValue();
-      expect(inputValue).toContain('Read the file');
-      expect(inputValue).toContain('data.json');
-
-      // No chat message should have been sent (no user bubble)
-      const userBubbles = await page.locator('.user-bubble').count();
-      expect(userBubbles).toBe(0);
+      // "Ask Claude to read" is hidden
+      expect(menuText.some(t => t.includes('Ask Claude to read'))).toBe(false);
     } finally {
       await page.close();
       agent.ws.close();
