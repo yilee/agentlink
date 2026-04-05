@@ -62,6 +62,9 @@
   "sidebar.tasks": "tasks",
   "sidebar.server": "server",
   "sidebar.agent": "agent",
+  "sidebar.searchSessions": "Search sessions",
+  "sidebar.searchPlaceholder": "Search sessions...",
+  "sidebar.searchNoResults": "No matching sessions found.",
 
   "filePanel.files": "Files",
   "filePanel.loading": "Loading...",
@@ -309,6 +312,9 @@
   "outline.close": "Close outline",
   "outline.toggle": "Toggle outline",
   "outline.empty": "No questions yet",
+  "outline.searchPlaceholder": "Search messages...",
+  "outline.searchNoResults": "No matches found",
+  "outline.searchResultCount": "{n} matches",
 
   "search.title": "Search",
   "search.placeholder": "Search across all Brain sources…",

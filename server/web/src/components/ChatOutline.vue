@@ -2,10 +2,14 @@
 import { inject, computed, ref, watch, nextTick, onUnmounted } from 'vue';
 
 const store = inject('store');
+const chatSearch = inject('chatSearch');
+
 const {
   messages, outlineOpen, toggleOutline,
   scrollToMessage, t,
 } = store;
+
+const { messageSearchQuery, messageSearchResults } = chatSearch;
 
 // Build outline items from ALL messages
 const outlineItems = computed(() => {
@@ -82,6 +86,26 @@ function onItemClick(item) {
   activeId.value = item.msgId;
 }
 
+function onSearchResultClick(item) {
+  scrollToMessage(item.msgIdx);
+  toggleOutline();
+}
+
+function getSnippetParts(item) {
+  const s = item.snippet;
+  const start = item.matchStart;
+  const len = item.matchLength;
+  return {
+    before: s.slice(0, start),
+    match: s.slice(start, start + len),
+    after: s.slice(start + len),
+  };
+}
+
+function getRoleBadge(role) {
+  return role === 'user' ? 'Q' : 'A';
+}
+
 // Track input-area height so panel stops above it
 const inputAreaHeight = ref(0);
 let resizeObserver = null;
@@ -117,21 +141,50 @@ onUnmounted(() => {
         <span class="chat-outline-title">{{ t('outline.title') }}</span>
         <button class="chat-outline-close" @click="toggleOutline" :title="t('outline.close')">&times;</button>
       </div>
+      <div class="chat-outline-search">
+        <input
+          v-model="messageSearchQuery"
+          class="chat-outline-search-input"
+          :placeholder="t('outline.searchPlaceholder')"
+          @keydown.escape="messageSearchQuery = ''"
+        />
+      </div>
       <div class="chat-outline-body">
-        <div v-if="outlineItems.length === 0" class="chat-outline-empty">
-          {{ t('outline.empty') }}
-        </div>
-        <div v-else class="chat-outline-list">
-          <div
-            v-for="item in outlineItems"
-            :key="item.msgId"
-            :class="['chat-outline-item', { active: activeId === item.msgId }]"
-            @click="onItemClick(item)"
-          >
-            <span class="chat-outline-index">Q{{ item.index }}</span>
-            <span class="chat-outline-text">{{ item.text }}</span>
+        <!-- Search results mode -->
+        <template v-if="messageSearchQuery.trim()">
+          <div v-if="messageSearchResults.length === 0" class="chat-outline-empty">
+            {{ t('outline.searchNoResults') }}
           </div>
-        </div>
+          <div v-else class="chat-outline-list">
+            <div class="chat-outline-search-count">{{ t('outline.searchResultCount').replace('{n}', messageSearchResults.length) }}</div>
+            <div
+              v-for="item in messageSearchResults"
+              :key="item.msgId + '-' + item.matchStart"
+              class="chat-outline-item chat-search-result"
+              @click="onSearchResultClick(item)"
+            >
+              <span :class="['chat-outline-index', 'chat-search-role', item.role === 'user' ? 'role-user' : 'role-assistant']">{{ getRoleBadge(item.role) }}</span>
+              <span class="chat-outline-text">{{ getSnippetParts(item).before }}<mark>{{ getSnippetParts(item).match }}</mark>{{ getSnippetParts(item).after }}</span>
+            </div>
+          </div>
+        </template>
+        <!-- Default outline mode -->
+        <template v-else>
+          <div v-if="outlineItems.length === 0" class="chat-outline-empty">
+            {{ t('outline.empty') }}
+          </div>
+          <div v-else class="chat-outline-list">
+            <div
+              v-for="item in outlineItems"
+              :key="item.msgId"
+              :class="['chat-outline-item', { active: activeId === item.msgId }]"
+              @click="onItemClick(item)"
+            >
+              <span class="chat-outline-index">Q{{ item.index }}</span>
+              <span class="chat-outline-text">{{ item.text }}</span>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </Transition>

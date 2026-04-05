@@ -289,6 +289,51 @@
   gap: 2px;
 }
 
+/* ── Session search inline header ── */
+
+.sidebar-search-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: default;
+}
+
+.sidebar-search-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.sidebar-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text);
+  font-size: 0.75rem;
+  outline: none;
+}
+.sidebar-search-input:focus {
+  border-color: var(--accent);
+}
+.sidebar-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.sidebar-search-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 0.15rem;
+  line-height: 1;
+}
+.sidebar-search-close:hover {
+  color: var(--text);
+}
+
 .sidebar-collapse-btn {
   display: flex;
   align-items: center;
