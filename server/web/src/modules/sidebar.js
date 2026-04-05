@@ -431,6 +431,17 @@ export function createSidebar(deps) {
     return order.filter(k => groups[k]).map(k => ({ label: t(GROUP_KEYS[k]), sessions: groups[k] }));
   });
 
+  const flatSessionItems = computed(() => {
+    const items = [];
+    for (const group of groupedSessions.value) {
+      items.push({ _type: 'header', label: group.label });
+      for (const s of group.sessions) {
+        items.push({ _type: 'session', ...s });
+      }
+    }
+    return items;
+  });
+
   // ── Workdir menu actions ──
 
   function toggleWorkdirMenu() {
@@ -516,13 +527,13 @@ export function createSidebar(deps) {
     if (requireVersion && !requireVersion('0.1.127', 'Global Sessions')) return;
     if (_globalSessionsLoaded && globalRecentSessions.value.length > 0) return;
     loadingGlobalSessions.value = true;
-    wsSend({ type: 'list_recent_sessions', limit: 50 });
+    wsSend({ type: 'list_recent_sessions', limit: 500 });
     _globalSessionsLoaded = true;
   }
 
   function refreshGlobalSessions() {
     loadingGlobalSessions.value = true;
-    wsSend({ type: 'list_recent_sessions', limit: 50 });
+    wsSend({ type: 'list_recent_sessions', limit: 500 });
   }
 
   function resumeGlobalSession(session) {
@@ -570,7 +581,7 @@ export function createSidebar(deps) {
     startRename, confirmRename, cancelRename,
     openFolderPicker, folderPickerNavigateUp, folderPickerSelectItem,
     folderPickerEnter, folderPickerGoToPath, confirmFolderPicker,
-    groupedSessions, isSessionProcessing,
+    groupedSessions, flatSessionItems, isSessionProcessing,
     loadWorkdirHistory, addToWorkdirHistory, removeFromWorkdirHistory,
     switchToWorkdir, filteredWorkdirHistory, workdirCollapsed,
     toggleWorkdirMenu, workdirMenuBrowse, workdirMenuChangeDir, workdirMenuCopyPath, workdirMenuGit, workdirMenuProxy,
