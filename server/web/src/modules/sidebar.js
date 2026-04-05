@@ -15,7 +15,6 @@ import { useConfirmDialog } from '../composables/useConfirmDialog.js';
  * @param {import('vue').Ref} deps.loadingSessions
  * @param {import('vue').Ref} deps.loadingHistory
  * @param {import('vue').Ref} deps.workDir
- * @param {import('vue').Ref} deps.visibleLimit
  * @param {import('vue').Ref} deps.folderPickerOpen
  * @param {import('vue').Ref} deps.folderPickerPath
  * @param {import('vue').Ref} deps.folderPickerEntries
@@ -30,7 +29,7 @@ export function createSidebar(deps) {
   const {
     wsSend, messages, isProcessing, sidebarOpen, sidebarWidth,
     historySessions, currentClaudeSessionId, needsResume,
-    loadingSessions, loadingHistory, workDir, visibleLimit,
+    loadingSessions, loadingHistory, workDir,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
     hostname, workdirHistory, workdirCollapsed, workdirSwitching,
@@ -127,7 +126,6 @@ export function createSidebar(deps) {
     // Legacy fallback (no multi-session)
     if (isProcessing.value) return;
     messages.value = [];
-    visibleLimit.value = 50;
     streaming.setMessageIdCounter(0);
     streaming.setStreamingMessageId(null);
     streaming.reset();
@@ -177,7 +175,6 @@ export function createSidebar(deps) {
     // Legacy fallback (no multi-session)
     if (isProcessing.value) return;
     messages.value = [];
-    visibleLimit.value = 50;
     streaming.setMessageIdCounter(0);
     streaming.setStreamingMessageId(null);
     streaming.reset();

@@ -7,9 +7,9 @@ const store = inject('store');
 const devops = inject('devops');
 
 const {
-  currentView, messages, visibleMessages, hasMoreMessages,
+  currentView, messages,
   isProcessing, hasStreamingMessage, loadingHistory,
-  onMessageListScroll, loadMoreMessages,
+  onMessageListScroll,
 } = store;
 const {
   selectedEntityType, selectedEntityId, selectedEntity,
@@ -136,14 +136,11 @@ onUnmounted(() => {
       <div class="devops-chat-area">
         <MessageList
           :messages="messages"
-          :visible-messages="visibleMessages"
-          :has-more-messages="hasMoreMessages"
           :is-processing="isProcessing"
           :has-streaming-message="hasStreamingMessage"
           :loading-history="loadingHistory"
           :compact="true"
           @scroll="onMessageListScroll"
-          @load-more="loadMoreMessages"
         >
           <template #empty>
             <div class="devops-chat-empty">

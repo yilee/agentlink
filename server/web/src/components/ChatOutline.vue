@@ -3,11 +3,11 @@ import { inject, computed, ref, watch, nextTick, onUnmounted } from 'vue';
 
 const store = inject('store');
 const {
-  messages, visibleMessages, outlineOpen, toggleOutline,
+  messages, outlineOpen, toggleOutline,
   scrollToMessage, t,
 } = store;
 
-// Build outline items from ALL messages (not just visible)
+// Build outline items from ALL messages
 const outlineItems = computed(() => {
   const items = [];
   let qIndex = 0;
@@ -21,7 +21,7 @@ const outlineItems = computed(() => {
       }
       // Replace newlines with spaces, truncate
       text = text.replace(/\n/g, ' ').trim();
-      if (text.length > 60) text = text.slice(0, 60) + '…';
+      if (text.length > 60) text = text.slice(0, 60) + '\u2026';
       items.push({ index: qIndex, msgIdx: i, msgId: msg.id, text });
     }
   }
@@ -37,6 +37,7 @@ let observer = null;
 function setupObserver() {
   if (observer) observer.disconnect();
 
+  // VList renders items inside a scrollable container; find it
   const root = document.querySelector('.message-list');
   if (!root) return;
 
@@ -57,11 +58,11 @@ function setupObserver() {
   });
 }
 
-// Re-observe when visible messages change
-watch(visibleMessages, () => {
+// Re-observe when messages change (virtua may render different items on scroll)
+watch(messages, () => {
   if (!outlineOpen.value) return;
   nextTick(setupObserver);
-});
+}, { deep: false });
 
 // Setup observer when panel opens
 watch(outlineOpen, (open) => {
