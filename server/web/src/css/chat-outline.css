@@ -141,9 +141,53 @@
 
 /* Highlight flash animation for scrollToMessage */
 @keyframes outline-highlight-flash {
-  0% { box-shadow: 0 0 0 2px var(--accent); }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  0%   { background-color: color-mix(in srgb, var(--accent) 18%, transparent); }
+  100% { background-color: transparent; }
 }
 .outline-highlight {
-  animation: outline-highlight-flash 1.5s ease-out;
+  animation: outline-highlight-flash 1.8s ease-out;
+  border-radius: 4px;
+}
+
+/* ── In-conversation search (inside Outline panel) ── */
+
+.chat-outline-search {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.chat-outline-search-input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: 0.8rem;
+  outline: none;
+}
+.chat-outline-search-input:focus {
+  border-color: var(--accent);
+}
+.chat-outline-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.chat-outline-search-count {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.chat-search-result mark {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--text);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.chat-search-role.role-assistant {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
 }

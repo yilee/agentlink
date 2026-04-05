@@ -29,6 +29,7 @@ import { createBriefing } from './modules/briefing.js';
 import { createDevops } from './modules/devops.js';
 import { createProject } from './modules/project.js';
 import { createSearch } from './modules/search.js';
+import { createChatSearch } from './modules/chatSearch.js';
 import { createRouter } from './modules/router.js';
 import { createScrollManager, createHighlightScheduler, formatUsage } from './modules/appHelpers.js';
 import { createI18n } from './modules/i18n.js';
@@ -552,6 +553,12 @@ export function createStore() {
   // Search module (only in brain/ms mode)
   const search = isMsRoute ? createSearch({ wsSend }) : null;
   if (search) setSearch(search);
+
+  // Chat search module (session filtering + in-conversation message search)
+  const chatSearch = createChatSearch({
+    historySessions, groupedSessions: sidebar.groupedSessions,
+    flatSessionItems: sidebar.flatSessionItems, messages, t,
+  });
 
   // ── Hash router — route registration ──
   // Register routes AFTER all modules are created so handlers can access module state.
@@ -1325,6 +1332,6 @@ export function createStore() {
     // Team feed helpers (depend on both store + team)
     feedAgentName, feedContentRest,
     // Domain modules (for App.vue to provide separately)
-    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing, _devops: devops, _project: project, _search: search, _proxy: proxy,
+    _team, _loop, _sidebar, _files, _recap: recap, _briefing: briefing, _devops: devops, _project: project, _search: search, _proxy: proxy, _chatSearch: chatSearch,
   };
 }

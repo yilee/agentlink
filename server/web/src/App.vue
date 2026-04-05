@@ -51,6 +51,7 @@ if (store._search) {
   provide('search', store._search);
 }
 provide('proxy', store._proxy);
+provide('chatSearch', store._chatSearch);
 
 // Only destructure what App.vue template actually needs
 const {

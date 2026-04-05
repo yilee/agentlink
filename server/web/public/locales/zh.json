@@ -62,6 +62,9 @@
   "sidebar.tasks": "个任务",
   "sidebar.server": "server",
   "sidebar.agent": "agent",
+  "sidebar.searchSessions": "搜索会话",
+  "sidebar.searchPlaceholder": "搜索会话...",
+  "sidebar.searchNoResults": "未找到匹配的会话。",
 
   "filePanel.files": "文件",
   "filePanel.loading": "加载中...",
@@ -309,6 +312,9 @@
   "outline.close": "关闭大纲",
   "outline.toggle": "切换大纲",
   "outline.empty": "暂无提问",
+  "outline.searchPlaceholder": "搜索消息...",
+  "outline.searchNoResults": "未找到匹配内容",
+  "outline.searchResultCount": "{n} 条匹配",
 
   "search.title": "搜索",
   "search.placeholder": "搜索所有 Brain 数据源…",
