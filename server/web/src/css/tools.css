@@ -50,6 +50,21 @@
   min-width: 0;
 }
 
+/* Clickable file path in tool summary and diff header */
+.tool-summary.file-path-clickable,
+.diff-file.file-path-clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+  color: #7aafe0;
+}
+
+[data-theme="light"] .tool-summary.file-path-clickable,
+[data-theme="light"] .diff-file.file-path-clickable {
+  color: #2563eb;
+}
+
 .tool-status-icon {
   color: var(--text-secondary);
   font-weight: normal;
