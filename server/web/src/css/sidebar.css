@@ -89,6 +89,7 @@
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
+  min-height: 22px;
 }
 .workdir-history-label:hover {
   opacity: 1;
@@ -269,6 +270,7 @@
   letter-spacing: 0.05em;
   color: var(--text-secondary);
   margin-bottom: 2px;
+  min-height: 22px;
 }
 
 .sidebar-refresh-btn {
@@ -298,6 +300,21 @@
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+.sidebar-section-header-left {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sidebar-section-chevron {
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-section-chevron.collapsed {
+  transform: rotate(-90deg);
 }
 
 /* ── Session search inline header ── */
