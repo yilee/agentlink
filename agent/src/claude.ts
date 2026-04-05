@@ -259,6 +259,20 @@ export function rebindConversation(claudeSessionId: string, newConvId: string): 
   return false;
 }
 
+/** Return all pending AskUserQuestion requests for a conversation. */
+export function getPendingQuestions(conversationId: string): Array<{ requestId: string; questions: unknown[] }> {
+  const result: Array<{ requestId: string; questions: unknown[] }> = [];
+  for (const [reqId, pending] of pendingControlRequests) {
+    if (pending.conversationId === conversationId) {
+      result.push({
+        requestId: reqId,
+        questions: (pending.request.request.input as Record<string, unknown>)?.questions as unknown[] || [],
+      });
+    }
+  }
+  return result;
+}
+
 /** Whether context compaction is currently in progress for a conversation. */
 export function getIsCompacting(conversationId?: string): boolean {
   const conv = conversations.get(conversationId || DEFAULT_CONVERSATION_ID);

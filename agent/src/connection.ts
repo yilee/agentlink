@@ -18,7 +18,7 @@ import { createTunnelHandler } from './tunnel.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json');
-import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, handleBtwQuestion, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, restartConversation, createPlaceholderConversation, type ChatFile } from './claude.js';
+import { handleChat as claudeHandleChat, setSendFn, abort as abortClaude, abortAll as abortAllClaude, cancelExecution as claudeCancelExecution, handleUserAnswer, handleBtwQuestion, getConversation, getConversations, getIsCompacting, clearSessionId, evictByClaudeSessionId, rebindConversation, addOutputObserver, removeOutputObserver, addCloseObserver, removeCloseObserver, setOutputObserver, clearOutputObserver, setCloseObserver, clearCloseObserver, restartConversation, createPlaceholderConversation, getPendingQuestions, type ChatFile } from './claude.js';
 import { listSessions, readSessionMessages, deleteSession, renameSession, listAllRecentSessions } from './history.js';
 import { listMemoryFiles, updateMemoryFile, deleteMemoryFile } from './memory.js';
 import { decodeKey, parseMessage, encryptAndSend } from './encryption.js';
@@ -480,6 +480,20 @@ function handleServerMessage(msg: { type: string; [key: string]: unknown }): voi
         planMode: false,
         brainMode: resumeBrainMode,
       });
+
+      // Re-deliver any pending AskUserQuestion requests so the refreshed web client
+      // can display the question card and allow the user to answer.
+      if (convId && isSameSession) {
+        const pending = getPendingQuestions(convId);
+        for (const pq of pending) {
+          send({
+            type: 'ask_user_question',
+            conversationId: convId,
+            requestId: pq.requestId,
+            questions: pq.questions,
+          });
+        }
+      }
       break;
     }
     case 'ask_user_answer': {
