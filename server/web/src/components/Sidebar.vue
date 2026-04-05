@@ -1,6 +1,5 @@
 <script setup>
 import { inject } from 'vue';
-
 import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
@@ -618,7 +617,8 @@ const {
                   <div v-else-if="globalRecentSessions.length === 0" class="global-sessions-empty">{{ t('sidebar.noGlobalSessions') }}</div>
                   <div
                     v-else
-                    v-for="session in globalRecentSessions" :key="session.sessionId"
+                    v-for="session in globalRecentSessions"
+                    :key="session.sessionId"
                     class="global-session-item"
                     @click="resumeGlobalSession(session)"
                     :title="session.firstPrompt"

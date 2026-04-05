@@ -9,9 +9,9 @@ const store = inject('store');
 const recap = inject('recap');
 
 const {
-  currentView, messages, visibleMessages, hasMoreMessages,
+  currentView, messages,
   isProcessing, hasStreamingMessage, loadingHistory,
-  onMessageListScroll, loadMoreMessages,
+  onMessageListScroll,
 } = store;
 const { selectedDetail, detailLoading, selectedRecapId, feedEntries, recapChatActive, detailExpanded, detailHeight, onDetailResizeStart } = recap;
 
@@ -168,14 +168,11 @@ onUnmounted(() => {
       <div class="recap-chat-area">
         <MessageList
           :messages="messages"
-          :visible-messages="visibleMessages"
-          :has-more-messages="hasMoreMessages"
           :is-processing="isProcessing"
           :has-streaming-message="hasStreamingMessage"
           :loading-history="loadingHistory"
           :compact="true"
           @scroll="onMessageListScroll"
-          @load-more="loadMoreMessages"
         >
           <template #empty>
             <div class="recap-chat-empty">

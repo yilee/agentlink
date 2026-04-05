@@ -6,7 +6,7 @@ export function createFeatureHandlers(deps) {
     btwState, btwPending, setPlanMode, setBrainMode,
     workDir, workdirSwitching, sessionId,
     currentConversationId, processingConversations,
-    queuedMessages, visibleLimit, currentClaudeSessionId,
+    queuedMessages, currentClaudeSessionId,
     historySessions, memoryFiles, memoryDir, memoryPanelOpen, memoryEditing,
     sidebar, wsSend, switchConversation, toolMsgMap,
     t,
@@ -49,7 +49,6 @@ export function createFeatureHandlers(deps) {
           messages.value = [];
           queuedMessages.value = [];
           toolMsgMap.clear();
-          visibleLimit.value = 50;
           streaming.setMessageIdCounter(0);
           streaming.setStreamingMessageId(null);
           streaming.reset();

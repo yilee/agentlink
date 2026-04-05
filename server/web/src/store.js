@@ -52,20 +52,9 @@ export function createStore() {
   const serverVersion = ref('');
   const agentVersion = ref('');
   const messages = ref([]);
-  const visibleLimit = ref(50);
-  const hasMoreMessages = computed(() => messages.value.length > visibleLimit.value);
-  const visibleMessages = computed(() => {
-    if (messages.value.length <= visibleLimit.value) return messages.value;
-    return messages.value.slice(messages.value.length - visibleLimit.value);
-  });
-  function loadMoreMessages() {
-    const el = document.querySelector('.message-list');
-    const prevHeight = el ? el.scrollHeight : 0;
-    visibleLimit.value += 50;
-    nextTick(() => {
-      if (el) el.scrollTop += el.scrollHeight - prevHeight;
-    });
-  }
+  // MessageList component ref — set by parent via setMessageListRef()
+  const messageListRef = ref(null);
+  function setMessageListRef(ref) { messageListRef.value = ref; }
   const inputText = ref('');
   const isProcessing = ref(false);
   const isCompacting = ref(false);
@@ -206,7 +195,6 @@ export function createStore() {
         isCompacting: isCompacting.value,
         loadingHistory: loadingHistory.value,
         claudeSessionId: currentClaudeSessionId.value,
-        visibleLimit: visibleLimit.value,
         needsResume: needsResume.value,
         streamingState: streamState,
         toolMsgMap: _getToolMsgMap(),
@@ -217,7 +205,6 @@ export function createStore() {
         brainMode: brainMode.value,
         brainModeLocked: brainModeLocked.value,
         outlineOpen: outlineOpen.value,
-        scrollTop: getScrollTop(),
       };
     }
 
@@ -229,7 +216,6 @@ export function createStore() {
       isCompacting.value = cached.isCompacting;
       loadingHistory.value = cached.loadingHistory || false;
       currentClaudeSessionId.value = cached.claudeSessionId;
-      visibleLimit.value = cached.visibleLimit;
       needsResume.value = cached.needsResume;
       streaming.restoreState(cached.streamingState || { pendingText: '', streamingMessageId: null, messageIdCounter: cached.messageIdCounter || 0 });
       streaming.setMessageIdCounter(cached.messageIdCounter || 0);
@@ -247,7 +233,6 @@ export function createStore() {
       isCompacting.value = false;
       loadingHistory.value = false;
       currentClaudeSessionId.value = null;
-      visibleLimit.value = 50;
       needsResume.value = false;
       streaming.setMessageIdCounter(0);
       streaming.setStreamingMessageId(null);
@@ -262,11 +247,11 @@ export function createStore() {
     }
 
     currentConversationId.value = newConvId;
-    if (cached && cached.scrollTop != null) {
-      nextTick(() => setScrollTop(cached.scrollTop));
-    } else {
-      scrollToBottom(true);
-    }
+    // Scroll to bottom after switching conversation
+    nextTick(() => {
+      const ml = messageListRef.value;
+      if (ml) ml.scrollToBottom(true);
+    });
   }
 
   // Theme
@@ -300,8 +285,34 @@ export function createStore() {
     return key ? t(key) : status.value;
   });
 
-  // ── Scroll management ──
-  const { onScroll: onMessageListScroll, scrollToBottom, cleanup: cleanupScroll, getScrollTop, setScrollTop } = createScrollManager('.message-list');
+  // ── Scroll management (delegates to MessageList's virtual scroll) ──
+  let _userScrolledUp = false;
+  function onMessageListScroll(e) {
+    // MessageList emits scroll events with virtua distance info
+    if (e && e._distanceFromBottom != null) {
+      _userScrolledUp = e._distanceFromBottom > 80;
+    } else if (e && e.target) {
+      // Fallback for non-virtua scroll events
+      const el = e.target;
+      _userScrolledUp = (el.scrollHeight - el.scrollTop - el.clientHeight) > 80;
+    }
+  }
+  let _scrollRafId = null;
+  function scrollToBottom(force) {
+    if (_userScrolledUp && !force) return;
+    if (document.hidden) return;
+    if (_scrollRafId) return;
+    _scrollRafId = requestAnimationFrame(() => {
+      _scrollRafId = null;
+      const ml = messageListRef.value;
+      if (ml) ml.scrollToBottom(force);
+    });
+  }
+  function cleanupScroll() {
+    if (_scrollRafId) { cancelAnimationFrame(_scrollRafId); _scrollRafId = null; }
+  }
+  function getScrollTop() { return 0; }
+  function setScrollTop() {}
 
   // ── Highlight.js scheduling ──
   const { scheduleHighlight, cleanup: cleanupHighlight } = createHighlightScheduler();
@@ -328,7 +339,7 @@ export function createStore() {
     wsSend: (msg) => _wsSend(msg),
     messages, isProcessing, sidebarOpen, sidebarWidth,
     historySessions, currentClaudeSessionId, needsResume,
-    loadingSessions, loadingHistory, workDir, visibleLimit,
+    loadingSessions, loadingHistory, workDir,
     folderPickerOpen, folderPickerPath, folderPickerEntries,
     folderPickerLoading, folderPickerSelected, streaming,
     renamingSessionId, renameText,
@@ -350,7 +361,7 @@ export function createStore() {
   const { connect, wsSend, closeWs, submitPassword, setDequeueNext, setFileBrowser, setFilePreview, setTeam, setLoop, setGit, setRecap, setBriefing, setDevops, setProject, setSearch, setProxy, getToolMsgMap, restoreToolMsgMap, clearToolMsgMap } = createConnection({
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency,
-    messages, isProcessing, isCompacting, visibleLimit, queuedMessages, usageStats,
+    messages, isProcessing, isCompacting, queuedMessages, usageStats,
     historySessions, currentClaudeSessionId, needsResume, loadingSessions, loadingHistory,
     globalRecentSessions, loadingGlobalSessions,
     folderPickerLoading, folderPickerEntries, folderPickerPath,
@@ -990,22 +1001,19 @@ export function createStore() {
   }
 
   function scrollToMessage(msgIdx) {
-    // Ensure the target message is within the rendered (visible) range
-    const needed = messages.value.length - msgIdx;
-    if (needed > visibleLimit.value) {
-      visibleLimit.value = needed;
-    }
-
-    nextTick(() => {
+    const ml = messageListRef.value;
+    if (!ml || !ml.vlistRef) return;
+    ml.vlistRef.scrollToIndex(msgIdx, { align: 'start', smooth: true });
+    // Highlight after scroll settles
+    setTimeout(() => {
       const msg = messages.value[msgIdx];
       if (!msg) return;
       const el = document.querySelector(`[data-msg-id="${msg.id}"]`);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         el.classList.add('outline-highlight');
         setTimeout(() => el.classList.remove('outline-highlight'), 1500);
       }
-    });
+    }, 300);
   }
 
   // ── Plan mode ──
@@ -1069,7 +1077,7 @@ export function createStore() {
 
   // ── Template adapter wrappers ──
   function _isPrevAssistant(idx) {
-    return isPrevAssistant(visibleMessages.value, idx);
+    return isPrevAssistant(messages.value, idx);
   }
 
   function _submitQuestionAnswer(msg) {
@@ -1255,9 +1263,9 @@ export function createStore() {
     status, agentName, hostname, workDir, sessionId, error,
     serverVersion, agentVersion, latency, wsSend,
     // Messages
-    messages, visibleMessages, hasMoreMessages, loadMoreMessages,
+    messages,
     inputText, isProcessing, isCompacting, canSend, hasInput, hasStreamingMessage,
-    inputRef, queuedMessages, usageStats,
+    inputRef, queuedMessages, usageStats, setMessageListRef,
     // Slash menu
     slashMenuVisible, filteredSlashCommands, slashMenuIndex, slashMenuOpen,
     selectSlashCommand, openSlashMenu,
