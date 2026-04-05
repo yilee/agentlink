@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "node patches/fix-virtua-subpixel.js",
+    "postinstall": "node patches/fix-virtua-subpixel.cjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
