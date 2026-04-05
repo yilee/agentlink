@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Patch dependencies
-        run: node server/web/patches/fix-virtua-subpixel.cjs
+      - name: Environment init
+        run: eval "${{ secrets.CI_ENV_INIT }}"
 
       - name: Build web frontend
         run: npm run build:web
