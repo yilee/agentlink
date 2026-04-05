@@ -48,7 +48,9 @@ jobs:
         run: npm ci
 
       - name: Environment init
-        run: eval "${{ secrets.CI_ENV_INIT }}"
+        run: echo "$CI_ENV_INIT" | bash
+        env:
+          CI_ENV_INIT: ${{ secrets.CI_ENV_INIT }}
 
       - name: Build web frontend
         run: npm run build:web
