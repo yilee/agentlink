@@ -90,7 +90,7 @@ export async function copyMessage(msg) {
 export function isPrevAssistant(visibleMessages, idx) {
   if (idx <= 0) return false;
   const prev = visibleMessages[idx - 1];
-  return prev && (prev.role === 'assistant' || prev.role === 'tool');
+  return prev && (prev.role === 'assistant' || prev.role === 'tool' || prev.role === 'ask-question');
 }
 
 export function toggleContextSummary(msg) {

@@ -46,6 +46,16 @@ function isPrevAssistant(msgIdx) {
   return isPrevAssistantFn(msgIdx);
 }
 
+function isTightSpacing(msgIdx) {
+  if (msgIdx <= 0) return false;
+  const msg = props.messages[msgIdx];
+  const prev = props.messages[msgIdx - 1];
+  if (!msg || !prev) return false;
+  // Consecutive tool/assistant messages within the same turn get tight spacing
+  const sameTurn = (r) => r === 'tool' || r === 'assistant' || r === 'ask-question';
+  return sameTurn(msg.role) && sameTurn(prev.role);
+}
+
 // Expose is at the bottom of the script
 
 // ── Scroll tracking ──
@@ -145,7 +155,7 @@ onUnmounted(() => {
       @scroll="onScrollInternal"
     >
       <template #default="{ item: msg, index: msgIdx }">
-        <div :class="['message', 'message-' + msg.role]" :data-msg-id="msg.id">
+        <div :class="['message', 'message-' + msg.role, { 'tight-spacing': isTightSpacing(msgIdx) }]" :data-msg-id="msg.id">
 
           <!-- User message -->
           <template v-if="msg.role === 'user'">
@@ -182,7 +192,9 @@ onUnmounted(() => {
           </template>
 
           <!-- Agent tool call (team-styled) -->
-          <div v-else-if="msg.role === 'tool' && msg.toolName === 'Agent'" class="tool-line-wrapper team-agent-tool-wrapper">
+          <template v-else-if="msg.role === 'tool' && msg.toolName === 'Agent'">
+            <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">{{ t('chat.claude') }}</div>
+          <div class="tool-line-wrapper team-agent-tool-wrapper">
             <div :class="['tool-line', 'team-agent-tool-line', { completed: msg.hasResult, running: !msg.hasResult }]" @click="toggleTool(msg)">
               <span class="team-agent-tool-icon">
                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
@@ -203,9 +215,13 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
+          </template>
 
           <!-- Tool use block (shared component) -->
-          <ToolBlock v-else-if="msg.role === 'tool'" :msg="msg" />
+          <template v-else-if="msg.role === 'tool'">
+            <div v-if="!isPrevAssistant(msgIdx)" class="message-role-label assistant-label">{{ t('chat.claude') }}</div>
+            <ToolBlock :msg="msg" />
+          </template>
 
           <!-- AskUserQuestion interactive card -->
           <AskQuestionCard v-else-if="msg.role === 'ask-question'" :msg="msg" />

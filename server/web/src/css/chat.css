@@ -55,8 +55,23 @@
 }
 
 .message-user,
-.message-assistant {
+.message-assistant,
+.message-tool {
   margin-top: 1.25rem;
+}
+
+.message-tool + .message-tool {
+  margin-top: 0.25rem;
+}
+
+.message-tool + .message-assistant {
+  margin-top: 0.25rem;
+}
+
+/* VList wraps each item — adjacent sibling selectors above are kept as
+   fallback, but .tight-spacing is applied via JS for virtual-scrolled lists */
+.tight-spacing {
+  margin-top: 0.25rem !important;
 }
 
 .message-role-label {
