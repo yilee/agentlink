@@ -49,3 +49,4 @@ test/e2e-workdir/*
 !test/e2e-workdir/.gitkeep
 
 CLAUDE.md
+PIPELINE.md
