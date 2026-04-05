@@ -1,8 +1,10 @@
 <script setup>
-import { inject } from 'vue';
+import { ref, inject } from 'vue';
 import ToolBlock from './ToolBlock.vue';
 import AskQuestionCard from './AskQuestionCard.vue';
+import { useFilePathClick } from '../composables/useFilePathClick.js';
 
+const messageListRef = ref(null);
 
 const props = defineProps({
   messages: { type: Array, required: true },
@@ -19,6 +21,7 @@ const emit = defineEmits(['scroll', 'load-more']);
 
 const store = inject('store');
 const teamStore = inject('team');
+const filesStore = inject('files');
 const {
   t,
   status,
@@ -36,6 +39,9 @@ const {
 
 const { teamState: team } = teamStore;
 
+// Clickable file paths in messages
+useFilePathClick(messageListRef, filesStore.filePreview.openPreview);
+
 function isPrevAssistant(msgIdx) {
   // isPrevAssistant from store checks against the full visibleMessages list,
   // but we receive visibleMessages as a prop. Delegate to store function which
@@ -46,7 +52,7 @@ function isPrevAssistant(msgIdx) {
 </script>
 
 <template>
-  <div :class="['message-list', { compact }]" @scroll="emit('scroll', $event)">
+  <div ref="messageListRef" :class="['message-list', { compact }]" @scroll="emit('scroll', $event)">
     <div class="message-list-inner">
       <div v-if="messages.length === 0 && status === 'Connected' && !loadingHistory && showEmptyState" class="empty-state">
         <slot name="empty">

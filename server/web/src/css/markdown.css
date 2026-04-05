@@ -65,6 +65,19 @@
   font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
 }
 
+/* Clickable file path detection — hover state added dynamically by useFilePathClick */
+.file-path-clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+  color: #7aafe0;
+}
+
+[data-theme="light"] .file-path-clickable {
+  color: #2563eb;
+}
+
 .markdown-body pre {
   margin: 0.5em 0;
   overflow-x: auto;

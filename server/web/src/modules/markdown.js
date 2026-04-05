@@ -2,9 +2,17 @@
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 
+const renderer = new marked.Renderer();
+const _origLink = renderer.link.bind(renderer);
+renderer.link = function(token) {
+  const html = _origLink(token);
+  return html.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+};
+
 marked.setOptions({
   breaks: true,
   gfm: true,
+  renderer,
   highlight: function(code, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try { return hljs.highlight(code, { language: lang }).value; } catch {}
