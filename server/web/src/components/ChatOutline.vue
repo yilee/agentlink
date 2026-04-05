@@ -87,7 +87,7 @@ function onItemClick(item) {
 }
 
 function onSearchResultClick(item) {
-  scrollToMessage(item.msgIdx);
+  scrollToMessage(item.msgIdx, chatSearch.messageSearchQuery.value);
   toggleOutline();
 }
 

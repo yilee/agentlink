@@ -1007,7 +1007,7 @@ export function createStore() {
     outlineOpen.value = !outlineOpen.value;
   }
 
-  function scrollToMessage(msgIdx) {
+  function scrollToMessage(msgIdx, keyword) {
     const ml = messageListRef.value;
     if (!ml || !ml.vlistRef) return;
     ml.vlistRef.scrollToIndex(msgIdx, { align: 'start', smooth: true });
@@ -1019,8 +1019,34 @@ export function createStore() {
       if (el) {
         el.classList.add('outline-highlight');
         setTimeout(() => el.classList.remove('outline-highlight'), 1500);
+        if (keyword) highlightKeyword(el, keyword);
       }
     }, 300);
+  }
+
+  /** Walk text nodes inside el, wrap first occurrence of keyword in a <mark> that fades out. */
+  function highlightKeyword(el, keyword) {
+    const lc = keyword.toLowerCase();
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const idx = node.textContent.toLowerCase().indexOf(lc);
+      if (idx === -1) continue;
+      const range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + keyword.length);
+      const mark = document.createElement('mark');
+      mark.className = 'search-keyword-highlight';
+      range.surroundContents(mark);
+      setTimeout(() => {
+        mark.classList.add('fade-out');
+        setTimeout(() => {
+          const parent = mark.parentNode;
+          if (parent) { parent.replaceChild(document.createTextNode(mark.textContent), mark); parent.normalize(); }
+        }, 2000);
+      }, 1000);
+      break;
+    }
   }
 
   // ── Plan mode ──

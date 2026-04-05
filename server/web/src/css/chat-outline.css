@@ -149,6 +149,18 @@
   border-radius: 4px;
 }
 
+/* Keyword highlight (yellow marker) on search-result scroll */
+.search-keyword-highlight {
+  background-color: rgba(255, 213, 0, 0.4);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  transition: background-color 1.5s ease-out;
+}
+.search-keyword-highlight.fade-out {
+  background-color: transparent;
+}
+
 /* ── In-conversation search (inside Outline panel) ── */
 
 .chat-outline-search {
