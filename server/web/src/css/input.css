@@ -13,9 +13,9 @@
   margin: 0 auto 4px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 4px 0;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-md);
 }
 
 .slash-menu-item {
@@ -49,15 +49,15 @@
   margin: 0 auto;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 0.5rem;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-  transition: border-color 0.2s;
+  box-shadow: var(--shadow-md);
+  transition: border-color var(--transition-normal);
 }
 
 .input-card:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 2px 16px rgba(107, 159, 206, 0.1);
+  box-shadow: var(--shadow-md), 0 0 0 2px rgba(107, 159, 206, 0.15);
 }
 
 .input-card textarea {
@@ -96,7 +96,7 @@
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   width: 32px;
   height: 32px;
   font-size: 0.9rem;
@@ -105,7 +105,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, opacity 0.15s;
+  transition: background var(--transition-fast), opacity var(--transition-fast);
 }
 
 .send-btn:hover:not(:disabled) {
@@ -115,6 +115,10 @@
 .send-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+.send-btn:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 /* ── Stop button ── */
@@ -264,10 +268,10 @@
   height: 520px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
 }
 
 .folder-picker-header {

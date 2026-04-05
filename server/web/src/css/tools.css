@@ -57,12 +57,7 @@
   text-decoration: underline;
   text-decoration-style: dashed;
   text-underline-offset: 2px;
-  color: #7aafe0;
-}
-
-[data-theme="light"] .tool-summary.file-path-clickable,
-[data-theme="light"] .diff-file.file-path-clickable {
-  color: #2563eb;
+  color: var(--accent);
 }
 
 .tool-status-icon {
@@ -118,7 +113,7 @@
 
 .tool-block {
   background: var(--bg-secondary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 0.4rem 0.6rem;
   margin-top: 0.25rem;
   overflow-x: auto;
@@ -254,7 +249,7 @@
 /* ── Edit tool diff view ── */
 .tool-diff {
   background: var(--bg-secondary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 0.4rem 0.6rem;
   margin-top: 0.25rem;
   overflow-x: auto;
