@@ -587,16 +587,19 @@ const {
                 </div>
               </div>
               <div class="workdir-history">
-                <div class="workdir-history-label">
-                  <span>{{ t('sidebar.recent') }}</span>
-                  <div class="recent-tab-toggle">
+                <div class="workdir-history-label" @click.stop="workdirCollapsed = !workdirCollapsed">
+                  <span class="workdir-history-label-left">
+                    <svg :class="['workdir-history-chevron', { collapsed: workdirCollapsed }]" viewBox="0 0 24 24" width="12" height="12"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+                    {{ t('sidebar.recent') }}
+                  </span>
+                  <div v-show="!workdirCollapsed" class="recent-tab-toggle" @click.stop>
                     <button :class="['recent-tab-btn', { active: recentTab === 'dirs' }]" @click.stop="switchRecentTab('dirs')">{{ t('sidebar.dirs') }}</button>
                     <button :class="['recent-tab-btn', { active: recentTab === 'sessions' }]" @click.stop="switchRecentTab('sessions')">{{ t('sidebar.globalSessions') }}</button>
                   </div>
                 </div>
 
                 <!-- Dirs tab -->
-                <div v-if="recentTab === 'dirs'" class="workdir-history-list">
+                <div v-show="!workdirCollapsed" v-if="recentTab === 'dirs'" class="workdir-history-list">
                   <div
                     v-for="path in filteredWorkdirHistory" :key="path"
                     class="workdir-history-item"
@@ -612,7 +615,7 @@ const {
                 </div>
 
                 <!-- Sessions tab -->
-                <div v-if="recentTab === 'sessions'" class="global-sessions-list">
+                <div v-show="!workdirCollapsed" v-if="recentTab === 'sessions'" class="global-sessions-list">
                   <div v-if="loadingGlobalSessions" class="global-sessions-loading">{{ t('sidebar.loadingGlobalSessions') }}</div>
                   <div v-else-if="globalRecentSessions.length === 0" class="global-sessions-empty">{{ t('sidebar.noGlobalSessions') }}</div>
                   <div
