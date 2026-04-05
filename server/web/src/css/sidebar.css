@@ -65,7 +65,7 @@
 .sidebar-workdir-path {
   font-size: 0.8rem;
   color: var(--text-primary);
-  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -122,7 +122,7 @@
 .workdir-history-path {
   font-size: 0.72rem;
   color: var(--text-secondary);
-  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

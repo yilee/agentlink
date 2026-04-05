@@ -25,15 +25,6 @@
   padding: 1.5rem 1.5rem 1rem;
 }
 
-.message-list-inner {
-  max-width: 768px;
-  width: 100%;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
 .empty-state {
   flex: 1;
   display: flex;
@@ -58,6 +49,9 @@
 .message {
   display: flex;
   flex-direction: column;
+  max-width: var(--chat-max-width);
+  width: 100%;
+  margin: 0 auto;
 }
 
 .message-user {
@@ -97,7 +91,7 @@
 
 /* ── Queue bar (pending messages above input) ── */
 .queue-bar {
-  max-width: 768px;
+  max-width: var(--chat-max-width);
   margin: 0 auto 6px;
   display: flex;
   flex-direction: column;
@@ -162,7 +156,7 @@
 }
 
 .usage-bar {
-  max-width: 768px;
+  max-width: var(--chat-max-width);
   margin: 0 auto 6px;
   padding: 4px 10px;
   font-size: 0.75rem;
@@ -174,6 +168,7 @@
 .assistant-bubble {
   background: transparent;
   padding: 0.2rem 0;
+  font-family: var(--font-serif);
 }
 
 

@@ -262,7 +262,7 @@
   line-height: 1.5;
   max-height: 300px;
   overflow-y: auto;
-  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-family: var(--font-mono);
 }
 
 .diff-file {

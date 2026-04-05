@@ -75,7 +75,7 @@
 .file-panel-breadcrumb {
   padding: 0.5rem 0.75rem;
   font-size: 0.75rem;
-  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-mono);
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
@@ -97,7 +97,7 @@
   gap: 6px;
   padding: 3px 8px;
   font-size: 0.8rem;
-  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-mono);
   color: var(--text-primary);
   cursor: pointer;
   user-select: none;
@@ -409,7 +409,7 @@
   white-space: pre;
   overflow-x: auto;
   background: var(--bg);
-  font-family: var(--font-mono, 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace);
+  font-family: var(--font-mono);
 }
 
 .preview-code code {

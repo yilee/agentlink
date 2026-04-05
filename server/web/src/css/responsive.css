@@ -84,9 +84,8 @@
     padding: 0.75rem 0.75rem 0.5rem;
   }
 
-  .message-list-inner {
+  .message {
     max-width: 100%;
-    min-width: 0;
   }
 
   /* Constrain message rows and bubbles */

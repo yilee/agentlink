@@ -160,7 +160,7 @@
 }
 
 .proxy-port-number {
-  font-family: var(--font-mono, 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace);
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);

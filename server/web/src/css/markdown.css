@@ -62,7 +62,7 @@
   padding: 0.15em 0.35em;
   border-radius: 3px;
   font-size: 0.85em;
-  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 /* Clickable file path detection — hover state added dynamically by useFilePathClick */
@@ -153,7 +153,7 @@
 .code-lang {
   font-size: 11px;
   color: var(--text-secondary);
-  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 .code-copy-btn {

@@ -85,7 +85,7 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 0.82rem;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
 }
 .loop-cron-input:focus {
   outline: none;
