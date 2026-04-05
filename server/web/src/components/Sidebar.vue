@@ -1,7 +1,5 @@
 <script setup>
 import { inject } from 'vue';
-import { VList } from 'virtua/vue';
-
 import SessionList from './SessionList.vue';
 import TeamList from './TeamList.vue';
 import LoopList from './LoopList.vue';
@@ -617,18 +615,17 @@ const {
                 <div v-if="recentTab === 'sessions'" class="global-sessions-list">
                   <div v-if="loadingGlobalSessions" class="global-sessions-loading">{{ t('sidebar.loadingGlobalSessions') }}</div>
                   <div v-else-if="globalRecentSessions.length === 0" class="global-sessions-empty">{{ t('sidebar.noGlobalSessions') }}</div>
-                  <VList v-else :data="globalRecentSessions" :bufferSize="5" class="global-sessions-vlist">
-                    <template #default="{ item: session }">
-                      <div
-                        class="global-session-item"
-                        @click="resumeGlobalSession(session)"
-                        :title="session.firstPrompt"
-                      >
-                        <div class="global-session-title">{{ session.title || session.firstPrompt || session.sessionId.slice(0, 8) }}</div>
-                        <div class="global-session-meta">{{ projectName(session.projectPath) }} &middot; {{ formatRelativeTime(session.lastModified) }}</div>
-                      </div>
-                    </template>
-                  </VList>
+                  <div
+                    v-else
+                    v-for="session in globalRecentSessions"
+                    :key="session.sessionId"
+                    class="global-session-item"
+                    @click="resumeGlobalSession(session)"
+                    :title="session.firstPrompt"
+                  >
+                    <div class="global-session-title">{{ session.title || session.firstPrompt || session.sessionId.slice(0, 8) }}</div>
+                    <div class="global-session-meta">{{ projectName(session.projectPath) }} &middot; {{ formatRelativeTime(session.lastModified) }}</div>
+                  </div>
                 </div>
               </div>
               </template>
