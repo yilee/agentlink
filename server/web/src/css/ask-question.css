@@ -269,6 +269,9 @@
   align-items: center;
   gap: 4px;
   padding: 0.5rem 0.9rem;
+  max-width: var(--chat-max-width);
+  width: 100%;
+  margin: 0 auto;
 }
 
 .typing-indicator span:not(.typing-label) {

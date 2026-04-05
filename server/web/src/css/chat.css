@@ -54,7 +54,8 @@
   margin: 0 auto;
 }
 
-.message-user {
+.message-user,
+.message-assistant {
   margin-top: 1.25rem;
 }
 
