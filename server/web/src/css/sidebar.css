@@ -435,8 +435,6 @@
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.15s, transform 0.1s;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 .session-item:hover {
