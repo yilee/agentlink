@@ -76,6 +76,7 @@ let _rafId = null;
 
 function scrollToBottom(force) {
   if (!_isFollowing && !force) return;
+  if (force) _isFollowing = true;
   if (!vlistRef.value) return;
   if (_rafId) return;
   _rafId = requestAnimationFrame(() => {

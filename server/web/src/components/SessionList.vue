@@ -1,5 +1,5 @@
 <script setup>
-import { inject, ref, nextTick } from 'vue';
+import { inject, ref, computed, nextTick } from 'vue';
 import { VList } from 'virtua/vue';
 
 const store = inject('store');
@@ -51,6 +51,19 @@ function onSessionSearchKeydown(e) {
     closeSessionSearch();
   }
 }
+
+// Force VList remount when session order changes (virtua only watches data.length,
+// not content — reordered items render at stale positions without this).
+const sessionListKey = computed(() => {
+  const items = sessionSearchOpen.value ? filteredFlatSessionItems.value : flatSessionItems.value;
+  let key = '';
+  for (let i = 0, n = Math.min(items.length, 8); i < n; i++) {
+    const it = items[i];
+    key += it._type === 'header' ? it.label : it.sessionId;
+    key += ',';
+  }
+  return key;
+});
 </script>
 
 <template>
@@ -96,7 +109,7 @@ function onSessionSearchKeydown(e) {
     <div v-else-if="sessionSearchOpen && filteredFlatSessionItems.length === 0" class="sidebar-empty">
       {{ t('sidebar.searchNoResults') }}
     </div>
-    <VList v-else :data="sessionSearchOpen ? filteredFlatSessionItems : flatSessionItems" :bufferSize="5" class="session-list">
+    <VList v-else :key="sessionListKey" :data="sessionSearchOpen ? filteredFlatSessionItems : flatSessionItems" :bufferSize="5" class="session-list">
       <template #default="{ item }">
         <div v-if="item._type === 'header'" class="session-group-label">{{ item.label }}</div>
         <div
