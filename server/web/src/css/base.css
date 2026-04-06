@@ -51,6 +51,8 @@
   --transition-fast: 0.12s ease;
   --transition-normal: 0.2s ease;
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ── Light theme ── */
