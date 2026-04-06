@@ -47,13 +47,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install web dependencies
+        run: cd server/web && npm install
+
       - name: Environment init
         run: echo "$CI_ENV_INIT" | bash
         env:
           CI_ENV_INIT: ${{ secrets.CI_ENV_INIT }}
 
       - name: Build web frontend
-        run: npm run build:web
+        run: cd server/web && npm run build
 
       - name: Build
         run: npm run build
